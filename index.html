@@ -116,6 +116,7 @@
         .loading.hidden {
             opacity: 0;
             visibility: hidden;
+            pointer-events: none;
         }
 
         .loading-bar {
@@ -180,39 +181,25 @@
     </div>
 
     <div class="ui-overlay tech-info">
-        <p>THREE.JS r158 · WebGL 2.0</p>
+        <p>THREE.JS · WebGL 2.0</p>
         <p>6-AXIS INDUSTRIAL ARM · IK SOLVER</p>
     </div>
 
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
-            "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
-        }
-    }
-    </script>
-
-    <script type="module">
-        import * as THREE from 'three';
-        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
         // Scene Setup
         const container = document.getElementById('canvas-container');
         const loadingEl = document.getElementById('loading');
         const loadingBarFill = document.getElementById('loading-bar-fill');
         const coordsEl = document.getElementById('coords');
 
-        let scene, camera, renderer, composer;
+        let scene, camera, renderer;
         let robotArm, targetPosition = new THREE.Vector3(0, 2, 2);
         let mousePosition = new THREE.Vector2();
         let isWelding = false;
         let weldProgress = 0;
         let particles = [];
-        let weldTrail = [];
+        let weldTrail;
         let clock = new THREE.Clock();
 
         // Logo path points for "ALBA STUDIO"
@@ -221,21 +208,20 @@
         function generateLogoPath() {
             const points = [];
             const text = "ALBA STUDIO";
-            const scale = 0.15;
-            const startX = -2.8;
-            const startY = 1.8;
+            const scale = 0.18;
+            const startX = -1.4;
+            const startY = 1.5;
 
-            // Simplified vector font paths for each letter
             const letterPaths = {
-                'A': [[0,0], [0.3,1], [0.6,0], [0.45,0.5], [0.15,0.5]],
-                'L': [[0,1], [0,0], [0.5,0]],
-                'B': [[0,0], [0,1], [0.4,1], [0.5,0.9], [0.5,0.6], [0.4,0.5], [0,0.5], [0.45,0.5], [0.55,0.35], [0.55,0.15], [0.45,0], [0,0]],
-                'S': [[0.5,0.85], [0.4,1], [0.1,1], [0,0.85], [0,0.65], [0.1,0.5], [0.4,0.5], [0.5,0.35], [0.5,0.15], [0.4,0], [0.1,0], [0,0.15]],
-                'T': [[0,1], [0.6,1], [0.3,1], [0.3,0]],
-                'U': [[0,1], [0,0.15], [0.15,0], [0.45,0], [0.6,0.15], [0.6,1]],
-                'D': [[0,0], [0,1], [0.4,1], [0.6,0.8], [0.6,0.2], [0.4,0], [0,0]],
-                'I': [[0.1,1], [0.4,1], [0.25,1], [0.25,0], [0.1,0], [0.4,0]],
-                'O': [[0.3,0], [0.1,0.15], [0,0.4], [0,0.6], [0.1,0.85], [0.3,1], [0.5,0.85], [0.6,0.6], [0.6,0.4], [0.5,0.15], [0.3,0]],
+                'A': [[0,0], [0.3,1], [0.6,0], null, [0.15,0.4], [0.45,0.4]],
+                'L': [[0,1], [0,0], [0.4,0]],
+                'B': [[0,0], [0,1], [0.35,1], [0.45,0.85], [0.45,0.65], [0.35,0.5], [0,0.5], null, [0.35,0.5], [0.5,0.35], [0.5,0.15], [0.35,0], [0,0]],
+                'S': [[0.45,0.85], [0.35,1], [0.1,1], [0,0.85], [0,0.65], [0.1,0.5], [0.35,0.5], [0.45,0.35], [0.45,0.15], [0.35,0], [0.1,0], [0,0.15]],
+                'T': [[0,1], [0.5,1], null, [0.25,1], [0.25,0]],
+                'U': [[0,1], [0,0.15], [0.1,0], [0.4,0], [0.5,0.15], [0.5,1]],
+                'D': [[0,0], [0,1], [0.3,1], [0.5,0.8], [0.5,0.2], [0.3,0], [0,0]],
+                'I': [[0,1], [0.3,1], null, [0.15,1], [0.15,0], null, [0,0], [0.3,0]],
+                'O': [[0.25,0], [0.08,0.15], [0,0.5], [0.08,0.85], [0.25,1], [0.42,0.85], [0.5,0.5], [0.42,0.15], [0.25,0]],
                 ' ': []
             };
 
@@ -243,36 +229,25 @@
 
             for (let char of text) {
                 const path = letterPaths[char] || [];
-                if (path.length > 0) {
-                    // Add pen up move to start of letter
-                    if (points.length > 0) {
-                        points.push({ x: currentX + path[0][0] * scale, y: startY + path[0][1] * scale, penUp: true });
+                let firstPoint = true;
+
+                for (let p of path) {
+                    if (p === null) {
+                        firstPoint = true;
+                        continue;
                     }
 
-                    for (let p of path) {
-                        points.push({
-                            x: currentX + p[0] * scale,
-                            y: startY + p[1] * scale,
-                            penUp: false
-                        });
-                    }
+                    points.push({
+                        x: currentX + p[0] * scale,
+                        y: startY + p[1] * scale,
+                        penUp: firstPoint
+                    });
+                    firstPoint = false;
                 }
-                currentX += (char === ' ' ? 0.3 : 0.65) * scale + 0.12;
+                currentX += (char === ' ' ? 0.25 : 0.55) * scale + 0.14;
             }
 
             return points;
-        }
-
-        // Robot Arm Segments
-        class RobotSegment {
-            constructor(length, radius, parent = null) {
-                this.length = length;
-                this.radius = radius;
-                this.parent = parent;
-                this.angle = 0;
-                this.mesh = null;
-                this.joint = null;
-            }
         }
 
         class RoboticArm {
@@ -283,8 +258,15 @@
                 this.weldPoint = new THREE.Vector3();
                 this.laserBeam = null;
                 this.laserActive = false;
-
                 this.createArm();
+            }
+
+            createMetalMaterial(color) {
+                return new THREE.MeshStandardMaterial({
+                    color: color,
+                    metalness: 0.85,
+                    roughness: 0.25
+                });
             }
 
             createArm() {
@@ -294,128 +276,100 @@
                 const base = new THREE.Mesh(baseGeo, baseMat);
                 base.position.y = 0.15;
                 base.castShadow = true;
-                base.receiveShadow = true;
                 this.group.add(base);
 
                 // Rotating platform
                 const platformGeo = new THREE.CylinderGeometry(0.4, 0.45, 0.15, 32);
                 const platformMat = this.createMetalMaterial(0xff6b35);
-                const platform = new THREE.Mesh(platformGeo, platformMat);
-                platform.position.y = 0.375;
-                platform.castShadow = true;
-                this.group.add(platform);
-                this.basePlatform = platform;
+                this.basePlatform = new THREE.Mesh(platformGeo, platformMat);
+                this.basePlatform.position.y = 0.375;
+                this.basePlatform.castShadow = true;
+                this.group.add(this.basePlatform);
 
-                // Segment 1 - Lower arm
-                const seg1 = this.createSegment(1.2, 0.15, 0x3a3a3a);
-                seg1.group.position.y = 0.45;
-                this.basePlatform.add(seg1.group);
-                this.segments.push(seg1);
+                // Segments
+                const segmentConfigs = [
+                    { length: 1.2, radius: 0.15 },
+                    { length: 1.0, radius: 0.12 },
+                    { length: 0.7, radius: 0.1 },
+                    { length: 0.4, radius: 0.08 }
+                ];
 
-                // Segment 2 - Upper arm
-                const seg2 = this.createSegment(1.0, 0.12, 0x3a3a3a);
-                seg2.group.position.y = seg1.length;
-                seg1.group.add(seg2.group);
-                this.segments.push(seg2);
+                let parent = this.basePlatform;
+                let yOffset = 0.075;
 
-                // Segment 3 - Forearm
-                const seg3 = this.createSegment(0.7, 0.1, 0x3a3a3a);
-                seg3.group.position.y = seg2.length;
-                seg2.group.add(seg3.group);
-                this.segments.push(seg3);
+                segmentConfigs.forEach((config, i) => {
+                    const seg = this.createSegment(config.length, config.radius);
+                    seg.group.position.y = yOffset;
+                    parent.add(seg.group);
+                    this.segments.push(seg);
+                    parent = seg.group;
+                    yOffset = config.length;
+                });
 
-                // Segment 4 - Wrist
-                const seg4 = this.createSegment(0.4, 0.08, 0x3a3a3a);
-                seg4.group.position.y = seg3.length;
-                seg3.group.add(seg4.group);
-                this.segments.push(seg4);
-
-                // End effector (Welding torch)
-                this.createEndEffector(seg4);
-
-                // Laser beam
+                this.createEndEffector();
                 this.createLaserBeam();
             }
 
-            createMetalMaterial(color) {
-                return new THREE.MeshStandardMaterial({
-                    color: color,
-                    metalness: 0.9,
-                    roughness: 0.3,
-                    envMapIntensity: 1.0
-                });
-            }
+            createSegment(length, radius) {
+                const segment = { length, radius, group: new THREE.Group() };
 
-            createSegment(length, radius, color) {
-                const segment = { length, radius, group: new THREE.Group(), angle: 0 };
-
-                // Joint sphere
-                const jointGeo = new THREE.SphereGeometry(radius * 1.4, 16, 16);
+                // Joint
+                const jointGeo = new THREE.SphereGeometry(radius * 1.3, 16, 16);
                 const jointMat = this.createMetalMaterial(0xff6b35);
                 const joint = new THREE.Mesh(jointGeo, jointMat);
                 joint.castShadow = true;
                 segment.group.add(joint);
 
-                // Arm cylinder
-                const armGeo = new THREE.CylinderGeometry(radius, radius * 0.9, length, 16);
-                const armMat = this.createMetalMaterial(color);
+                // Arm
+                const armGeo = new THREE.CylinderGeometry(radius * 0.9, radius, length, 16);
+                const armMat = this.createMetalMaterial(0x3a3a3a);
                 const arm = new THREE.Mesh(armGeo, armMat);
                 arm.position.y = length / 2;
                 arm.castShadow = true;
                 segment.group.add(arm);
 
-                // Hydraulic details
-                const hydraulicGeo = new THREE.CylinderGeometry(radius * 0.3, radius * 0.3, length * 0.7, 8);
-                const hydraulicMat = this.createMetalMaterial(0x1a1a1a);
-                const hydraulic = new THREE.Mesh(hydraulicGeo, hydraulicMat);
-                hydraulic.position.set(radius * 0.8, length * 0.4, 0);
-                hydraulic.castShadow = true;
-                segment.group.add(hydraulic);
-
-                // Cable bundle
-                const cableGeo = new THREE.TorusGeometry(radius * 0.5, 0.02, 8, 16, Math.PI);
-                const cableMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.3, roughness: 0.8 });
-                const cable = new THREE.Mesh(cableGeo, cableMat);
-                cable.position.set(-radius * 0.6, length * 0.3, 0);
-                cable.rotation.z = Math.PI / 2;
-                segment.group.add(cable);
+                // Hydraulic detail
+                const hydGeo = new THREE.CylinderGeometry(radius * 0.25, radius * 0.25, length * 0.6, 8);
+                const hydMat = this.createMetalMaterial(0x1a1a1a);
+                const hyd = new THREE.Mesh(hydGeo, hydMat);
+                hyd.position.set(radius * 0.7, length * 0.35, 0);
+                segment.group.add(hyd);
 
                 return segment;
             }
 
-            createEndEffector(parentSegment) {
-                const effectorGroup = new THREE.Group();
-                effectorGroup.position.y = parentSegment.length;
+            createEndEffector() {
+                const lastSeg = this.segments[this.segments.length - 1];
+                const effector = new THREE.Group();
+                effector.position.y = lastSeg.length;
 
                 // Torch body
-                const torchGeo = new THREE.CylinderGeometry(0.06, 0.08, 0.25, 16);
+                const torchGeo = new THREE.CylinderGeometry(0.05, 0.07, 0.2, 16);
                 const torchMat = this.createMetalMaterial(0x2a2a2a);
                 const torch = new THREE.Mesh(torchGeo, torchMat);
-                torch.castShadow = true;
-                effectorGroup.add(torch);
+                effector.add(torch);
 
-                // Torch nozzle
-                const nozzleGeo = new THREE.ConeGeometry(0.04, 0.15, 16);
+                // Nozzle
+                const nozzleGeo = new THREE.ConeGeometry(0.035, 0.12, 16);
                 const nozzleMat = this.createMetalMaterial(0xcc5500);
                 const nozzle = new THREE.Mesh(nozzleGeo, nozzleMat);
-                nozzle.position.y = -0.2;
+                nozzle.position.y = -0.16;
                 nozzle.rotation.x = Math.PI;
-                nozzle.castShadow = true;
-                effectorGroup.add(nozzle);
+                effector.add(nozzle);
 
                 // Glowing tip
-                const tipGeo = new THREE.SphereGeometry(0.025, 16, 16);
+                const tipGeo = new THREE.SphereGeometry(0.02, 16, 16);
                 const tipMat = new THREE.MeshBasicMaterial({ color: 0xff4400 });
                 this.weldTip = new THREE.Mesh(tipGeo, tipMat);
-                this.weldTip.position.y = -0.28;
-                effectorGroup.add(this.weldTip);
+                this.weldTip.position.y = -0.22;
+                effector.add(this.weldTip);
 
-                parentSegment.group.add(effectorGroup);
-                this.effectorGroup = effectorGroup;
+                lastSeg.group.add(effector);
+                this.effectorGroup = effector;
             }
 
             createLaserBeam() {
-                const laserGeo = new THREE.CylinderGeometry(0.008, 0.015, 1, 8);
+                const laserGeo = new THREE.CylinderGeometry(0.006, 0.012, 1, 8);
                 const laserMat = new THREE.MeshBasicMaterial({
                     color: 0xff6600,
                     transparent: true,
@@ -425,56 +379,41 @@
                 this.laserBeam.visible = false;
                 this.group.add(this.laserBeam);
 
-                // Laser glow
-                const glowGeo = new THREE.CylinderGeometry(0.02, 0.04, 1, 8);
+                // Glow
+                const glowGeo = new THREE.CylinderGeometry(0.015, 0.03, 1, 8);
                 const glowMat = new THREE.MeshBasicMaterial({
                     color: 0xff4400,
                     transparent: true,
-                    opacity: 0.3
+                    opacity: 0.4
                 });
                 this.laserGlow = new THREE.Mesh(glowGeo, glowMat);
                 this.laserBeam.add(this.laserGlow);
             }
 
             solveIK(target) {
-                // FABRIK-inspired IK solver for robot arm
                 const basePos = new THREE.Vector3(0, 0.45, 0);
-                const direction = target.clone().sub(basePos);
+                const dir = target.clone().sub(basePos);
 
-                // Base rotation (Y axis)
-                const baseAngle = Math.atan2(direction.x, direction.z);
-                this.basePlatform.rotation.y = baseAngle;
+                // Base Y rotation
+                this.basePlatform.rotation.y = Math.atan2(dir.x, dir.z);
 
-                // Calculate reach in the YZ plane relative to base rotation
-                const horizontalDist = Math.sqrt(direction.x * direction.x + direction.z * direction.z);
-                const verticalDist = direction.y;
-                const totalDist = Math.sqrt(horizontalDist * horizontalDist + verticalDist * verticalDist);
+                // Calculate distances
+                const hDist = Math.sqrt(dir.x * dir.x + dir.z * dir.z);
+                const vDist = dir.y;
+                const totalDist = Math.sqrt(hDist * hDist + vDist * vDist);
 
-                // Segment lengths
-                const L1 = 1.2, L2 = 1.0, L3 = 0.7, L4 = 0.4;
-                const totalLength = L1 + L2 + L3 + L4;
-                const clampedDist = Math.min(totalDist, totalLength * 0.95);
+                const totalLen = 3.3;
+                const ratio = Math.min(totalDist / totalLen, 0.92);
+                const reachAngle = Math.atan2(vDist, hDist);
 
-                // Simple analytical IK for main angles
-                const reachAngle = Math.atan2(verticalDist, horizontalDist);
-                const reachRatio = clampedDist / totalLength;
+                const base = Math.PI / 2 - reachAngle * 0.55;
 
-                // Distribute angles across segments
-                const baseReach = Math.PI / 2 - reachAngle * 0.6;
+                this.segments[0].group.rotation.x = -base + ratio * 0.25;
+                this.segments[1].group.rotation.x = -0.25 + ratio * 0.45;
+                this.segments[2].group.rotation.x = 0.15 - ratio * 0.25;
+                this.segments[3].group.rotation.x = 0.35 - ratio * 0.15;
 
-                this.segments[0].group.rotation.x = -baseReach + reachRatio * 0.3;
-                this.segments[1].group.rotation.x = -0.3 + reachRatio * 0.5;
-                this.segments[2].group.rotation.x = 0.2 - reachRatio * 0.3;
-                this.segments[3].group.rotation.x = 0.4 - reachRatio * 0.2;
-
-                // Update end effector world position
-                this.updateEndEffectorPosition();
-            }
-
-            updateEndEffectorPosition() {
-                const worldPos = new THREE.Vector3();
-                this.weldTip.getWorldPosition(worldPos);
-                this.endEffector.copy(worldPos);
+                this.weldTip.getWorldPosition(this.endEffector);
             }
 
             setLaserActive(active, targetPoint) {
@@ -484,7 +423,6 @@
                 if (active && targetPoint) {
                     this.weldPoint.copy(targetPoint);
                     this.weldTip.material.color.setHex(0xffff00);
-                    this.weldTip.material.emissive = new THREE.Color(0xff6600);
                 } else {
                     this.weldTip.material.color.setHex(0xff4400);
                 }
@@ -496,90 +434,92 @@
                 const start = this.endEffector.clone();
                 const end = this.weldPoint.clone();
                 const mid = start.clone().add(end).multiplyScalar(0.5);
-                const length = start.distanceTo(end);
+                const len = start.distanceTo(end);
 
                 this.laserBeam.position.copy(mid);
                 this.laserBeam.lookAt(end);
                 this.laserBeam.rotation.x += Math.PI / 2;
-                this.laserBeam.scale.y = length;
+                this.laserBeam.scale.y = Math.max(len, 0.01);
 
-                // Flicker effect
-                const flicker = 0.7 + Math.random() * 0.3;
-                this.laserBeam.material.opacity = flicker;
+                this.laserBeam.material.opacity = 0.7 + Math.random() * 0.3;
             }
         }
 
-        // Particle System for Welding Sparks
         class SparkParticle {
-            constructor(position, velocity, life) {
-                this.position = position.clone();
-                this.velocity = velocity.clone();
+            constructor(pos, vel, life) {
+                this.pos = pos.clone();
+                this.vel = vel.clone();
                 this.life = life;
                 this.maxLife = life;
-                this.size = 0.02 + Math.random() * 0.03;
 
-                const geo = new THREE.SphereGeometry(this.size, 4, 4);
+                const geo = new THREE.SphereGeometry(0.015 + Math.random() * 0.02, 4, 4);
                 const mat = new THREE.MeshBasicMaterial({
-                    color: new THREE.Color().setHSL(0.08 + Math.random() * 0.05, 1, 0.5 + Math.random() * 0.5),
+                    color: new THREE.Color().setHSL(0.07 + Math.random() * 0.06, 1, 0.5 + Math.random() * 0.5),
                     transparent: true
                 });
                 this.mesh = new THREE.Mesh(geo, mat);
-                this.mesh.position.copy(position);
+                this.mesh.position.copy(pos);
             }
 
-            update(delta) {
-                this.life -= delta;
-                this.velocity.y -= 9.8 * delta; // gravity
-                this.position.add(this.velocity.clone().multiplyScalar(delta));
-                this.mesh.position.copy(this.position);
+            update(dt) {
+                this.life -= dt;
+                this.vel.y -= 12 * dt;
+                this.pos.add(this.vel.clone().multiplyScalar(dt));
+                this.mesh.position.copy(this.pos);
 
-                const lifeRatio = this.life / this.maxLife;
-                this.mesh.material.opacity = lifeRatio;
-                this.mesh.scale.setScalar(lifeRatio);
+                const ratio = Math.max(this.life / this.maxLife, 0);
+                this.mesh.material.opacity = ratio;
+                this.mesh.scale.setScalar(ratio);
 
                 return this.life > 0;
             }
+
+            dispose() {
+                this.mesh.geometry.dispose();
+                this.mesh.material.dispose();
+            }
         }
 
-        // Weld Trail
         class WeldTrail {
-            constructor(scene) {
+            constructor(scn) {
                 this.points = [];
-                this.line = null;
-                this.scene = scene;
+                this.mesh = null;
+                this.scene = scn;
             }
 
-            addPoint(point) {
-                this.points.push(point.clone());
-                this.updateGeometry();
+            addPoint(pt) {
+                if (this.points.length > 0) {
+                    const last = this.points[this.points.length - 1];
+                    if (pt.distanceTo(last) < 0.01) return;
+                }
+                this.points.push(pt.clone());
+                this.updateGeo();
             }
 
-            updateGeometry() {
-                if (this.line) {
-                    this.scene.remove(this.line);
-                    this.line.geometry.dispose();
+            updateGeo() {
+                if (this.mesh) {
+                    this.scene.remove(this.mesh);
+                    this.mesh.geometry.dispose();
                 }
 
                 if (this.points.length < 2) return;
 
                 const curve = new THREE.CatmullRomCurve3(this.points);
-                const tubeGeo = new THREE.TubeGeometry(curve, this.points.length * 2, 0.012, 8, false);
-                const tubeMat = new THREE.MeshStandardMaterial({
+                const geo = new THREE.TubeGeometry(curve, this.points.length * 3, 0.01, 6, false);
+                const mat = new THREE.MeshBasicMaterial({
                     color: 0xff4400,
-                    emissive: 0xff2200,
-                    emissiveIntensity: 0.5,
-                    metalness: 0.8,
-                    roughness: 0.4
+                    transparent: true,
+                    opacity: 0.9
                 });
-                this.line = new THREE.Mesh(tubeGeo, tubeMat);
-                this.scene.add(this.line);
+                this.mesh = new THREE.Mesh(geo, mat);
+                this.scene.add(this.mesh);
             }
 
             clear() {
-                if (this.line) {
-                    this.scene.remove(this.line);
-                    this.line.geometry.dispose();
-                    this.line = null;
+                if (this.mesh) {
+                    this.scene.remove(this.mesh);
+                    this.mesh.geometry.dispose();
+                    this.mesh = null;
                 }
                 this.points = [];
             }
@@ -589,12 +529,12 @@
             // Scene
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x0a0a0f);
-            scene.fog = new THREE.Fog(0x0a0a0f, 8, 25);
+            scene.fog = new THREE.Fog(0x0a0a0f, 8, 20);
 
             // Camera
             camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
-            camera.position.set(4, 3, 6);
-            camera.lookAt(0, 1.5, 0);
+            camera.position.set(3.5, 2.5, 5);
+            camera.lookAt(0, 1.2, 0);
 
             // Renderer
             renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -606,65 +546,29 @@
             renderer.toneMappingExposure = 1.2;
             container.appendChild(renderer.domElement);
 
-            // Post-processing
-            composer = new EffectComposer(renderer);
-            composer.addPass(new RenderPass(scene, camera));
-
-            const bloomPass = new UnrealBloomPass(
-                new THREE.Vector2(window.innerWidth, window.innerHeight),
-                1.5,  // strength
-                0.4,  // radius
-                0.85  // threshold
-            );
-            composer.addPass(bloomPass);
-            composer.addPass(new OutputPass());
-
             // Lights
-            const ambientLight = new THREE.AmbientLight(0x404050, 0.5);
-            scene.add(ambientLight);
+            scene.add(new THREE.AmbientLight(0x404050, 0.6));
 
-            const mainLight = new THREE.DirectionalLight(0xffffff, 2);
+            const mainLight = new THREE.DirectionalLight(0xffffff, 1.5);
             mainLight.position.set(5, 10, 5);
             mainLight.castShadow = true;
-            mainLight.shadow.mapSize.width = 2048;
-            mainLight.shadow.mapSize.height = 2048;
-            mainLight.shadow.camera.near = 0.5;
-            mainLight.shadow.camera.far = 30;
-            mainLight.shadow.camera.left = -10;
-            mainLight.shadow.camera.right = 10;
-            mainLight.shadow.camera.top = 10;
-            mainLight.shadow.camera.bottom = -10;
+            mainLight.shadow.mapSize.width = 1024;
+            mainLight.shadow.mapSize.height = 1024;
             scene.add(mainLight);
 
-            const fillLight = new THREE.DirectionalLight(0x4466ff, 0.5);
+            const fillLight = new THREE.DirectionalLight(0x4466ff, 0.4);
             fillLight.position.set(-5, 3, -5);
             scene.add(fillLight);
 
-            const rimLight = new THREE.DirectionalLight(0xff6633, 0.8);
-            rimLight.position.set(0, 5, -8);
+            const rimLight = new THREE.PointLight(0xff6633, 0.8, 10);
+            rimLight.position.set(0, 4, -3);
             scene.add(rimLight);
-
-            // Environment map for reflections
-            const pmremGenerator = new THREE.PMREMGenerator(renderer);
-            const envScene = new THREE.Scene();
-            envScene.background = new THREE.Color(0x111122);
-
-            // Add some lights to env scene for reflections
-            const envLight1 = new THREE.PointLight(0xff6633, 10, 10);
-            envLight1.position.set(2, 2, 2);
-            envScene.add(envLight1);
-            const envLight2 = new THREE.PointLight(0x3366ff, 10, 10);
-            envLight2.position.set(-2, 2, -2);
-            envScene.add(envLight2);
-
-            const envMap = pmremGenerator.fromScene(envScene).texture;
-            scene.environment = envMap;
 
             // Floor
             const floorGeo = new THREE.PlaneGeometry(20, 20);
             const floorMat = new THREE.MeshStandardMaterial({
                 color: 0x1a1a1f,
-                metalness: 0.5,
+                metalness: 0.4,
                 roughness: 0.8
             });
             const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -673,75 +577,82 @@
             scene.add(floor);
 
             // Grid
-            const gridHelper = new THREE.GridHelper(20, 40, 0x333340, 0x222230);
-            gridHelper.position.y = 0.001;
-            scene.add(gridHelper);
+            const grid = new THREE.GridHelper(20, 40, 0x333340, 0x222230);
+            grid.position.y = 0.001;
+            scene.add(grid);
 
-            // Work Panel (where logo is welded)
-            const panelGeo = new THREE.BoxGeometry(6, 3, 0.1);
+            // Work Panel
+            const panelGeo = new THREE.BoxGeometry(4, 2.2, 0.08);
             const panelMat = new THREE.MeshStandardMaterial({
-                color: 0x1f1f25,
-                metalness: 0.7,
+                color: 0x1a1a20,
+                metalness: 0.6,
                 roughness: 0.4
             });
             const panel = new THREE.Mesh(panelGeo, panelMat);
-            panel.position.set(0, 1.6, -1.5);
+            panel.position.set(0, 1.5, -1.2);
             panel.receiveShadow = true;
             scene.add(panel);
 
             // Panel frame
-            const frameMat = this.createMetalMaterial ? this.createMetalMaterial(0xff6b35) :
-                new THREE.MeshStandardMaterial({ color: 0xff6b35, metalness: 0.9, roughness: 0.3 });
+            const frameMat = new THREE.MeshStandardMaterial({ color: 0xff6b35, metalness: 0.85, roughness: 0.25 });
 
-            const frameGeo = new THREE.BoxGeometry(6.2, 0.1, 0.15);
-            const frameTop = new THREE.Mesh(frameGeo, new THREE.MeshStandardMaterial({ color: 0xff6b35, metalness: 0.9, roughness: 0.3 }));
-            frameTop.position.set(0, 3.15, -1.5);
+            const frameGeoH = new THREE.BoxGeometry(4.15, 0.08, 0.12);
+            const frameTop = new THREE.Mesh(frameGeoH, frameMat);
+            frameTop.position.set(0, 2.65, -1.2);
             scene.add(frameTop);
 
-            const frameBottom = frameTop.clone();
-            frameBottom.position.y = 0.05;
+            const frameBottom = new THREE.Mesh(frameGeoH, frameMat);
+            frameBottom.position.set(0, 0.35, -1.2);
             scene.add(frameBottom);
+
+            const frameGeoV = new THREE.BoxGeometry(0.08, 2.38, 0.12);
+            const frameLeft = new THREE.Mesh(frameGeoV, frameMat);
+            frameLeft.position.set(-2.04, 1.5, -1.2);
+            scene.add(frameLeft);
+
+            const frameRight = new THREE.Mesh(frameGeoV, frameMat);
+            frameRight.position.set(2.04, 1.5, -1.2);
+            scene.add(frameRight);
 
             // Robot Arm
             robotArm = new RoboticArm();
             scene.add(robotArm.group);
 
-            // Weld trail
+            // Weld Trail
             weldTrail = new WeldTrail(scene);
 
-            // Event listeners
-            window.addEventListener('resize', onWindowResize);
+            // Events
+            window.addEventListener('resize', onResize);
             window.addEventListener('mousemove', onMouseMove);
-            window.addEventListener('click', onMouseClick);
-            window.addEventListener('touchstart', onTouchStart);
-            window.addEventListener('touchmove', onTouchMove);
+            window.addEventListener('click', onClick);
+            window.addEventListener('touchstart', onTouch, { passive: false });
+            window.addEventListener('touchmove', onTouchMove, { passive: false });
 
-            // Loading complete
+            // Hide loading
             loadingBarFill.style.width = '100%';
             setTimeout(() => {
                 loadingEl.classList.add('hidden');
-            }, 500);
+            }, 300);
+
+            animate();
         }
 
-        function onWindowResize() {
+        function onResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-            composer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        function onMouseMove(event) {
-            mousePosition.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mousePosition.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        function onMouseMove(e) {
+            mousePosition.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mousePosition.y = -(e.clientY / window.innerHeight) * 2 + 1;
 
             if (!isWelding) {
-                // Map mouse to 3D target position
-                targetPosition.x = mousePosition.x * 3;
-                targetPosition.y = 1.5 + mousePosition.y * 1.5;
-                targetPosition.z = 2 - Math.abs(mousePosition.x) * 0.5;
+                targetPosition.x = mousePosition.x * 2.5;
+                targetPosition.y = 1.3 + mousePosition.y * 1.2;
+                targetPosition.z = 1.5 - Math.abs(mousePosition.x) * 0.4;
             }
 
-            // Update coords display
             coordsEl.innerHTML = `
                 <p>X: ${targetPosition.x.toFixed(2)}</p>
                 <p>Y: ${targetPosition.y.toFixed(2)}</p>
@@ -749,98 +660,90 @@
             `;
         }
 
-        function onTouchStart(event) {
-            event.preventDefault();
-            onMouseClick(event);
+        function onTouch(e) {
+            e.preventDefault();
+            if (e.touches.length > 0) {
+                const t = e.touches[0];
+                mousePosition.x = (t.clientX / window.innerWidth) * 2 - 1;
+                mousePosition.y = -(t.clientY / window.innerHeight) * 2 + 1;
+            }
+            onClick();
         }
 
-        function onTouchMove(event) {
-            if (event.touches.length > 0) {
-                const touch = event.touches[0];
-                mousePosition.x = (touch.clientX / window.innerWidth) * 2 - 1;
-                mousePosition.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+        function onTouchMove(e) {
+            e.preventDefault();
+            if (e.touches.length > 0) {
+                const t = e.touches[0];
+                mousePosition.x = (t.clientX / window.innerWidth) * 2 - 1;
+                mousePosition.y = -(t.clientY / window.innerHeight) * 2 + 1;
 
                 if (!isWelding) {
-                    targetPosition.x = mousePosition.x * 3;
-                    targetPosition.y = 1.5 + mousePosition.y * 1.5;
-                    targetPosition.z = 2 - Math.abs(mousePosition.x) * 0.5;
+                    targetPosition.x = mousePosition.x * 2.5;
+                    targetPosition.y = 1.3 + mousePosition.y * 1.2;
+                    targetPosition.z = 1.5 - Math.abs(mousePosition.x) * 0.4;
                 }
             }
         }
 
-        function onMouseClick(event) {
+        function onClick() {
             if (!isWelding) {
-                startWelding();
+                isWelding = true;
+                weldProgress = 0;
+                weldTrail.clear();
+                document.body.classList.add('welding-active');
             }
         }
 
-        function startWelding() {
-            isWelding = true;
-            weldProgress = 0;
-            weldTrail.clear();
-            document.body.classList.add('welding-active');
-        }
-
-        function spawnSparks(position, count = 5) {
+        function spawnSparks(pos, count) {
             for (let i = 0; i < count; i++) {
-                const velocity = new THREE.Vector3(
-                    (Math.random() - 0.5) * 3,
-                    Math.random() * 4 + 1,
-                    (Math.random() - 0.5) * 3
+                const vel = new THREE.Vector3(
+                    (Math.random() - 0.5) * 2.5,
+                    Math.random() * 3.5 + 1,
+                    (Math.random() - 0.5) * 2.5
                 );
-                const life = 0.3 + Math.random() * 0.5;
-                const particle = new SparkParticle(position, velocity, life);
-                scene.add(particle.mesh);
-                particles.push(particle);
+                const p = new SparkParticle(pos, vel, 0.25 + Math.random() * 0.4);
+                scene.add(p.mesh);
+                particles.push(p);
             }
         }
 
-        function updateParticles(delta) {
-            particles = particles.filter(particle => {
-                const alive = particle.update(delta);
+        function updateParticles(dt) {
+            particles = particles.filter(p => {
+                const alive = p.update(dt);
                 if (!alive) {
-                    scene.remove(particle.mesh);
-                    particle.mesh.geometry.dispose();
-                    particle.mesh.material.dispose();
+                    scene.remove(p.mesh);
+                    p.dispose();
                 }
                 return alive;
             });
         }
 
-        function updateWelding(delta) {
+        function updateWelding(dt) {
             if (!isWelding) return;
 
-            weldProgress += delta * 0.8; // Welding speed
+            weldProgress += dt * 0.65;
+            const idx = Math.floor(weldProgress * logoPath.length);
 
-            const pathIndex = Math.floor(weldProgress * logoPath.length);
-
-            if (pathIndex >= logoPath.length) {
-                // Welding complete
+            if (idx >= logoPath.length) {
                 isWelding = false;
                 robotArm.setLaserActive(false);
                 document.body.classList.remove('welding-active');
-
-                // Reset after delay
-                setTimeout(() => {
-                    weldTrail.clear();
-                }, 5000);
+                setTimeout(() => weldTrail.clear(), 4000);
                 return;
             }
 
-            const point = logoPath[pathIndex];
-            const weldTarget = new THREE.Vector3(point.x, point.y, -1.45);
+            const pt = logoPath[idx];
+            const weldTarget = new THREE.Vector3(pt.x, pt.y, -1.16);
 
-            // Move arm to welding position
             targetPosition.copy(weldTarget);
-            targetPosition.z += 0.5; // Offset for arm position
+            targetPosition.z += 0.4;
 
-            if (!point.penUp) {
+            if (!pt.penUp) {
                 robotArm.setLaserActive(true, weldTarget);
                 weldTrail.addPoint(weldTarget);
 
-                // Spawn sparks at weld point
-                if (Math.random() > 0.5) {
-                    spawnSparks(weldTarget, 3 + Math.floor(Math.random() * 5));
+                if (Math.random() > 0.4) {
+                    spawnSparks(weldTarget, 2 + Math.floor(Math.random() * 4));
                 }
             } else {
                 robotArm.setLaserActive(false);
@@ -850,49 +753,36 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            const delta = clock.getDelta();
-            const time = clock.getElapsedTime();
+            const dt = clock.getDelta();
+            const t = clock.getElapsedTime();
 
-            // Smooth target following
             const currentTarget = targetPosition.clone();
-
-            // Add subtle idle motion when not welding
             if (!isWelding) {
-                currentTarget.x += Math.sin(time * 0.5) * 0.1;
-                currentTarget.y += Math.cos(time * 0.7) * 0.05;
+                currentTarget.x += Math.sin(t * 0.5) * 0.08;
+                currentTarget.y += Math.cos(t * 0.7) * 0.04;
             }
 
-            // Update robot IK
             robotArm.solveIK(currentTarget);
             robotArm.updateLaser();
 
-            // Update welding process
-            updateWelding(delta);
+            updateWelding(dt);
+            updateParticles(dt);
 
-            // Update particles
-            updateParticles(delta);
+            camera.position.x = 3.5 + Math.sin(t * 0.15) * 0.15;
+            camera.position.y = 2.5 + Math.cos(t * 0.12) * 0.08;
+            camera.lookAt(0, 1.2, 0);
 
-            // Camera subtle movement
-            camera.position.x = 4 + Math.sin(time * 0.2) * 0.2;
-            camera.position.y = 3 + Math.cos(time * 0.15) * 0.1;
-            camera.lookAt(0, 1.5, 0);
-
-            // Render with post-processing
-            composer.render();
+            renderer.render(scene, camera);
         }
 
-        // Loading simulation
-        let loadProgress = 0;
-        const loadInterval = setInterval(() => {
-            loadProgress += Math.random() * 15;
-            if (loadProgress >= 100) {
-                loadProgress = 100;
-                clearInterval(loadInterval);
-                init();
-                animate();
-            }
-            loadingBarFill.style.width = loadProgress + '%';
-        }, 100);
+        // Start
+        window.addEventListener('DOMContentLoaded', () => {
+            loadingBarFill.style.width = '50%';
+            setTimeout(() => {
+                loadingBarFill.style.width = '80%';
+                setTimeout(init, 200);
+            }, 300);
+        });
     </script>
 </body>
 </html>
