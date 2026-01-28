@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Alba Studio | Roger Alba - Robotic & CAD Solutions</title>
+    <title>ALBA STUDIO | Training Creative Systems</title>
     <style>
         * {
             margin: 0;
@@ -12,14 +12,12 @@
         }
 
         body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            background: #0a0a0f;
-            color: #fff;
+            background: #000;
             overflow: hidden;
-            cursor: crosshair;
+            font-family: 'Courier New', monospace;
         }
 
-        #canvas-container {
+        #webgl-canvas {
             position: fixed;
             top: 0;
             left: 0;
@@ -28,761 +26,1151 @@
             z-index: 1;
         }
 
-        .ui-overlay {
-            position: fixed;
-            z-index: 10;
-            pointer-events: none;
-        }
-
-        .header {
-            top: 30px;
-            left: 40px;
-        }
-
-        .header h1 {
-            font-size: 1.2rem;
-            font-weight: 300;
-            letter-spacing: 4px;
-            color: rgba(255, 255, 255, 0.7);
-            text-transform: uppercase;
-        }
-
-        .header p {
-            font-size: 0.75rem;
-            color: rgba(255, 255, 255, 0.4);
-            margin-top: 5px;
-            letter-spacing: 2px;
-        }
-
-        .instructions {
-            bottom: 40px;
-            left: 50%;
-            transform: translateX(-50%);
-            text-align: center;
-            transition: opacity 0.5s ease;
-        }
-
-        .instructions p {
-            font-size: 0.85rem;
-            color: rgba(255, 255, 255, 0.5);
-            letter-spacing: 1px;
-        }
-
-        .instructions .key {
-            display: inline-block;
-            padding: 4px 12px;
-            background: rgba(255, 140, 50, 0.2);
-            border: 1px solid rgba(255, 140, 50, 0.4);
-            border-radius: 4px;
-            margin: 0 5px;
-            color: #ff8c32;
-        }
-
-        .tech-info {
-            bottom: 40px;
-            right: 40px;
-            text-align: right;
-        }
-
-        .tech-info p {
-            font-size: 0.7rem;
-            color: rgba(255, 255, 255, 0.3);
-            letter-spacing: 1px;
-        }
-
-        .coords {
-            top: 30px;
-            right: 40px;
-            font-family: 'Courier New', monospace;
-            font-size: 0.75rem;
-            color: rgba(255, 140, 50, 0.7);
-        }
-
-        .loading {
+        #overlay-canvas {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: #0a0a0f;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-            transition: opacity 0.8s ease, visibility 0.8s ease;
-        }
-
-        .loading.hidden {
-            opacity: 0;
-            visibility: hidden;
+            z-index: 2;
             pointer-events: none;
         }
 
-        .loading-bar {
-            width: 200px;
-            height: 2px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 2px;
-            overflow: hidden;
+        .ui-layer {
+            position: fixed;
+            z-index: 10;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 11px;
+            letter-spacing: 2px;
+            pointer-events: none;
         }
 
-        .loading-bar-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #ff6b35, #ff8c32);
-            width: 0%;
-            transition: width 0.3s ease;
+        .metrics {
+            top: 20px;
+            left: 20px;
         }
 
-        .loading p {
-            margin-top: 20px;
-            font-size: 0.8rem;
-            color: rgba(255, 255, 255, 0.5);
-            letter-spacing: 3px;
+        .metrics p {
+            margin: 4px 0;
+            font-size: 10px;
         }
 
-        .welding-active .instructions {
-            opacity: 0;
+        .metrics .value {
+            color: #00ff88;
         }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 0.5; }
-            50% { opacity: 1; }
+        .metrics .label {
+            color: rgba(255, 255, 255, 0.4);
         }
 
-        .pulse {
-            animation: pulse 2s ease-in-out infinite;
+        .architecture {
+            top: 20px;
+            right: 20px;
+            text-align: right;
+        }
+
+        .architecture p {
+            margin: 3px 0;
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .footer {
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+        }
+
+        .footer p {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+
+        .cursor-blink {
+            animation: blink 1s infinite;
         }
     </style>
 </head>
 <body>
-    <div class="loading" id="loading">
-        <div class="loading-bar">
-            <div class="loading-bar-fill" id="loading-bar-fill"></div>
-        </div>
-        <p>INITIALIZING SYSTEMS</p>
+    <canvas id="webgl-canvas"></canvas>
+    <canvas id="overlay-canvas"></canvas>
+
+    <div class="ui-layer metrics" id="metrics">
+        <p><span class="label">EPOCH:</span> <span class="value" id="epoch">0</span></p>
+        <p><span class="label">LOSS:</span> <span class="value" id="loss">1.0000</span></p>
+        <p><span class="label">ACCURACY:</span> <span class="value" id="accuracy">0.00%</span></p>
+        <p><span class="label">NEURONS:</span> <span class="value" id="neurons">0</span></p>
+        <p><span class="label">SYNAPSES:</span> <span class="value" id="synapses">0</span></p>
     </div>
 
-    <div id="canvas-container"></div>
-
-    <div class="ui-overlay header">
-        <h1>Alba Studio</h1>
-        <p>Roger Alba · Robotic Systems & CAD</p>
+    <div class="ui-layer architecture" id="arch-info">
+        <p>MULTILAYER PERCEPTRON</p>
+        <p>ACTIVATION: SIGMOID / RELU</p>
+        <p>OPTIMIZER: VISUAL SGD</p>
+        <p>LEARNING RATE: ADAPTIVE</p>
     </div>
 
-    <div class="ui-overlay coords" id="coords">
-        <p>X: 0.00</p>
-        <p>Y: 0.00</p>
-        <p>Z: 0.00</p>
+    <div class="ui-layer footer">
+        <p>PURE WEBGL + CANVAS 2D HYBRID</p>
+        <p>NO FRAMEWORKS</p>
     </div>
 
-    <div class="ui-overlay instructions" id="instructions">
-        <p class="pulse">Move cursor to control · <span class="key">CLICK</span> to weld logo</p>
-    </div>
-
-    <div class="ui-overlay tech-info">
-        <p>THREE.JS · WebGL 2.0</p>
-        <p>6-AXIS INDUSTRIAL ARM · IK SOLVER</p>
-    </div>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
-        // Scene Setup
-        const container = document.getElementById('canvas-container');
-        const loadingEl = document.getElementById('loading');
-        const loadingBarFill = document.getElementById('loading-bar-fill');
-        const coordsEl = document.getElementById('coords');
+    (function() {
+        'use strict';
 
-        let scene, camera, renderer;
-        let robotArm, targetPosition = new THREE.Vector3(0, 2, 2);
-        let mousePosition = new THREE.Vector2();
-        let isWelding = false;
-        let weldProgress = 0;
-        let particles = [];
-        let weldTrail;
-        let clock = new THREE.Clock();
+        // ============================================
+        // WEBGL SETUP
+        // ============================================
+        const glCanvas = document.getElementById('webgl-canvas');
+        const overlayCanvas = document.getElementById('overlay-canvas');
+        const gl = glCanvas.getContext('webgl2', {
+            antialias: true,
+            alpha: true,
+            premultipliedAlpha: false
+        }) || glCanvas.getContext('webgl', { antialias: true, alpha: true });
 
-        // Logo path points for "ALBA STUDIO"
-        const logoPath = generateLogoPath();
+        const ctx = overlayCanvas.getContext('2d');
 
-        function generateLogoPath() {
-            const points = [];
-            const text = "ALBA STUDIO";
-            const scale = 0.18;
-            const startX = -1.4;
-            const startY = 1.5;
+        if (!gl) {
+            alert('WebGL not supported');
+            return;
+        }
 
-            const letterPaths = {
-                'A': [[0,0], [0.3,1], [0.6,0], null, [0.15,0.4], [0.45,0.4]],
-                'L': [[0,1], [0,0], [0.4,0]],
-                'B': [[0,0], [0,1], [0.35,1], [0.45,0.85], [0.45,0.65], [0.35,0.5], [0,0.5], null, [0.35,0.5], [0.5,0.35], [0.5,0.15], [0.35,0], [0,0]],
-                'S': [[0.45,0.85], [0.35,1], [0.1,1], [0,0.85], [0,0.65], [0.1,0.5], [0.35,0.5], [0.45,0.35], [0.45,0.15], [0.35,0], [0.1,0], [0,0.15]],
-                'T': [[0,1], [0.5,1], null, [0.25,1], [0.25,0]],
-                'U': [[0,1], [0,0.15], [0.1,0], [0.4,0], [0.5,0.15], [0.5,1]],
-                'D': [[0,0], [0,1], [0.3,1], [0.5,0.8], [0.5,0.2], [0.3,0], [0,0]],
-                'I': [[0,1], [0.3,1], null, [0.15,1], [0.15,0], null, [0,0], [0.3,0]],
-                'O': [[0.25,0], [0.08,0.15], [0,0.5], [0.08,0.85], [0.25,1], [0.42,0.85], [0.5,0.5], [0.42,0.15], [0.25,0]],
-                ' ': []
-            };
+        let width, height, aspect;
+        let mouseX = 0, mouseY = 0;
+        let mouseInfluence = 0;
+        let time = 0;
+        let epoch = 0;
+        let convergence = 0;
+        let trainingPhase = 0;
 
-            let currentX = startX;
+        // ============================================
+        // SHADER SOURCES
+        // ============================================
+        const neuronVertexShader = `
+            attribute vec3 aPosition;
+            attribute float aActivation;
+            attribute float aLayer;
+            attribute float aType;
 
-            for (let char of text) {
-                const path = letterPaths[char] || [];
-                let firstPoint = true;
+            uniform mat4 uProjection;
+            uniform mat4 uView;
+            uniform mat4 uModel;
+            uniform float uTime;
+            uniform float uConvergence;
 
-                for (let p of path) {
-                    if (p === null) {
-                        firstPoint = true;
-                        continue;
+            varying float vActivation;
+            varying float vLayer;
+            varying float vType;
+            varying vec3 vWorldPos;
+
+            void main() {
+                vec3 pos = aPosition;
+
+                // Breathing effect based on activation
+                float pulse = sin(uTime * 3.0 + aActivation * 6.28) * 0.1 * aActivation;
+                pos *= 1.0 + pulse;
+
+                vec4 worldPos = uModel * vec4(pos, 1.0);
+                vWorldPos = worldPos.xyz;
+
+                gl_Position = uProjection * uView * worldPos;
+                gl_PointSize = (8.0 + aActivation * 12.0) * (1.0 - gl_Position.z * 0.15);
+
+                vActivation = aActivation;
+                vLayer = aLayer;
+                vType = aType;
+            }
+        `;
+
+        const neuronFragmentShader = `
+            precision highp float;
+
+            varying float vActivation;
+            varying float vLayer;
+            varying float vType;
+            varying vec3 vWorldPos;
+
+            uniform float uTime;
+            uniform float uConvergence;
+
+            void main() {
+                vec2 coord = gl_PointCoord - vec2(0.5);
+                float dist = length(coord);
+
+                if (dist > 0.5) discard;
+
+                // Core glow
+                float core = 1.0 - smoothstep(0.0, 0.2, dist);
+                float glow = 1.0 - smoothstep(0.1, 0.5, dist);
+
+                // Color based on layer and activation type
+                vec3 baseColor;
+                if (vType < 0.5) {
+                    // Sigmoid - warm colors (orange to white)
+                    baseColor = mix(vec3(1.0, 0.3, 0.1), vec3(1.0, 0.9, 0.7), vActivation);
+                } else {
+                    // ReLU - cool colors (cyan to white)
+                    baseColor = mix(vec3(0.1, 0.5, 1.0), vec3(0.7, 1.0, 1.0), vActivation);
+                }
+
+                // Layer depth coloring
+                float layerFade = 0.6 + vLayer * 0.1;
+                baseColor *= layerFade;
+
+                // Pulse effect
+                float pulse = sin(uTime * 4.0 + vLayer * 2.0) * 0.15 + 0.85;
+
+                vec3 color = baseColor * (core * 2.0 + glow) * vActivation * pulse;
+                float alpha = (core * 0.9 + glow * 0.6) * (0.3 + vActivation * 0.7);
+
+                // Convergence boost
+                color += vec3(1.0) * uConvergence * core * 0.5;
+
+                gl_FragColor = vec4(color, alpha);
+            }
+        `;
+
+        const synapseVertexShader = `
+            attribute vec3 aStart;
+            attribute vec3 aEnd;
+            attribute float aWeight;
+            attribute float aPulsePhase;
+            attribute float aProgress;
+
+            uniform mat4 uProjection;
+            uniform mat4 uView;
+            uniform float uTime;
+
+            varying float vWeight;
+            varying float vPulsePhase;
+            varying float vProgress;
+            varying float vDepth;
+
+            void main() {
+                vec3 pos = mix(aStart, aEnd, aProgress);
+
+                // Add slight curve to connections
+                vec3 mid = (aStart + aEnd) * 0.5;
+                float curve = sin(aProgress * 3.14159) * 0.15 * length(aEnd - aStart);
+                pos.y += curve;
+
+                vec4 viewPos = uView * vec4(pos, 1.0);
+                gl_Position = uProjection * viewPos;
+                gl_PointSize = 2.0 + aWeight * 3.0;
+
+                vWeight = aWeight;
+                vPulsePhase = aPulsePhase;
+                vProgress = aProgress;
+                vDepth = -viewPos.z;
+            }
+        `;
+
+        const synapseFragmentShader = `
+            precision highp float;
+
+            varying float vWeight;
+            varying float vPulsePhase;
+            varying float vProgress;
+            varying float vDepth;
+
+            uniform float uTime;
+
+            void main() {
+                vec2 coord = gl_PointCoord - vec2(0.5);
+                float dist = length(coord);
+
+                if (dist > 0.5) discard;
+
+                // Traveling pulse along synapse
+                float pulsePos = fract(uTime * 0.8 + vPulsePhase);
+                float pulseDist = abs(vProgress - pulsePos);
+                float pulse = exp(-pulseDist * pulseDist * 50.0) * vWeight;
+
+                // Base connection glow
+                float baseGlow = (1.0 - dist * 2.0) * 0.15 * vWeight;
+
+                // Color based on weight (negative=red, positive=cyan)
+                vec3 color;
+                if (vWeight > 0.0) {
+                    color = mix(vec3(0.2, 0.6, 1.0), vec3(1.0, 1.0, 1.0), pulse);
+                } else {
+                    color = mix(vec3(1.0, 0.2, 0.3), vec3(1.0, 0.8, 0.8), pulse);
+                }
+
+                float intensity = baseGlow + pulse * 0.8;
+                float alpha = intensity * (1.0 - smoothstep(0.0, 0.5, dist));
+
+                // Depth fade
+                float depthFade = 1.0 / (1.0 + vDepth * 0.05);
+
+                gl_FragColor = vec4(color * intensity * depthFade, alpha * depthFade);
+            }
+        `;
+
+        // Background shader for subtle neural field effect
+        const bgVertexShader = `
+            attribute vec2 aPosition;
+            varying vec2 vUv;
+            void main() {
+                vUv = aPosition * 0.5 + 0.5;
+                gl_Position = vec4(aPosition, 0.0, 1.0);
+            }
+        `;
+
+        const bgFragmentShader = `
+            precision highp float;
+            varying vec2 vUv;
+            uniform float uTime;
+            uniform vec2 uMouse;
+            uniform float uConvergence;
+
+            // Simplex noise function
+            vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+            vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+            vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
+
+            float snoise(vec2 v) {
+                const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
+                vec2 i  = floor(v + dot(v, C.yy));
+                vec2 x0 = v - i + dot(i, C.xx);
+                vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+                vec4 x12 = x0.xyxy + C.xxzz;
+                x12.xy -= i1;
+                i = mod289(i);
+                vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
+                vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+                m = m*m; m = m*m;
+                vec3 x = 2.0 * fract(p * C.www) - 1.0;
+                vec3 h = abs(x) - 0.5;
+                vec3 ox = floor(x + 0.5);
+                vec3 a0 = x - ox;
+                m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
+                vec3 g;
+                g.x = a0.x * x0.x + h.x * x0.y;
+                g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+                return 130.0 * dot(m, g);
+            }
+
+            void main() {
+                vec2 uv = vUv;
+
+                // Neural field noise
+                float noise1 = snoise(uv * 3.0 + uTime * 0.05) * 0.5 + 0.5;
+                float noise2 = snoise(uv * 6.0 - uTime * 0.08) * 0.5 + 0.5;
+                float noise3 = snoise(uv * 12.0 + uTime * 0.1) * 0.5 + 0.5;
+
+                float field = noise1 * 0.5 + noise2 * 0.3 + noise3 * 0.2;
+
+                // Mouse influence
+                float mouseDist = length(uv - uMouse);
+                float mouseGlow = exp(-mouseDist * mouseDist * 8.0) * 0.15;
+
+                // Base dark with subtle neural patterns
+                vec3 color = vec3(0.02, 0.02, 0.04);
+                color += vec3(0.03, 0.05, 0.08) * field;
+                color += vec3(0.1, 0.2, 0.4) * mouseGlow;
+
+                // Vignette
+                float vignette = 1.0 - length(uv - 0.5) * 0.8;
+                color *= vignette;
+
+                // Convergence brightening
+                color += vec3(0.05, 0.08, 0.12) * uConvergence;
+
+                gl_FragColor = vec4(color, 1.0);
+            }
+        `;
+
+        // ============================================
+        // SHADER COMPILATION
+        // ============================================
+        function createShader(type, source) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error('Shader compile error:', gl.getShaderInfoLog(shader));
+                gl.deleteShader(shader);
+                return null;
+            }
+            return shader;
+        }
+
+        function createProgram(vertSrc, fragSrc) {
+            const vert = createShader(gl.VERTEX_SHADER, vertSrc);
+            const frag = createShader(gl.FRAGMENT_SHADER, fragSrc);
+            const program = gl.createProgram();
+            gl.attachShader(program, vert);
+            gl.attachShader(program, frag);
+            gl.linkProgram(program);
+            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                console.error('Program link error:', gl.getProgramInfoLog(program));
+                return null;
+            }
+            return program;
+        }
+
+        const neuronProgram = createProgram(neuronVertexShader, neuronFragmentShader);
+        const synapseProgram = createProgram(synapseVertexShader, synapseFragmentShader);
+        const bgProgram = createProgram(bgVertexShader, bgFragmentShader);
+
+        // ============================================
+        // MATRIX UTILITIES
+        // ============================================
+        function mat4Perspective(fov, aspect, near, far) {
+            const f = 1.0 / Math.tan(fov / 2);
+            const nf = 1 / (near - far);
+            return new Float32Array([
+                f / aspect, 0, 0, 0,
+                0, f, 0, 0,
+                0, 0, (far + near) * nf, -1,
+                0, 0, 2 * far * near * nf, 0
+            ]);
+        }
+
+        function mat4LookAt(eye, target, up) {
+            const zAxis = normalize([eye[0] - target[0], eye[1] - target[1], eye[2] - target[2]]);
+            const xAxis = normalize(cross(up, zAxis));
+            const yAxis = cross(zAxis, xAxis);
+
+            return new Float32Array([
+                xAxis[0], yAxis[0], zAxis[0], 0,
+                xAxis[1], yAxis[1], zAxis[1], 0,
+                xAxis[2], yAxis[2], zAxis[2], 0,
+                -dot(xAxis, eye), -dot(yAxis, eye), -dot(zAxis, eye), 1
+            ]);
+        }
+
+        function mat4Identity() {
+            return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
+        }
+
+        function mat4RotateY(m, angle) {
+            const c = Math.cos(angle);
+            const s = Math.sin(angle);
+            const result = new Float32Array(16);
+            result[0] = m[0] * c + m[8] * s;
+            result[1] = m[1] * c + m[9] * s;
+            result[2] = m[2] * c + m[10] * s;
+            result[3] = m[3] * c + m[11] * s;
+            result[4] = m[4];
+            result[5] = m[5];
+            result[6] = m[6];
+            result[7] = m[7];
+            result[8] = m[8] * c - m[0] * s;
+            result[9] = m[9] * c - m[1] * s;
+            result[10] = m[10] * c - m[2] * s;
+            result[11] = m[11] * c - m[3] * s;
+            result[12] = m[12];
+            result[13] = m[13];
+            result[14] = m[14];
+            result[15] = m[15];
+            return result;
+        }
+
+        function normalize(v) {
+            const len = Math.sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
+            return [v[0]/len, v[1]/len, v[2]/len];
+        }
+
+        function cross(a, b) {
+            return [
+                a[1]*b[2] - a[2]*b[1],
+                a[2]*b[0] - a[0]*b[2],
+                a[0]*b[1] - a[1]*b[0]
+            ];
+        }
+
+        function dot(a, b) {
+            return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+        }
+
+        // ============================================
+        // NEURAL NETWORK SIMULATION
+        // ============================================
+        class Neuron {
+            constructor(x, y, z, layer, activationType) {
+                this.x = x;
+                this.y = y;
+                this.z = z;
+                this.baseX = x;
+                this.baseY = y;
+                this.baseZ = z;
+                this.targetX = x;
+                this.targetY = y;
+                this.targetZ = z;
+                this.layer = layer;
+                this.activationType = activationType; // 0 = sigmoid, 1 = ReLU
+                this.activation = Math.random() * 0.3;
+                this.input = 0;
+                this.bias = (Math.random() - 0.5) * 0.5;
+                this.connections = [];
+                this.pulsePhase = Math.random() * Math.PI * 2;
+            }
+
+            // Activation functions
+            sigmoid(x) {
+                return 1 / (1 + Math.exp(-x));
+            }
+
+            relu(x) {
+                return Math.max(0, x);
+            }
+
+            leakyRelu(x) {
+                return x > 0 ? x : 0.01 * x;
+            }
+
+            activate() {
+                const input = this.input + this.bias;
+                if (this.activationType === 0) {
+                    this.activation = this.sigmoid(input);
+                } else {
+                    this.activation = Math.min(1, this.leakyRelu(input) * 0.5);
+                }
+                this.input = 0;
+            }
+
+            update(dt, time, mouseX, mouseY, mouseInfluence) {
+                // Plasticity - slow reorganization
+                const plasticitySpeed = 0.0005;
+                const noiseX = Math.sin(time * 0.1 + this.pulsePhase) * 0.2;
+                const noiseY = Math.cos(time * 0.08 + this.pulsePhase * 1.3) * 0.15;
+                const noiseZ = Math.sin(time * 0.12 + this.pulsePhase * 0.7) * 0.2;
+
+                this.targetX = this.baseX + noiseX;
+                this.targetY = this.baseY + noiseY;
+                this.targetZ = this.baseZ + noiseZ;
+
+                // Mouse influence on topology
+                if (mouseInfluence > 0.1) {
+                    const dx = mouseX * 4 - this.x;
+                    const dy = mouseY * 3 - this.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 3) {
+                        const force = (1 - dist / 3) * mouseInfluence * 0.5;
+                        this.targetX += dx * force * 0.3;
+                        this.targetY += dy * force * 0.3;
+                    }
+                }
+
+                // Smooth interpolation
+                this.x += (this.targetX - this.x) * 0.02;
+                this.y += (this.targetY - this.y) * 0.02;
+                this.z += (this.targetZ - this.z) * 0.02;
+
+                // Decay activation over time
+                this.activation *= 0.98;
+            }
+        }
+
+        class Synapse {
+            constructor(from, to) {
+                this.from = from;
+                this.to = to;
+                this.weight = (Math.random() - 0.5) * 2;
+                this.pulsePhase = Math.random();
+                this.pulseStrength = 0;
+                this.plasticity = 0.001;
+            }
+
+            transmit(signal) {
+                const output = signal * this.weight;
+                this.to.input += output;
+                this.pulseStrength = Math.abs(signal * this.weight);
+                return output;
+            }
+
+            // Hebbian-like learning
+            updateWeight(learningRate) {
+                const delta = this.from.activation * this.to.activation * learningRate;
+                this.weight += delta * this.plasticity;
+                this.weight = Math.max(-2, Math.min(2, this.weight));
+            }
+        }
+
+        class NeuralNetwork {
+            constructor() {
+                this.neurons = [];
+                this.synapses = [];
+                this.layers = [];
+                this.targetPattern = [];
+                this.buildNetwork();
+                this.generateTargetPattern();
+            }
+
+            buildNetwork() {
+                // Architecture: Input(25) -> Hidden1(40) -> Hidden2(50) -> Hidden3(40) -> Output(35)
+                const layerSizes = [25, 40, 50, 40, 35];
+                const layerSpacing = 2.5;
+                const startZ = -layerSizes.length * layerSpacing / 2;
+
+                for (let l = 0; l < layerSizes.length; l++) {
+                    const layer = [];
+                    const size = layerSizes[l];
+                    const cols = Math.ceil(Math.sqrt(size));
+                    const rows = Math.ceil(size / cols);
+                    const spacing = 0.8;
+                    const offsetX = -cols * spacing / 2;
+                    const offsetY = -rows * spacing / 2;
+
+                    for (let i = 0; i < size; i++) {
+                        const col = i % cols;
+                        const row = Math.floor(i / cols);
+                        const x = offsetX + col * spacing + (Math.random() - 0.5) * 0.3;
+                        const y = offsetY + row * spacing + (Math.random() - 0.5) * 0.3;
+                        const z = startZ + l * layerSpacing + (Math.random() - 0.5) * 0.4;
+
+                        // Alternate activation types per layer
+                        const activationType = (l % 2 === 0) ? 0 : 1;
+                        const neuron = new Neuron(x, y, z, l, activationType);
+                        layer.push(neuron);
+                        this.neurons.push(neuron);
+                    }
+                    this.layers.push(layer);
+                }
+
+                // Create connections between adjacent layers
+                for (let l = 0; l < this.layers.length - 1; l++) {
+                    const fromLayer = this.layers[l];
+                    const toLayer = this.layers[l + 1];
+
+                    for (const from of fromLayer) {
+                        // Connect to random subset of next layer (sparse connectivity)
+                        const connectionCount = Math.floor(toLayer.length * 0.4);
+                        const shuffled = [...toLayer].sort(() => Math.random() - 0.5);
+
+                        for (let i = 0; i < connectionCount; i++) {
+                            const synapse = new Synapse(from, shuffled[i]);
+                            this.synapses.push(synapse);
+                            from.connections.push(synapse);
+                        }
+                    }
+                }
+
+                // Add some skip connections for more interesting patterns
+                for (let l = 0; l < this.layers.length - 2; l++) {
+                    const fromLayer = this.layers[l];
+                    const toLayer = this.layers[l + 2];
+
+                    for (let i = 0; i < fromLayer.length; i += 4) {
+                        const to = toLayer[Math.floor(Math.random() * toLayer.length)];
+                        const synapse = new Synapse(fromLayer[i], to);
+                        synapse.weight *= 0.5; // Weaker skip connections
+                        this.synapses.push(synapse);
+                        fromLayer[i].connections.push(synapse);
+                    }
+                }
+            }
+
+            generateTargetPattern() {
+                // Generate pattern for "ALBA STUDIO" text reconstruction
+                const outputLayer = this.layers[this.layers.length - 1];
+                for (let i = 0; i < outputLayer.length; i++) {
+                    // Create a wave pattern that will resolve into text
+                    this.targetPattern.push(Math.sin(i * 0.5) * 0.5 + 0.5);
+                }
+            }
+
+            forwardPropagate() {
+                // Activate input layer with varying patterns
+                const inputLayer = this.layers[0];
+                for (let i = 0; i < inputLayer.length; i++) {
+                    inputLayer[i].activation = 0.3 + Math.sin(time * 2 + i * 0.5) * 0.3 + Math.random() * 0.2;
+                }
+
+                // Propagate through layers
+                for (let l = 0; l < this.layers.length - 1; l++) {
+                    const fromLayer = this.layers[l];
+
+                    for (const neuron of fromLayer) {
+                        for (const synapse of neuron.connections) {
+                            synapse.transmit(neuron.activation);
+                        }
                     }
 
-                    points.push({
-                        x: currentX + p[0] * scale,
-                        y: startY + p[1] * scale,
-                        penUp: firstPoint
-                    });
-                    firstPoint = false;
-                }
-                currentX += (char === ' ' ? 0.25 : 0.55) * scale + 0.14;
-            }
-
-            return points;
-        }
-
-        class RoboticArm {
-            constructor() {
-                this.segments = [];
-                this.group = new THREE.Group();
-                this.endEffector = new THREE.Vector3();
-                this.weldPoint = new THREE.Vector3();
-                this.laserBeam = null;
-                this.laserActive = false;
-                this.createArm();
-            }
-
-            createMetalMaterial(color) {
-                return new THREE.MeshStandardMaterial({
-                    color: color,
-                    metalness: 0.85,
-                    roughness: 0.25
-                });
-            }
-
-            createArm() {
-                // Base
-                const baseGeo = new THREE.CylinderGeometry(0.5, 0.6, 0.3, 32);
-                const baseMat = this.createMetalMaterial(0x2a2a2a);
-                const base = new THREE.Mesh(baseGeo, baseMat);
-                base.position.y = 0.15;
-                base.castShadow = true;
-                this.group.add(base);
-
-                // Rotating platform
-                const platformGeo = new THREE.CylinderGeometry(0.4, 0.45, 0.15, 32);
-                const platformMat = this.createMetalMaterial(0xff6b35);
-                this.basePlatform = new THREE.Mesh(platformGeo, platformMat);
-                this.basePlatform.position.y = 0.375;
-                this.basePlatform.castShadow = true;
-                this.group.add(this.basePlatform);
-
-                // Segments
-                const segmentConfigs = [
-                    { length: 1.2, radius: 0.15 },
-                    { length: 1.0, radius: 0.12 },
-                    { length: 0.7, radius: 0.1 },
-                    { length: 0.4, radius: 0.08 }
-                ];
-
-                let parent = this.basePlatform;
-                let yOffset = 0.075;
-
-                segmentConfigs.forEach((config, i) => {
-                    const seg = this.createSegment(config.length, config.radius);
-                    seg.group.position.y = yOffset;
-                    parent.add(seg.group);
-                    this.segments.push(seg);
-                    parent = seg.group;
-                    yOffset = config.length;
-                });
-
-                this.createEndEffector();
-                this.createLaserBeam();
-            }
-
-            createSegment(length, radius) {
-                const segment = { length, radius, group: new THREE.Group() };
-
-                // Joint
-                const jointGeo = new THREE.SphereGeometry(radius * 1.3, 16, 16);
-                const jointMat = this.createMetalMaterial(0xff6b35);
-                const joint = new THREE.Mesh(jointGeo, jointMat);
-                joint.castShadow = true;
-                segment.group.add(joint);
-
-                // Arm
-                const armGeo = new THREE.CylinderGeometry(radius * 0.9, radius, length, 16);
-                const armMat = this.createMetalMaterial(0x3a3a3a);
-                const arm = new THREE.Mesh(armGeo, armMat);
-                arm.position.y = length / 2;
-                arm.castShadow = true;
-                segment.group.add(arm);
-
-                // Hydraulic detail
-                const hydGeo = new THREE.CylinderGeometry(radius * 0.25, radius * 0.25, length * 0.6, 8);
-                const hydMat = this.createMetalMaterial(0x1a1a1a);
-                const hyd = new THREE.Mesh(hydGeo, hydMat);
-                hyd.position.set(radius * 0.7, length * 0.35, 0);
-                segment.group.add(hyd);
-
-                return segment;
-            }
-
-            createEndEffector() {
-                const lastSeg = this.segments[this.segments.length - 1];
-                const effector = new THREE.Group();
-                effector.position.y = lastSeg.length;
-
-                // Torch body
-                const torchGeo = new THREE.CylinderGeometry(0.05, 0.07, 0.2, 16);
-                const torchMat = this.createMetalMaterial(0x2a2a2a);
-                const torch = new THREE.Mesh(torchGeo, torchMat);
-                effector.add(torch);
-
-                // Nozzle
-                const nozzleGeo = new THREE.ConeGeometry(0.035, 0.12, 16);
-                const nozzleMat = this.createMetalMaterial(0xcc5500);
-                const nozzle = new THREE.Mesh(nozzleGeo, nozzleMat);
-                nozzle.position.y = -0.16;
-                nozzle.rotation.x = Math.PI;
-                effector.add(nozzle);
-
-                // Glowing tip
-                const tipGeo = new THREE.SphereGeometry(0.02, 16, 16);
-                const tipMat = new THREE.MeshBasicMaterial({ color: 0xff4400 });
-                this.weldTip = new THREE.Mesh(tipGeo, tipMat);
-                this.weldTip.position.y = -0.22;
-                effector.add(this.weldTip);
-
-                lastSeg.group.add(effector);
-                this.effectorGroup = effector;
-            }
-
-            createLaserBeam() {
-                const laserGeo = new THREE.CylinderGeometry(0.006, 0.012, 1, 8);
-                const laserMat = new THREE.MeshBasicMaterial({
-                    color: 0xff6600,
-                    transparent: true,
-                    opacity: 0.9
-                });
-                this.laserBeam = new THREE.Mesh(laserGeo, laserMat);
-                this.laserBeam.visible = false;
-                this.group.add(this.laserBeam);
-
-                // Glow
-                const glowGeo = new THREE.CylinderGeometry(0.015, 0.03, 1, 8);
-                const glowMat = new THREE.MeshBasicMaterial({
-                    color: 0xff4400,
-                    transparent: true,
-                    opacity: 0.4
-                });
-                this.laserGlow = new THREE.Mesh(glowGeo, glowMat);
-                this.laserBeam.add(this.laserGlow);
-            }
-
-            solveIK(target) {
-                const basePos = new THREE.Vector3(0, 0.45, 0);
-                const dir = target.clone().sub(basePos);
-
-                // Base Y rotation
-                this.basePlatform.rotation.y = Math.atan2(dir.x, dir.z);
-
-                // Calculate distances
-                const hDist = Math.sqrt(dir.x * dir.x + dir.z * dir.z);
-                const vDist = dir.y;
-                const totalDist = Math.sqrt(hDist * hDist + vDist * vDist);
-
-                const totalLen = 3.3;
-                const ratio = Math.min(totalDist / totalLen, 0.92);
-                const reachAngle = Math.atan2(vDist, hDist);
-
-                const base = Math.PI / 2 - reachAngle * 0.55;
-
-                this.segments[0].group.rotation.x = -base + ratio * 0.25;
-                this.segments[1].group.rotation.x = -0.25 + ratio * 0.45;
-                this.segments[2].group.rotation.x = 0.15 - ratio * 0.25;
-                this.segments[3].group.rotation.x = 0.35 - ratio * 0.15;
-
-                this.weldTip.getWorldPosition(this.endEffector);
-            }
-
-            setLaserActive(active, targetPoint) {
-                this.laserActive = active;
-                this.laserBeam.visible = active;
-
-                if (active && targetPoint) {
-                    this.weldPoint.copy(targetPoint);
-                    this.weldTip.material.color.setHex(0xffff00);
-                } else {
-                    this.weldTip.material.color.setHex(0xff4400);
+                    // Activate next layer
+                    const toLayer = this.layers[l + 1];
+                    for (const neuron of toLayer) {
+                        neuron.activate();
+                    }
                 }
             }
 
-            updateLaser() {
-                if (!this.laserActive) return;
-
-                const start = this.endEffector.clone();
-                const end = this.weldPoint.clone();
-                const mid = start.clone().add(end).multiplyScalar(0.5);
-                const len = start.distanceTo(end);
-
-                this.laserBeam.position.copy(mid);
-                this.laserBeam.lookAt(end);
-                this.laserBeam.rotation.x += Math.PI / 2;
-                this.laserBeam.scale.y = Math.max(len, 0.01);
-
-                this.laserBeam.material.opacity = 0.7 + Math.random() * 0.3;
-            }
-        }
-
-        class SparkParticle {
-            constructor(pos, vel, life) {
-                this.pos = pos.clone();
-                this.vel = vel.clone();
-                this.life = life;
-                this.maxLife = life;
-
-                const geo = new THREE.SphereGeometry(0.015 + Math.random() * 0.02, 4, 4);
-                const mat = new THREE.MeshBasicMaterial({
-                    color: new THREE.Color().setHSL(0.07 + Math.random() * 0.06, 1, 0.5 + Math.random() * 0.5),
-                    transparent: true
-                });
-                this.mesh = new THREE.Mesh(geo, mat);
-                this.mesh.position.copy(pos);
-            }
-
-            update(dt) {
-                this.life -= dt;
-                this.vel.y -= 12 * dt;
-                this.pos.add(this.vel.clone().multiplyScalar(dt));
-                this.mesh.position.copy(this.pos);
-
-                const ratio = Math.max(this.life / this.maxLife, 0);
-                this.mesh.material.opacity = ratio;
-                this.mesh.scale.setScalar(ratio);
-
-                return this.life > 0;
-            }
-
-            dispose() {
-                this.mesh.geometry.dispose();
-                this.mesh.material.dispose();
-            }
-        }
-
-        class WeldTrail {
-            constructor(scn) {
-                this.points = [];
-                this.mesh = null;
-                this.scene = scn;
-            }
-
-            addPoint(pt) {
-                if (this.points.length > 0) {
-                    const last = this.points[this.points.length - 1];
-                    if (pt.distanceTo(last) < 0.01) return;
+            calculateLoss() {
+                const outputLayer = this.layers[this.layers.length - 1];
+                let loss = 0;
+                for (let i = 0; i < outputLayer.length; i++) {
+                    const diff = outputLayer[i].activation - this.targetPattern[i];
+                    loss += diff * diff;
                 }
-                this.points.push(pt.clone());
-                this.updateGeo();
+                return loss / outputLayer.length;
             }
 
-            updateGeo() {
-                if (this.mesh) {
-                    this.scene.remove(this.mesh);
-                    this.mesh.geometry.dispose();
+            train(learningRate) {
+                // Simplified visual training
+                for (const synapse of this.synapses) {
+                    synapse.updateWeight(learningRate);
                 }
-
-                if (this.points.length < 2) return;
-
-                const curve = new THREE.CatmullRomCurve3(this.points);
-                const geo = new THREE.TubeGeometry(curve, this.points.length * 3, 0.01, 6, false);
-                const mat = new THREE.MeshBasicMaterial({
-                    color: 0xff4400,
-                    transparent: true,
-                    opacity: 0.9
-                });
-                this.mesh = new THREE.Mesh(geo, mat);
-                this.scene.add(this.mesh);
             }
 
-            clear() {
-                if (this.mesh) {
-                    this.scene.remove(this.mesh);
-                    this.mesh.geometry.dispose();
-                    this.mesh = null;
+            update(dt, mouseX, mouseY, mouseInfluence) {
+                for (const neuron of this.neurons) {
+                    neuron.update(dt, time, mouseX, mouseY, mouseInfluence);
                 }
-                this.points = [];
             }
         }
 
-        function init() {
-            // Scene
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0a0a0f);
-            scene.fog = new THREE.Fog(0x0a0a0f, 8, 20);
+        // ============================================
+        // TEXT GENERATION FOR "ALBA STUDIO"
+        // ============================================
+        const textPoints = [];
 
-            // Camera
-            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
-            camera.position.set(3.5, 2.5, 5);
-            camera.lookAt(0, 1.2, 0);
+        function generateTextPoints() {
+            // Create temporary canvas to render text
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = 400;
+            tempCanvas.height = 100;
 
-            // Renderer
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 1.2;
-            container.appendChild(renderer.domElement);
+            tempCtx.fillStyle = '#000';
+            tempCtx.fillRect(0, 0, 400, 100);
+            tempCtx.fillStyle = '#fff';
+            tempCtx.font = 'bold 48px Courier New';
+            tempCtx.textAlign = 'center';
+            tempCtx.textBaseline = 'middle';
+            tempCtx.fillText('ALBA STUDIO', 200, 50);
 
-            // Lights
-            scene.add(new THREE.AmbientLight(0x404050, 0.6));
+            // Sample points from the text
+            const imageData = tempCtx.getImageData(0, 0, 400, 100);
+            const data = imageData.data;
 
-            const mainLight = new THREE.DirectionalLight(0xffffff, 1.5);
-            mainLight.position.set(5, 10, 5);
-            mainLight.castShadow = true;
-            mainLight.shadow.mapSize.width = 1024;
-            mainLight.shadow.mapSize.height = 1024;
-            scene.add(mainLight);
-
-            const fillLight = new THREE.DirectionalLight(0x4466ff, 0.4);
-            fillLight.position.set(-5, 3, -5);
-            scene.add(fillLight);
-
-            const rimLight = new THREE.PointLight(0xff6633, 0.8, 10);
-            rimLight.position.set(0, 4, -3);
-            scene.add(rimLight);
-
-            // Floor
-            const floorGeo = new THREE.PlaneGeometry(20, 20);
-            const floorMat = new THREE.MeshStandardMaterial({
-                color: 0x1a1a1f,
-                metalness: 0.4,
-                roughness: 0.8
-            });
-            const floor = new THREE.Mesh(floorGeo, floorMat);
-            floor.rotation.x = -Math.PI / 2;
-            floor.receiveShadow = true;
-            scene.add(floor);
-
-            // Grid
-            const grid = new THREE.GridHelper(20, 40, 0x333340, 0x222230);
-            grid.position.y = 0.001;
-            scene.add(grid);
-
-            // Work Panel
-            const panelGeo = new THREE.BoxGeometry(4, 2.2, 0.08);
-            const panelMat = new THREE.MeshStandardMaterial({
-                color: 0x1a1a20,
-                metalness: 0.6,
-                roughness: 0.4
-            });
-            const panel = new THREE.Mesh(panelGeo, panelMat);
-            panel.position.set(0, 1.5, -1.2);
-            panel.receiveShadow = true;
-            scene.add(panel);
-
-            // Panel frame
-            const frameMat = new THREE.MeshStandardMaterial({ color: 0xff6b35, metalness: 0.85, roughness: 0.25 });
-
-            const frameGeoH = new THREE.BoxGeometry(4.15, 0.08, 0.12);
-            const frameTop = new THREE.Mesh(frameGeoH, frameMat);
-            frameTop.position.set(0, 2.65, -1.2);
-            scene.add(frameTop);
-
-            const frameBottom = new THREE.Mesh(frameGeoH, frameMat);
-            frameBottom.position.set(0, 0.35, -1.2);
-            scene.add(frameBottom);
-
-            const frameGeoV = new THREE.BoxGeometry(0.08, 2.38, 0.12);
-            const frameLeft = new THREE.Mesh(frameGeoV, frameMat);
-            frameLeft.position.set(-2.04, 1.5, -1.2);
-            scene.add(frameLeft);
-
-            const frameRight = new THREE.Mesh(frameGeoV, frameMat);
-            frameRight.position.set(2.04, 1.5, -1.2);
-            scene.add(frameRight);
-
-            // Robot Arm
-            robotArm = new RoboticArm();
-            scene.add(robotArm.group);
-
-            // Weld Trail
-            weldTrail = new WeldTrail(scene);
-
-            // Events
-            window.addEventListener('resize', onResize);
-            window.addEventListener('mousemove', onMouseMove);
-            window.addEventListener('click', onClick);
-            window.addEventListener('touchstart', onTouch, { passive: false });
-            window.addEventListener('touchmove', onTouchMove, { passive: false });
-
-            // Hide loading
-            loadingBarFill.style.width = '100%';
-            setTimeout(() => {
-                loadingEl.classList.add('hidden');
-            }, 300);
-
-            animate();
+            for (let y = 0; y < 100; y += 3) {
+                for (let x = 0; x < 400; x += 3) {
+                    const idx = (y * 400 + x) * 4;
+                    if (data[idx] > 128) {
+                        textPoints.push({
+                            x: (x - 200) / 50,
+                            y: (50 - y) / 50,
+                            z: 0
+                        });
+                    }
+                }
+            }
         }
 
-        function onResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+        // ============================================
+        // BUFFERS AND RENDERING
+        // ============================================
+        let network;
+        let neuronPositions, neuronActivations, neuronLayers, neuronTypes;
+        let synapseStarts, synapseEnds, synapseWeights, synapsePulsePhases, synapseProgress;
+        let neuronBuffer, activationBuffer, layerBuffer, typeBuffer;
+        let synapseStartBuffer, synapseEndBuffer, synapseWeightBuffer, synapsePulseBuffer, synapseProgressBuffer;
+        let bgBuffer;
+
+        function initBuffers() {
+            network = new NeuralNetwork();
+            generateTextPoints();
+
+            // Neuron buffers
+            const neuronCount = network.neurons.length;
+            neuronPositions = new Float32Array(neuronCount * 3);
+            neuronActivations = new Float32Array(neuronCount);
+            neuronLayers = new Float32Array(neuronCount);
+            neuronTypes = new Float32Array(neuronCount);
+
+            neuronBuffer = gl.createBuffer();
+            activationBuffer = gl.createBuffer();
+            layerBuffer = gl.createBuffer();
+            typeBuffer = gl.createBuffer();
+
+            // Synapse buffers - each synapse rendered as multiple points
+            const pointsPerSynapse = 20;
+            const totalSynapsePoints = network.synapses.length * pointsPerSynapse;
+
+            synapseStarts = new Float32Array(totalSynapsePoints * 3);
+            synapseEnds = new Float32Array(totalSynapsePoints * 3);
+            synapseWeights = new Float32Array(totalSynapsePoints);
+            synapsePulsePhases = new Float32Array(totalSynapsePoints);
+            synapseProgress = new Float32Array(totalSynapsePoints);
+
+            synapseStartBuffer = gl.createBuffer();
+            synapseEndBuffer = gl.createBuffer();
+            synapseWeightBuffer = gl.createBuffer();
+            synapsePulseBuffer = gl.createBuffer();
+            synapseProgressBuffer = gl.createBuffer();
+
+            // Initialize synapse data
+            let idx = 0;
+            for (const synapse of network.synapses) {
+                for (let p = 0; p < pointsPerSynapse; p++) {
+                    const progress = p / (pointsPerSynapse - 1);
+                    synapseProgress[idx] = progress;
+                    synapsePulsePhases[idx] = synapse.pulsePhase;
+                    idx++;
+                }
+            }
+
+            // Background quad
+            bgBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, bgBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+                -1, -1, 1, -1, -1, 1,
+                -1, 1, 1, -1, 1, 1
+            ]), gl.STATIC_DRAW);
+
+            // Update DOM metrics
+            document.getElementById('neurons').textContent = neuronCount;
+            document.getElementById('synapses').textContent = network.synapses.length;
         }
 
+        function updateBuffers() {
+            // Update neuron data
+            for (let i = 0; i < network.neurons.length; i++) {
+                const n = network.neurons[i];
+                neuronPositions[i * 3] = n.x;
+                neuronPositions[i * 3 + 1] = n.y;
+                neuronPositions[i * 3 + 2] = n.z;
+                neuronActivations[i] = n.activation;
+                neuronLayers[i] = n.layer / (network.layers.length - 1);
+                neuronTypes[i] = n.activationType;
+            }
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, neuronBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, neuronPositions, gl.DYNAMIC_DRAW);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, activationBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, neuronActivations, gl.DYNAMIC_DRAW);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, layerBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, neuronLayers, gl.DYNAMIC_DRAW);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, typeBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, neuronTypes, gl.DYNAMIC_DRAW);
+
+            // Update synapse data
+            const pointsPerSynapse = 20;
+            let idx = 0;
+            for (const synapse of network.synapses) {
+                for (let p = 0; p < pointsPerSynapse; p++) {
+                    synapseStarts[idx * 3] = synapse.from.x;
+                    synapseStarts[idx * 3 + 1] = synapse.from.y;
+                    synapseStarts[idx * 3 + 2] = synapse.from.z;
+                    synapseEnds[idx * 3] = synapse.to.x;
+                    synapseEnds[idx * 3 + 1] = synapse.to.y;
+                    synapseEnds[idx * 3 + 2] = synapse.to.z;
+                    synapseWeights[idx] = Math.abs(synapse.weight) * synapse.pulseStrength;
+                    idx++;
+                }
+            }
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, synapseStartBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, synapseStarts, gl.DYNAMIC_DRAW);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, synapseEndBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, synapseEnds, gl.DYNAMIC_DRAW);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, synapseWeightBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, synapseWeights, gl.DYNAMIC_DRAW);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, synapsePulseBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, synapsePulsePhases, gl.DYNAMIC_DRAW);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, synapseProgressBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, synapseProgress, gl.DYNAMIC_DRAW);
+        }
+
+        // ============================================
+        // CANVAS 2D OVERLAY
+        // ============================================
+        function renderOverlay() {
+            ctx.clearRect(0, 0, width, height);
+
+            // Main title - appears gradually with convergence
+            const titleAlpha = Math.min(1, convergence * 2);
+            if (titleAlpha > 0.01) {
+                ctx.save();
+                ctx.globalAlpha = titleAlpha;
+
+                // Glowing text effect
+                ctx.shadowBlur = 30 * convergence;
+                ctx.shadowColor = 'rgba(0, 200, 255, 0.8)';
+
+                ctx.font = `bold ${Math.min(width / 8, 120)}px 'Courier New', monospace`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                // Gradient fill
+                const gradient = ctx.createLinearGradient(
+                    width / 2 - 200, height / 2,
+                    width / 2 + 200, height / 2
+                );
+                gradient.addColorStop(0, '#00aaff');
+                gradient.addColorStop(0.5, '#ffffff');
+                gradient.addColorStop(1, '#00ffaa');
+
+                ctx.fillStyle = gradient;
+
+                // Glitch effect during training
+                const glitchOffset = (1 - convergence) * 10;
+                if (Math.random() > 0.95 && convergence < 0.9) {
+                    ctx.fillStyle = '#ff0066';
+                    ctx.fillText('ALBA STUDIO', width / 2 + glitchOffset, height / 2 - 40);
+                }
+                ctx.fillText('ALBA STUDIO', width / 2, height / 2 - 40);
+
+                ctx.restore();
+            }
+
+            // Training status
+            ctx.save();
+            ctx.font = '14px "Courier New", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = `rgba(0, 255, 136, ${0.4 + Math.sin(time * 3) * 0.2})`;
+
+            const statusText = convergence < 0.95
+                ? 'TRAINING CREATIVE SYSTEMS...'
+                : 'CONVERGENCE ACHIEVED';
+            ctx.fillText(statusText, width / 2, height / 2 + 30);
+
+            // Blinking cursor
+            if (Math.sin(time * 4) > 0) {
+                ctx.fillText('_', width / 2 + ctx.measureText(statusText).width / 2 + 5, height / 2 + 30);
+            }
+            ctx.restore();
+
+            // Subtitle
+            ctx.save();
+            ctx.font = '11px "Courier New", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.fillText('ALBA STUDIO \u2014 UNDER DEVELOPMENT', width / 2, height / 2 + 60);
+            ctx.restore();
+
+            // Progress bar
+            const barWidth = 200;
+            const barHeight = 2;
+            const barX = (width - barWidth) / 2;
+            const barY = height / 2 + 80;
+
+            ctx.save();
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.fillRect(barX, barY, barWidth, barHeight);
+
+            ctx.fillStyle = `rgba(0, 200, 255, ${0.6 + Math.sin(time * 5) * 0.2})`;
+            ctx.fillRect(barX, barY, barWidth * convergence, barHeight);
+            ctx.restore();
+
+            // Network activity visualization in corners
+            ctx.save();
+            ctx.strokeStyle = 'rgba(0, 150, 255, 0.2)';
+            ctx.lineWidth = 1;
+
+            // Draw some activity lines
+            for (let i = 0; i < 5; i++) {
+                const yOffset = 150 + i * 15;
+                ctx.beginPath();
+                ctx.moveTo(20, yOffset);
+                for (let x = 0; x < 80; x += 2) {
+                    const activity = network.layers[i % network.layers.length][0].activation;
+                    const wave = Math.sin(x * 0.2 + time * 5 + i) * 5 * activity;
+                    ctx.lineTo(20 + x, yOffset + wave);
+                }
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        // ============================================
+        // MAIN RENDER LOOP
+        // ============================================
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            aspect = width / height;
+
+            glCanvas.width = width;
+            glCanvas.height = height;
+            overlayCanvas.width = width;
+            overlayCanvas.height = height;
+
+            gl.viewport(0, 0, width, height);
+        }
+
+        let lastTime = 0;
+        function render(timestamp) {
+            const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
+            lastTime = timestamp;
+            time += dt;
+
+            // Update epoch counter
+            if (Math.floor(time * 2) > epoch) {
+                epoch = Math.floor(time * 2);
+                document.getElementById('epoch').textContent = epoch;
+            }
+
+            // Training simulation
+            trainingPhase += dt * 0.5;
+            network.forwardPropagate();
+            network.train(0.001 * Math.sin(trainingPhase) + 0.001);
+
+            const loss = network.calculateLoss();
+            convergence = Math.min(1, convergence + dt * 0.02 * (1 - loss));
+
+            // Update DOM metrics
+            document.getElementById('loss').textContent = (1 - convergence).toFixed(4);
+            document.getElementById('accuracy').textContent = (convergence * 100).toFixed(2) + '%';
+
+            // Mouse influence decay
+            mouseInfluence *= 0.98;
+
+            // Update network
+            network.update(dt, mouseX, mouseY, mouseInfluence);
+            updateBuffers();
+
+            // Camera orbit
+            const camRadius = 12;
+            const camHeight = 2 + Math.sin(time * 0.2) * 0.5;
+            const camAngle = time * 0.15 + mouseX * 0.3;
+            const camX = Math.sin(camAngle) * camRadius;
+            const camZ = Math.cos(camAngle) * camRadius;
+
+            const projection = mat4Perspective(Math.PI / 4, aspect, 0.1, 100);
+            const view = mat4LookAt([camX, camHeight, camZ], [0, 0, 0], [0, 1, 0]);
+            let model = mat4Identity();
+            model = mat4RotateY(model, mouseY * 0.2);
+
+            // Clear
+            gl.clearColor(0, 0, 0, 1);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+
+            // Render background
+            gl.useProgram(bgProgram);
+            gl.uniform1f(gl.getUniformLocation(bgProgram, 'uTime'), time);
+            gl.uniform2f(gl.getUniformLocation(bgProgram, 'uMouse'), mouseX * 0.5 + 0.5, mouseY * 0.5 + 0.5);
+            gl.uniform1f(gl.getUniformLocation(bgProgram, 'uConvergence'), convergence);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, bgBuffer);
+            const bgPosLoc = gl.getAttribLocation(bgProgram, 'aPosition');
+            gl.enableVertexAttribArray(bgPosLoc);
+            gl.vertexAttribPointer(bgPosLoc, 2, gl.FLOAT, false, 0, 0);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+            gl.enable(gl.DEPTH_TEST);
+            gl.depthFunc(gl.LEQUAL);
+
+            // Render synapses
+            gl.useProgram(synapseProgram);
+            gl.uniformMatrix4fv(gl.getUniformLocation(synapseProgram, 'uProjection'), false, projection);
+            gl.uniformMatrix4fv(gl.getUniformLocation(synapseProgram, 'uView'), false, view);
+            gl.uniform1f(gl.getUniformLocation(synapseProgram, 'uTime'), time);
+
+            const synapseAttribs = ['aStart', 'aEnd', 'aWeight', 'aPulsePhase', 'aProgress'];
+            const synapseBuffers = [synapseStartBuffer, synapseEndBuffer, synapseWeightBuffer, synapsePulseBuffer, synapseProgressBuffer];
+            const synapseSizes = [3, 3, 1, 1, 1];
+
+            for (let i = 0; i < synapseAttribs.length; i++) {
+                const loc = gl.getAttribLocation(synapseProgram, synapseAttribs[i]);
+                if (loc >= 0) {
+                    gl.bindBuffer(gl.ARRAY_BUFFER, synapseBuffers[i]);
+                    gl.enableVertexAttribArray(loc);
+                    gl.vertexAttribPointer(loc, synapseSizes[i], gl.FLOAT, false, 0, 0);
+                }
+            }
+
+            gl.drawArrays(gl.POINTS, 0, network.synapses.length * 20);
+
+            // Render neurons
+            gl.useProgram(neuronProgram);
+            gl.uniformMatrix4fv(gl.getUniformLocation(neuronProgram, 'uProjection'), false, projection);
+            gl.uniformMatrix4fv(gl.getUniformLocation(neuronProgram, 'uView'), false, view);
+            gl.uniformMatrix4fv(gl.getUniformLocation(neuronProgram, 'uModel'), false, model);
+            gl.uniform1f(gl.getUniformLocation(neuronProgram, 'uTime'), time);
+            gl.uniform1f(gl.getUniformLocation(neuronProgram, 'uConvergence'), convergence);
+
+            // Position
+            const posLoc = gl.getAttribLocation(neuronProgram, 'aPosition');
+            gl.bindBuffer(gl.ARRAY_BUFFER, neuronBuffer);
+            gl.enableVertexAttribArray(posLoc);
+            gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 0, 0);
+
+            // Activation
+            const actLoc = gl.getAttribLocation(neuronProgram, 'aActivation');
+            gl.bindBuffer(gl.ARRAY_BUFFER, activationBuffer);
+            gl.enableVertexAttribArray(actLoc);
+            gl.vertexAttribPointer(actLoc, 1, gl.FLOAT, false, 0, 0);
+
+            // Layer
+            const layLoc = gl.getAttribLocation(neuronProgram, 'aLayer');
+            gl.bindBuffer(gl.ARRAY_BUFFER, layerBuffer);
+            gl.enableVertexAttribArray(layLoc);
+            gl.vertexAttribPointer(layLoc, 1, gl.FLOAT, false, 0, 0);
+
+            // Type
+            const typLoc = gl.getAttribLocation(neuronProgram, 'aType');
+            gl.bindBuffer(gl.ARRAY_BUFFER, typeBuffer);
+            gl.enableVertexAttribArray(typLoc);
+            gl.vertexAttribPointer(typLoc, 1, gl.FLOAT, false, 0, 0);
+
+            gl.drawArrays(gl.POINTS, 0, network.neurons.length);
+
+            // Render 2D overlay
+            renderOverlay();
+
+            requestAnimationFrame(render);
+        }
+
+        // ============================================
+        // EVENT HANDLERS
+        // ============================================
         function onMouseMove(e) {
-            mousePosition.x = (e.clientX / window.innerWidth) * 2 - 1;
-            mousePosition.y = -(e.clientY / window.innerHeight) * 2 + 1;
-
-            if (!isWelding) {
-                targetPosition.x = mousePosition.x * 2.5;
-                targetPosition.y = 1.3 + mousePosition.y * 1.2;
-                targetPosition.z = 1.5 - Math.abs(mousePosition.x) * 0.4;
-            }
-
-            coordsEl.innerHTML = `
-                <p>X: ${targetPosition.x.toFixed(2)}</p>
-                <p>Y: ${targetPosition.y.toFixed(2)}</p>
-                <p>Z: ${targetPosition.z.toFixed(2)}</p>
-            `;
-        }
-
-        function onTouch(e) {
-            e.preventDefault();
-            if (e.touches.length > 0) {
-                const t = e.touches[0];
-                mousePosition.x = (t.clientX / window.innerWidth) * 2 - 1;
-                mousePosition.y = -(t.clientY / window.innerHeight) * 2 + 1;
-            }
-            onClick();
+            mouseX = (e.clientX / width) * 2 - 1;
+            mouseY = -((e.clientY / height) * 2 - 1);
+            mouseInfluence = 1;
         }
 
         function onTouchMove(e) {
-            e.preventDefault();
             if (e.touches.length > 0) {
-                const t = e.touches[0];
-                mousePosition.x = (t.clientX / window.innerWidth) * 2 - 1;
-                mousePosition.y = -(t.clientY / window.innerHeight) * 2 + 1;
-
-                if (!isWelding) {
-                    targetPosition.x = mousePosition.x * 2.5;
-                    targetPosition.y = 1.3 + mousePosition.y * 1.2;
-                    targetPosition.z = 1.5 - Math.abs(mousePosition.x) * 0.4;
-                }
+                mouseX = (e.touches[0].clientX / width) * 2 - 1;
+                mouseY = -((e.touches[0].clientY / height) * 2 - 1);
+                mouseInfluence = 1;
             }
         }
 
         function onClick() {
-            if (!isWelding) {
-                isWelding = true;
-                weldProgress = 0;
-                weldTrail.clear();
-                document.body.classList.add('welding-active');
+            // Trigger a burst of activity
+            const inputLayer = network.layers[0];
+            for (const neuron of inputLayer) {
+                neuron.activation = 1;
             }
+            mouseInfluence = 2;
         }
 
-        function spawnSparks(pos, count) {
-            for (let i = 0; i < count; i++) {
-                const vel = new THREE.Vector3(
-                    (Math.random() - 0.5) * 2.5,
-                    Math.random() * 3.5 + 1,
-                    (Math.random() - 0.5) * 2.5
-                );
-                const p = new SparkParticle(pos, vel, 0.25 + Math.random() * 0.4);
-                scene.add(p.mesh);
-                particles.push(p);
-            }
-        }
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        window.addEventListener('resize', resize);
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('touchmove', onTouchMove, { passive: true });
+        window.addEventListener('click', onClick);
+        window.addEventListener('touchstart', onClick, { passive: true });
 
-        function updateParticles(dt) {
-            particles = particles.filter(p => {
-                const alive = p.update(dt);
-                if (!alive) {
-                    scene.remove(p.mesh);
-                    p.dispose();
-                }
-                return alive;
-            });
-        }
+        resize();
+        initBuffers();
+        requestAnimationFrame(render);
 
-        function updateWelding(dt) {
-            if (!isWelding) return;
-
-            weldProgress += dt * 0.65;
-            const idx = Math.floor(weldProgress * logoPath.length);
-
-            if (idx >= logoPath.length) {
-                isWelding = false;
-                robotArm.setLaserActive(false);
-                document.body.classList.remove('welding-active');
-                setTimeout(() => weldTrail.clear(), 4000);
-                return;
-            }
-
-            const pt = logoPath[idx];
-            const weldTarget = new THREE.Vector3(pt.x, pt.y, -1.16);
-
-            targetPosition.copy(weldTarget);
-            targetPosition.z += 0.4;
-
-            if (!pt.penUp) {
-                robotArm.setLaserActive(true, weldTarget);
-                weldTrail.addPoint(weldTarget);
-
-                if (Math.random() > 0.4) {
-                    spawnSparks(weldTarget, 2 + Math.floor(Math.random() * 4));
-                }
-            } else {
-                robotArm.setLaserActive(false);
-            }
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-
-            const dt = clock.getDelta();
-            const t = clock.getElapsedTime();
-
-            const currentTarget = targetPosition.clone();
-            if (!isWelding) {
-                currentTarget.x += Math.sin(t * 0.5) * 0.08;
-                currentTarget.y += Math.cos(t * 0.7) * 0.04;
-            }
-
-            robotArm.solveIK(currentTarget);
-            robotArm.updateLaser();
-
-            updateWelding(dt);
-            updateParticles(dt);
-
-            camera.position.x = 3.5 + Math.sin(t * 0.15) * 0.15;
-            camera.position.y = 2.5 + Math.cos(t * 0.12) * 0.08;
-            camera.lookAt(0, 1.2, 0);
-
-            renderer.render(scene, camera);
-        }
-
-        // Start
-        window.addEventListener('DOMContentLoaded', () => {
-            loadingBarFill.style.width = '50%';
-            setTimeout(() => {
-                loadingBarFill.style.width = '80%';
-                setTimeout(init, 200);
-            }, 300);
-        });
+    })();
     </script>
 </body>
 </html>
