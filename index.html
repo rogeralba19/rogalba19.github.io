@@ -182,7 +182,7 @@
                 vWorldPos = worldPos.xyz;
 
                 gl_Position = uProjection * uView * worldPos;
-                gl_PointSize = (8.0 + aActivation * 12.0) * (1.0 - gl_Position.z * 0.15);
+                gl_PointSize = (14.0 + aActivation * 20.0) * (1.0 - gl_Position.z * 0.12);
 
                 vActivation = aActivation;
                 vLayer = aLayer;
@@ -207,9 +207,10 @@
 
                 if (dist > 0.5) discard;
 
-                // Core glow
-                float core = 1.0 - smoothstep(0.0, 0.2, dist);
-                float glow = 1.0 - smoothstep(0.1, 0.5, dist);
+                // Core glow - enhanced brightness
+                float core = 1.0 - smoothstep(0.0, 0.15, dist);
+                float glow = 1.0 - smoothstep(0.05, 0.5, dist);
+                float outerGlow = 1.0 - smoothstep(0.2, 0.5, dist);
 
                 // Color based on layer and activation type
                 vec3 baseColor;
@@ -228,11 +229,12 @@
                 // Pulse effect
                 float pulse = sin(uTime * 4.0 + vLayer * 2.0) * 0.15 + 0.85;
 
-                vec3 color = baseColor * (core * 2.0 + glow) * vActivation * pulse;
-                float alpha = (core * 0.9 + glow * 0.6) * (0.3 + vActivation * 0.7);
+                vec3 color = baseColor * (core * 3.5 + glow * 1.5 + outerGlow * 0.8) * vActivation * pulse;
+                float alpha = (core * 1.0 + glow * 0.8 + outerGlow * 0.4) * (0.5 + vActivation * 0.5);
 
-                // Convergence boost
-                color += vec3(1.0) * uConvergence * core * 0.5;
+                // Convergence boost - enhanced
+                color += vec3(1.0) * uConvergence * core * 0.8;
+                color += baseColor * outerGlow * 0.5;
 
                 gl_FragColor = vec4(color, alpha);
             }
@@ -264,7 +266,7 @@
 
                 vec4 viewPos = uView * vec4(pos, 1.0);
                 gl_Position = uProjection * viewPos;
-                gl_PointSize = 2.0 + aWeight * 3.0;
+                gl_PointSize = 4.0 + aWeight * 6.0;
 
                 vWeight = aWeight;
                 vPulsePhase = aPulsePhase;
@@ -289,13 +291,13 @@
 
                 if (dist > 0.5) discard;
 
-                // Traveling pulse along synapse
+                // Traveling pulse along synapse - enhanced
                 float pulsePos = fract(uTime * 0.8 + vPulsePhase);
                 float pulseDist = abs(vProgress - pulsePos);
-                float pulse = exp(-pulseDist * pulseDist * 50.0) * vWeight;
+                float pulse = exp(-pulseDist * pulseDist * 30.0) * vWeight * 1.5;
 
-                // Base connection glow
-                float baseGlow = (1.0 - dist * 2.0) * 0.15 * vWeight;
+                // Base connection glow - enhanced
+                float baseGlow = (1.0 - dist * 2.0) * 0.35 * vWeight;
 
                 // Color based on weight (negative=red, positive=cyan)
                 vec3 color;
@@ -305,13 +307,13 @@
                     color = mix(vec3(1.0, 0.2, 0.3), vec3(1.0, 0.8, 0.8), pulse);
                 }
 
-                float intensity = baseGlow + pulse * 0.8;
-                float alpha = intensity * (1.0 - smoothstep(0.0, 0.5, dist));
+                float intensity = baseGlow + pulse * 1.2;
+                float alpha = intensity * (1.0 - smoothstep(0.0, 0.5, dist)) * 1.5;
 
-                // Depth fade
-                float depthFade = 1.0 / (1.0 + vDepth * 0.05);
+                // Depth fade - less aggressive
+                float depthFade = 1.0 / (1.0 + vDepth * 0.03);
 
-                gl_FragColor = vec4(color * intensity * depthFade, alpha * depthFade);
+                gl_FragColor = vec4(color * intensity * depthFade * 1.3, alpha * depthFade);
             }
         `;
 
@@ -905,7 +907,7 @@
                 ctx.shadowBlur = 30 * convergence;
                 ctx.shadowColor = 'rgba(0, 200, 255, 0.8)';
 
-                ctx.font = `bold ${Math.min(width / 8, 120)}px 'Courier New', monospace`;
+                ctx.font = `bold ${Math.min(width / 5, 180)}px 'Courier New', monospace`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
 
@@ -920,13 +922,29 @@
 
                 ctx.fillStyle = gradient;
 
-                // Glitch effect during training
-                const glitchOffset = (1 - convergence) * 10;
-                if (Math.random() > 0.95 && convergence < 0.9) {
+                // Glitch effect - permanent during and after training
+                const glitchIntensity = convergence < 0.9 ? (1 - convergence) * 12 : 3;
+                const glitchOffset = glitchIntensity * (Math.random() - 0.5);
+
+                // Multiple glitch layers
+                if (Math.random() > 0.92) {
                     ctx.fillStyle = '#ff0066';
-                    ctx.fillText('ALBA STUDIO', width / 2 + glitchOffset, height / 2 - 40);
+                    ctx.fillText('ALBA', width / 2 + glitchOffset * 2, height / 2 - 60);
                 }
-                ctx.fillText('ALBA STUDIO', width / 2, height / 2 - 40);
+                if (Math.random() > 0.94) {
+                    ctx.fillStyle = '#00ffaa';
+                    ctx.fillText('ALBA', width / 2 - glitchOffset * 1.5, height / 2 - 60);
+                }
+                ctx.fillText('ALBA', width / 2, height / 2 - 60);
+
+                // STUDIO below with slightly smaller font
+                ctx.font = `bold ${Math.min(width / 12, 80)}px 'Courier New', monospace`;
+                if (Math.random() > 0.93) {
+                    ctx.fillStyle = '#ff0066';
+                    ctx.fillText('STUDIO', width / 2 + glitchOffset * 1.5, height / 2 + 20);
+                }
+                ctx.fillStyle = gradient;
+                ctx.fillText('STUDIO', width / 2, height / 2 + 20);
 
                 ctx.restore();
             }
@@ -940,11 +958,11 @@
             const statusText = convergence < 0.95
                 ? 'TRAINING CREATIVE SYSTEMS...'
                 : 'CONVERGENCE ACHIEVED';
-            ctx.fillText(statusText, width / 2, height / 2 + 30);
+            ctx.fillText(statusText, width / 2, height / 2 + 80);
 
             // Blinking cursor
             if (Math.sin(time * 4) > 0) {
-                ctx.fillText('_', width / 2 + ctx.measureText(statusText).width / 2 + 5, height / 2 + 30);
+                ctx.fillText('_', width / 2 + ctx.measureText(statusText).width / 2 + 5, height / 2 + 80);
             }
             ctx.restore();
 
@@ -953,14 +971,14 @@
             ctx.font = '11px "Courier New", monospace';
             ctx.textAlign = 'center';
             ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-            ctx.fillText('ALBA STUDIO \u2014 UNDER DEVELOPMENT', width / 2, height / 2 + 60);
+            ctx.fillText('UNDER DEVELOPMENT', width / 2, height / 2 + 110);
             ctx.restore();
 
             // Progress bar
             const barWidth = 200;
             const barHeight = 2;
             const barX = (width - barWidth) / 2;
-            const barY = height / 2 + 80;
+            const barY = height / 2 + 130;
 
             ctx.save();
             ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
@@ -1024,7 +1042,7 @@
             network.train(0.001 * Math.sin(trainingPhase) + 0.001);
 
             const loss = network.calculateLoss();
-            convergence = Math.min(1, convergence + dt * 0.02 * (1 - loss));
+            convergence = Math.min(1, convergence + dt * 0.005 * (1 - loss));
 
             // Update DOM metrics
             document.getElementById('loss').textContent = (1 - convergence).toFixed(4);
