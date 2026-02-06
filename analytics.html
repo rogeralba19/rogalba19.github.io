@@ -178,7 +178,7 @@
         /* Stats Grid */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
         }
@@ -220,10 +220,6 @@
             margin-top: 8px;
         }
 
-        .stat-card .change.negative {
-            color: #ff4466;
-        }
-
         /* Main Content */
         .main-content {
             display: grid;
@@ -251,6 +247,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
         .panel-header h2 {
@@ -259,18 +257,38 @@
             color: rgba(255, 255, 255, 0.8);
         }
 
+        .panel-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .sort-select {
+            padding: 6px 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 11px;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .sort-select:focus {
+            border-color: #00aaff;
+        }
+
         .panel-header .filter {
             font-size: 11px;
             color: rgba(255, 255, 255, 0.4);
             padding: 4px 10px;
             background: rgba(0, 0, 0, 0.2);
             border-radius: 4px;
-            cursor: pointer;
         }
 
         .panel-content {
             padding: 20px;
-            max-height: 400px;
+            max-height: 500px;
             overflow-y: auto;
         }
 
@@ -296,10 +314,12 @@
             border-radius: 8px;
             margin-bottom: 10px;
             transition: all 0.3s;
+            cursor: pointer;
         }
 
         .visitor-item:hover {
-            background: rgba(0, 170, 255, 0.1);
+            background: rgba(0, 170, 255, 0.15);
+            transform: translateX(4px);
         }
 
         .visitor-item .flag {
@@ -322,10 +342,13 @@
             color: rgba(255, 255, 255, 0.4);
         }
 
+        .visitor-item .meta {
+            text-align: right;
+        }
+
         .visitor-item .time {
             font-size: 11px;
             color: rgba(255, 255, 255, 0.3);
-            text-align: right;
         }
 
         .visitor-item .visits {
@@ -334,7 +357,51 @@
             padding: 4px 8px;
             border-radius: 4px;
             font-size: 11px;
-            margin-left: 10px;
+            margin-top: 4px;
+            display: inline-block;
+        }
+
+        .visitor-item .duration {
+            font-size: 10px;
+            color: #00ff88;
+            margin-top: 2px;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .pagination button {
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background: rgba(0, 170, 255, 0.2);
+            border-color: #00aaff;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .pagination .page-info {
+            padding: 8px 12px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
         }
 
         /* Country Stats */
@@ -380,7 +447,7 @@
             border-radius: 2px;
         }
 
-        /* Chart placeholder */
+        /* Chart */
         .chart-container {
             height: 200px;
             display: flex;
@@ -428,35 +495,98 @@
             margin-top: 8px;
         }
 
-        /* Device/Browser Stats */
-        .device-stats {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
         }
 
-        .device-item {
-            text-align: center;
-            padding: 15px;
+        .modal-overlay.visible {
+            display: flex;
+        }
+
+        .modal {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: 16px;
+            border: 1px solid rgba(0, 200, 255, 0.2);
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .modal-close:hover {
+            color: #ff4466;
+        }
+
+        .modal h3 {
+            font-size: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .modal h3 .flag {
+            font-size: 32px;
+        }
+
+        .modal-section {
+            margin-bottom: 20px;
+        }
+
+        .modal-section h4 {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .modal-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .modal-stat {
             background: rgba(0, 0, 0, 0.2);
+            padding: 12px;
             border-radius: 8px;
         }
 
-        .device-item .icon {
-            font-size: 24px;
-            margin-bottom: 8px;
-        }
-
-        .device-item .name {
-            font-size: 11px;
-            color: rgba(255, 255, 255, 0.5);
+        .modal-stat .label {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.4);
             margin-bottom: 4px;
         }
 
-        .device-item .percent {
-            font-size: 18px;
-            font-weight: bold;
+        .modal-stat .value {
+            font-size: 16px;
             color: #00aaff;
+            font-weight: bold;
         }
 
         /* Empty State */
@@ -512,34 +642,6 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
-
-        /* Firebase Config Notice */
-        .config-notice {
-            background: rgba(255, 170, 0, 0.1);
-            border: 1px solid rgba(255, 170, 0, 0.3);
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-
-        .config-notice h3 {
-            color: #ffaa00;
-            font-size: 14px;
-            margin-bottom: 10px;
-        }
-
-        .config-notice p {
-            font-size: 12px;
-            color: rgba(255, 255, 255, 0.6);
-            line-height: 1.6;
-        }
-
-        .config-notice code {
-            background: rgba(0, 0, 0, 0.3);
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 11px;
-        }
     </style>
 </head>
 <body>
@@ -567,18 +669,6 @@
             <button class="logout-btn" onclick="logout()">Cerrar Sesion</button>
         </div>
 
-        <!-- Config Notice (shown when Firebase not configured) -->
-        <div class="config-notice" id="configNotice" style="display: none;">
-            <h3>Configuracion de Firebase Requerida</h3>
-            <p>
-                Para activar el tracking de visitantes, necesitas configurar Firebase:<br><br>
-                1. Ve a <code>console.firebase.google.com</code><br>
-                2. Crea un nuevo proyecto<br>
-                3. Activa Realtime Database<br>
-                4. Copia tu configuracion en este archivo y en <code>index.html</code>
-            </p>
-        </div>
-
         <!-- Stats Grid -->
         <div class="stats-grid">
             <div class="stat-card">
@@ -602,14 +692,14 @@
                 <div class="change">diferentes</div>
             </div>
             <div class="stat-card">
-                <div class="label">Promedio Visitas/Usuario</div>
+                <div class="label">Promedio Visitas</div>
                 <div class="value" id="avgVisits">0</div>
-                <div class="change">por persona</div>
+                <div class="change">por usuario</div>
             </div>
             <div class="stat-card">
-                <div class="label">Ultima Visita</div>
-                <div class="value" id="lastVisitTime" style="font-size: 18px;">--</div>
-                <div class="change" id="lastVisitCountry">--</div>
+                <div class="label">Tiempo Promedio</div>
+                <div class="value" id="avgDuration" style="font-size: 24px;">--</div>
+                <div class="change">en pagina</div>
             </div>
         </div>
 
@@ -620,11 +710,24 @@
                 <!-- Visitors Panel -->
                 <div class="panel" style="margin-bottom: 20px;">
                     <div class="panel-header">
-                        <h2>Visitantes Recientes</h2>
-                        <span class="filter" id="visitorCount">0 registros</span>
+                        <h2>Todos los Visitantes</h2>
+                        <div class="panel-controls">
+                            <select class="sort-select" id="sortSelect" onchange="sortVisitors()">
+                                <option value="recent">Mas recientes</option>
+                                <option value="visits">Mas visitas</option>
+                                <option value="duration">Mayor permanencia</option>
+                                <option value="country">Por pais</option>
+                            </select>
+                            <span class="filter" id="visitorCount">0 registros</span>
+                        </div>
                     </div>
                     <div class="panel-content" id="visitorsList">
                         <div class="loading"><div class="spinner"></div></div>
+                    </div>
+                    <div class="pagination" id="pagination">
+                        <button onclick="prevPage()" id="prevBtn" disabled>&larr; Anterior</button>
+                        <span class="page-info" id="pageInfo">1 de 1</span>
+                        <button onclick="nextPage()" id="nextBtn" disabled>Siguiente &rarr;</button>
                     </div>
                 </div>
 
@@ -634,9 +737,7 @@
                         <h2>Actividad por Hora (Ultimas 24h)</h2>
                     </div>
                     <div class="panel-content">
-                        <div class="chart-container" id="hourlyChart">
-                            <!-- Chart bars will be generated here -->
-                        </div>
+                        <div class="chart-container" id="hourlyChart"></div>
                     </div>
                 </div>
             </div>
@@ -644,7 +745,7 @@
             <!-- Right Column -->
             <div>
                 <!-- Countries Panel -->
-                <div class="panel" style="margin-bottom: 20px;">
+                <div class="panel">
                     <div class="panel-header">
                         <h2>Paises</h2>
                     </div>
@@ -652,35 +753,78 @@
                         <div class="loading"><div class="spinner"></div></div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
 
-                <!-- Devices Panel -->
-                <div class="panel">
-                    <div class="panel-header">
-                        <h2>Dispositivos y Navegadores</h2>
+    <!-- Visitor Detail Modal -->
+    <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+            <h3 id="modalTitle"><span class="flag"></span><span class="name"></span></h3>
+
+            <div class="modal-section">
+                <h4>Informacion de Visitas</h4>
+                <div class="modal-grid">
+                    <div class="modal-stat">
+                        <div class="label">Total Visitas</div>
+                        <div class="value" id="modalVisits">0</div>
                     </div>
-                    <div class="panel-content">
-                        <div class="device-stats" id="deviceStats">
-                            <div class="device-item">
-                                <div class="icon">💻</div>
-                                <div class="name">Desktop</div>
-                                <div class="percent" id="desktopPercent">0%</div>
-                            </div>
-                            <div class="device-item">
-                                <div class="icon">📱</div>
-                                <div class="name">Mobile</div>
-                                <div class="percent" id="mobilePercent">0%</div>
-                            </div>
-                            <div class="device-item">
-                                <div class="icon">🌐</div>
-                                <div class="name">Chrome</div>
-                                <div class="percent" id="chromePercent">0%</div>
-                            </div>
-                            <div class="device-item">
-                                <div class="icon">🦊</div>
-                                <div class="name">Firefox</div>
-                                <div class="percent" id="firefoxPercent">0%</div>
-                            </div>
-                        </div>
+                    <div class="modal-stat">
+                        <div class="label">Tiempo Total</div>
+                        <div class="value" id="modalDuration">0m</div>
+                    </div>
+                    <div class="modal-stat">
+                        <div class="label">Primera Visita</div>
+                        <div class="value" id="modalFirstVisit">--</div>
+                    </div>
+                    <div class="modal-stat">
+                        <div class="label">Ultima Visita</div>
+                        <div class="value" id="modalLastVisit">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-section">
+                <h4>Ubicacion</h4>
+                <div class="modal-grid">
+                    <div class="modal-stat">
+                        <div class="label">Ciudad</div>
+                        <div class="value" id="modalCity">--</div>
+                    </div>
+                    <div class="modal-stat">
+                        <div class="label">Region</div>
+                        <div class="value" id="modalRegion">--</div>
+                    </div>
+                    <div class="modal-stat">
+                        <div class="label">Pais</div>
+                        <div class="value" id="modalCountry">--</div>
+                    </div>
+                    <div class="modal-stat">
+                        <div class="label">Zona Horaria</div>
+                        <div class="value" id="modalTimezone">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-section">
+                <h4>Dispositivo</h4>
+                <div class="modal-grid">
+                    <div class="modal-stat">
+                        <div class="label">Navegador</div>
+                        <div class="value" id="modalBrowser">--</div>
+                    </div>
+                    <div class="modal-stat">
+                        <div class="label">Dispositivo</div>
+                        <div class="value" id="modalDevice">--</div>
+                    </div>
+                    <div class="modal-stat">
+                        <div class="label">Sistema</div>
+                        <div class="value" id="modalOS">--</div>
+                    </div>
+                    <div class="modal-stat">
+                        <div class="label">Pantalla</div>
+                        <div class="value" id="modalScreen">--</div>
                     </div>
                 </div>
             </div>
@@ -692,9 +836,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
     <script>
-    // ============================================
-    // FIREBASE CONFIGURATION
-    // ============================================
     // Firebase Configuration
     const firebaseConfig = {
         apiKey: "AIzaSyBvju4gyCpz6E6R3TsvO1uR1KZB7ZbW9VU",
@@ -706,10 +847,8 @@
         appId: "1:519359936167:web:8c2680ed1e4583def28d82"
     };
 
-    // Password for access
     const ACCESS_PASSWORD = '132435';
 
-    // Country code to flag emoji mapping
     const countryFlags = {
         'US': '🇺🇸', 'MX': '🇲🇽', 'ES': '🇪🇸', 'AR': '🇦🇷', 'CO': '🇨🇴',
         'PE': '🇵🇪', 'CL': '🇨🇱', 'VE': '🇻🇪', 'EC': '🇪🇨', 'GT': '🇬🇹',
@@ -726,11 +865,12 @@
     };
 
     let db = null;
-    let visitorsRef = null;
+    let allVisitors = [];
+    let currentPage = 1;
+    const itemsPerPage = 15;
+    let currentSort = 'recent';
 
-    // ============================================
-    // LOGIN FUNCTIONALITY
-    // ============================================
+    // Login
     function attemptLogin() {
         const input = document.getElementById('passwordInput');
         if (input.value === ACCESS_PASSWORD) {
@@ -750,147 +890,108 @@
         document.getElementById('passwordInput').value = '';
     }
 
-    // Enter key to login
     document.getElementById('passwordInput').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') attemptLogin();
     });
 
-    // ============================================
-    // FIREBASE INITIALIZATION
-    // ============================================
+    // Firebase
     function initializeFirebase() {
         try {
-            // Check if config is set
-            if (firebaseConfig.apiKey === 'TU_API_KEY') {
-                document.getElementById('configNotice').style.display = 'block';
-                showDemoData();
-                return;
-            }
-
             firebase.initializeApp(firebaseConfig);
             db = firebase.database();
-            visitorsRef = db.ref('visitors');
 
-            // Listen for real-time updates
-            visitorsRef.on('value', (snapshot) => {
+            db.ref('visitors').on('value', (snapshot) => {
                 const data = snapshot.val();
                 if (data) {
-                    processVisitorData(data);
+                    allVisitors = Object.entries(data).map(([id, v]) => ({ id, ...v }));
+                    processVisitorData();
                 } else {
                     showEmptyState();
                 }
             });
-
         } catch (error) {
             console.error('Firebase error:', error);
-            document.getElementById('configNotice').style.display = 'block';
             showDemoData();
         }
     }
 
-    // ============================================
-    // DATA PROCESSING
-    // ============================================
-    function processVisitorData(data) {
-        const visitors = Object.values(data);
+    // Data Processing
+    function processVisitorData() {
         const now = Date.now();
         const todayStart = new Date().setHours(0, 0, 0, 0);
         const last24h = now - (24 * 60 * 60 * 1000);
 
-        // Calculate stats
         let totalVisits = 0;
         let todayVisits = 0;
         let activeNow = 0;
         let countries = {};
-        let devices = { desktop: 0, mobile: 0 };
-        let browsers = { chrome: 0, firefox: 0, safari: 0, other: 0 };
         let hourlyData = new Array(24).fill(0);
         let newToday = 0;
+        let totalDuration = 0;
 
-        visitors.forEach(visitor => {
-            const visitCount = visitor.visitCount || 1;
-            totalVisits += visitCount;
+        allVisitors.forEach(visitor => {
+            totalVisits += visitor.visitCount || 1;
+            totalDuration += visitor.totalDuration || 0;
 
-            // Check if visited today
-            if (visitor.lastVisit > todayStart) {
-                todayVisits++;
-            }
+            if (visitor.lastVisit > todayStart) todayVisits++;
+            if (visitor.firstVisit > todayStart) newToday++;
+            if (visitor.lastVisit > (now - 5 * 60 * 1000)) activeNow++;
 
-            // Check if first visit was today (new user)
-            if (visitor.firstVisit > todayStart) {
-                newToday++;
-            }
-
-            // Active in last 5 minutes
-            if (visitor.lastVisit > (now - 5 * 60 * 1000)) {
-                activeNow++;
-            }
-
-            // Country stats
             const country = visitor.country || 'Unknown';
             countries[country] = (countries[country] || 0) + 1;
 
-            // Device stats
-            if (visitor.device === 'mobile' || visitor.device === 'tablet') {
-                devices.mobile++;
-            } else {
-                devices.desktop++;
-            }
-
-            // Browser stats
-            const browser = (visitor.browser || '').toLowerCase();
-            if (browser.includes('chrome')) browsers.chrome++;
-            else if (browser.includes('firefox')) browsers.firefox++;
-            else if (browser.includes('safari')) browsers.safari++;
-            else browsers.other++;
-
-            // Hourly activity (last 24h)
             if (visitor.lastVisit > last24h) {
                 const hour = new Date(visitor.lastVisit).getHours();
                 hourlyData[hour]++;
             }
         });
 
-        // Update stats display
+        // Update stats
         document.getElementById('totalVisits').textContent = totalVisits.toLocaleString();
         document.getElementById('visitsChange').textContent = `+${todayVisits} hoy`;
-        document.getElementById('uniqueVisitors').textContent = visitors.length.toLocaleString();
+        document.getElementById('uniqueVisitors').textContent = allVisitors.length.toLocaleString();
         document.getElementById('uniqueChange').textContent = `+${newToday} nuevos`;
         document.getElementById('activeNow').textContent = activeNow;
         document.getElementById('totalCountries').textContent = Object.keys(countries).length;
-        document.getElementById('avgVisits').textContent = (totalVisits / visitors.length).toFixed(1);
-        document.getElementById('visitorCount').textContent = `${visitors.length} registros`;
+        document.getElementById('avgVisits').textContent = (totalVisits / Math.max(allVisitors.length, 1)).toFixed(1);
+        document.getElementById('visitorCount').textContent = `${allVisitors.length} registros`;
 
-        // Last visit
-        const sortedByTime = [...visitors].sort((a, b) => b.lastVisit - a.lastVisit);
-        if (sortedByTime.length > 0) {
-            const lastVisitor = sortedByTime[0];
-            document.getElementById('lastVisitTime').textContent = formatTime(lastVisitor.lastVisit);
-            document.getElementById('lastVisitCountry').textContent = `${getFlag(lastVisitor.countryCode)} ${lastVisitor.city || lastVisitor.country || 'Unknown'}`;
-        }
+        const avgDuration = totalDuration / Math.max(allVisitors.length, 1);
+        document.getElementById('avgDuration').textContent = formatDuration(avgDuration);
 
-        // Device percentages
-        const totalDevices = devices.desktop + devices.mobile;
-        document.getElementById('desktopPercent').textContent = `${Math.round((devices.desktop / totalDevices) * 100)}%`;
-        document.getElementById('mobilePercent').textContent = `${Math.round((devices.mobile / totalDevices) * 100)}%`;
-
-        // Browser percentages
-        const totalBrowsers = browsers.chrome + browsers.firefox + browsers.safari + browsers.other;
-        document.getElementById('chromePercent').textContent = `${Math.round((browsers.chrome / totalBrowsers) * 100)}%`;
-        document.getElementById('firefoxPercent').textContent = `${Math.round((browsers.firefox / totalBrowsers) * 100)}%`;
-
-        // Render visitors list
-        renderVisitorsList(sortedByTime.slice(0, 50));
-
-        // Render countries
+        sortVisitors();
         renderCountriesList(countries);
-
-        // Render hourly chart
         renderHourlyChart(hourlyData);
     }
 
+    // Sorting
+    function sortVisitors() {
+        currentSort = document.getElementById('sortSelect').value;
+        currentPage = 1;
+
+        const sorted = [...allVisitors].sort((a, b) => {
+            switch (currentSort) {
+                case 'visits':
+                    return (b.visitCount || 1) - (a.visitCount || 1);
+                case 'duration':
+                    return (b.totalDuration || 0) - (a.totalDuration || 0);
+                case 'country':
+                    return (a.country || 'ZZZ').localeCompare(b.country || 'ZZZ');
+                default: // recent
+                    return (b.lastVisit || 0) - (a.lastVisit || 0);
+            }
+        });
+
+        renderVisitorsList(sorted);
+    }
+
+    // Pagination
     function renderVisitorsList(visitors) {
         const container = document.getElementById('visitorsList');
+        const totalPages = Math.ceil(visitors.length / itemsPerPage);
+        const start = (currentPage - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        const pageVisitors = visitors.slice(start, end);
 
         if (visitors.length === 0) {
             container.innerHTML = `
@@ -902,42 +1003,94 @@
             return;
         }
 
-        container.innerHTML = visitors.map(v => `
-            <div class="visitor-item">
+        container.innerHTML = pageVisitors.map((v, i) => `
+            <div class="visitor-item" onclick="showVisitorDetail('${v.id}')">
                 <span class="flag">${getFlag(v.countryCode)}</span>
                 <div class="info">
                     <div class="location">${v.city || 'Unknown'}, ${v.country || 'Unknown'}</div>
-                    <div class="details">${v.browser || 'Unknown'} / ${v.device || 'Unknown'} / ${v.os || 'Unknown'}</div>
+                    <div class="details">${v.browser || '?'} / ${v.device || '?'} / ${v.os || '?'}</div>
                 </div>
-                <div class="time">${formatTime(v.lastVisit)}</div>
-                <span class="visits">${v.visitCount || 1}x</span>
+                <div class="meta">
+                    <div class="time">${formatTime(v.lastVisit)}</div>
+                    <span class="visits">${v.visitCount || 1} visitas</span>
+                    ${v.totalDuration ? `<div class="duration">${formatDuration(v.totalDuration)}</div>` : ''}
+                </div>
             </div>
         `).join('');
+
+        // Update pagination
+        document.getElementById('pageInfo').textContent = `${currentPage} de ${totalPages}`;
+        document.getElementById('prevBtn').disabled = currentPage <= 1;
+        document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+
+        // Store for pagination
+        window.currentVisitorList = visitors;
     }
 
+    function prevPage() {
+        if (currentPage > 1) {
+            currentPage--;
+            renderVisitorsList(window.currentVisitorList);
+        }
+    }
+
+    function nextPage() {
+        const totalPages = Math.ceil(window.currentVisitorList.length / itemsPerPage);
+        if (currentPage < totalPages) {
+            currentPage++;
+            renderVisitorsList(window.currentVisitorList);
+        }
+    }
+
+    // Modal
+    function showVisitorDetail(visitorId) {
+        const visitor = allVisitors.find(v => v.id === visitorId);
+        if (!visitor) return;
+
+        document.querySelector('#modalTitle .flag').textContent = getFlag(visitor.countryCode);
+        document.querySelector('#modalTitle .name').textContent = `${visitor.city || 'Unknown'}, ${visitor.country || 'Unknown'}`;
+
+        document.getElementById('modalVisits').textContent = visitor.visitCount || 1;
+        document.getElementById('modalDuration').textContent = formatDuration(visitor.totalDuration || 0);
+        document.getElementById('modalFirstVisit').textContent = formatDate(visitor.firstVisit);
+        document.getElementById('modalLastVisit').textContent = formatDate(visitor.lastVisit);
+
+        document.getElementById('modalCity').textContent = visitor.city || '--';
+        document.getElementById('modalRegion').textContent = visitor.region || '--';
+        document.getElementById('modalCountry').textContent = visitor.country || '--';
+        document.getElementById('modalTimezone').textContent = visitor.timezone || '--';
+
+        document.getElementById('modalBrowser').textContent = visitor.browser || '--';
+        document.getElementById('modalDevice').textContent = visitor.device || '--';
+        document.getElementById('modalOS').textContent = visitor.os || '--';
+        document.getElementById('modalScreen').textContent = visitor.screenWidth ? `${visitor.screenWidth}x${visitor.screenHeight}` : '--';
+
+        document.getElementById('modalOverlay').classList.add('visible');
+    }
+
+    function closeModal(event) {
+        if (!event || event.target === document.getElementById('modalOverlay')) {
+            document.getElementById('modalOverlay').classList.remove('visible');
+        }
+    }
+
+    // Render helpers
     function renderCountriesList(countries) {
         const container = document.getElementById('countriesList');
         const sorted = Object.entries(countries).sort((a, b) => b[1] - a[1]);
         const max = sorted[0] ? sorted[0][1] : 1;
 
         if (sorted.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <div class="icon">🌍</div>
-                    <p>No hay datos de paises</p>
-                </div>
-            `;
+            container.innerHTML = `<div class="empty-state"><div class="icon">🌍</div><p>No hay datos</p></div>`;
             return;
         }
 
-        container.innerHTML = sorted.slice(0, 10).map(([country, count]) => `
+        container.innerHTML = sorted.slice(0, 15).map(([country, count]) => `
             <div class="country-item">
                 <span class="flag">${getFlag(country)}</span>
                 <span class="name">${country}</span>
                 <span class="count">${count}</span>
-                <div class="bar">
-                    <div class="bar-fill" style="width: ${(count / max) * 100}%"></div>
-                </div>
+                <div class="bar"><div class="bar-fill" style="width: ${(count / max) * 100}%"></div></div>
             </div>
         `).join('');
     }
@@ -961,43 +1114,32 @@
         container.innerHTML = html;
     }
 
-    // ============================================
-    // DEMO DATA (when Firebase not configured)
-    // ============================================
+    // Demo data
     function showDemoData() {
-        const demoData = {
-            'user1': { city: 'Ciudad de Mexico', country: 'Mexico', countryCode: 'MX', browser: 'Chrome', device: 'desktop', os: 'Windows', visitCount: 5, lastVisit: Date.now() - 60000, firstVisit: Date.now() - 86400000 },
-            'user2': { city: 'Madrid', country: 'Spain', countryCode: 'ES', browser: 'Firefox', device: 'mobile', os: 'Android', visitCount: 3, lastVisit: Date.now() - 120000, firstVisit: Date.now() - 172800000 },
-            'user3': { city: 'Buenos Aires', country: 'Argentina', countryCode: 'AR', browser: 'Chrome', device: 'desktop', os: 'MacOS', visitCount: 8, lastVisit: Date.now() - 300000, firstVisit: Date.now() - 604800000 },
-            'user4': { city: 'Bogota', country: 'Colombia', countryCode: 'CO', browser: 'Safari', device: 'mobile', os: 'iOS', visitCount: 2, lastVisit: Date.now() - 600000, firstVisit: Date.now() - 259200000 },
-            'user5': { city: 'Lima', country: 'Peru', countryCode: 'PE', browser: 'Chrome', device: 'desktop', os: 'Windows', visitCount: 4, lastVisit: Date.now() - 900000, firstVisit: Date.now() - 432000000 }
-        };
-        processVisitorData(demoData);
+        allVisitors = [
+            { id: '1', city: 'Ciudad de Mexico', country: 'Mexico', countryCode: 'MX', browser: 'Chrome', device: 'desktop', os: 'Windows', visitCount: 15, totalDuration: 3600000, lastVisit: Date.now() - 60000, firstVisit: Date.now() - 86400000 * 7 },
+            { id: '2', city: 'Madrid', country: 'Spain', countryCode: 'ES', browser: 'Firefox', device: 'mobile', os: 'Android', visitCount: 8, totalDuration: 1800000, lastVisit: Date.now() - 120000, firstVisit: Date.now() - 86400000 * 5 },
+            { id: '3', city: 'Buenos Aires', country: 'Argentina', countryCode: 'AR', browser: 'Chrome', device: 'desktop', os: 'MacOS', visitCount: 23, totalDuration: 7200000, lastVisit: Date.now() - 300000, firstVisit: Date.now() - 86400000 * 14 },
+            { id: '4', city: 'Bogota', country: 'Colombia', countryCode: 'CO', browser: 'Safari', device: 'mobile', os: 'iOS', visitCount: 5, totalDuration: 900000, lastVisit: Date.now() - 600000, firstVisit: Date.now() - 86400000 * 3 },
+            { id: '5', city: 'Lima', country: 'Peru', countryCode: 'PE', browser: 'Chrome', device: 'desktop', os: 'Windows', visitCount: 12, totalDuration: 2400000, lastVisit: Date.now() - 900000, firstVisit: Date.now() - 86400000 * 10 },
+            { id: '6', city: 'Santiago', country: 'Chile', countryCode: 'CL', browser: 'Edge', device: 'desktop', os: 'Windows', visitCount: 7, totalDuration: 1500000, lastVisit: Date.now() - 1800000, firstVisit: Date.now() - 86400000 * 4 },
+            { id: '7', city: 'Quito', country: 'Ecuador', countryCode: 'EC', browser: 'Chrome', device: 'mobile', os: 'Android', visitCount: 3, totalDuration: 600000, lastVisit: Date.now() - 3600000, firstVisit: Date.now() - 86400000 * 2 }
+        ];
+        processVisitorData();
     }
 
     function showEmptyState() {
-        document.getElementById('visitorsList').innerHTML = `
-            <div class="empty-state">
-                <div class="icon">📊</div>
-                <p>Esperando visitantes...</p>
-            </div>
-        `;
-        document.getElementById('countriesList').innerHTML = `
-            <div class="empty-state">
-                <div class="icon">🌍</div>
-                <p>Sin datos aun</p>
-            </div>
-        `;
+        document.getElementById('visitorsList').innerHTML = `<div class="empty-state"><div class="icon">📊</div><p>Esperando visitantes...</p></div>`;
+        document.getElementById('countriesList').innerHTML = `<div class="empty-state"><div class="icon">🌍</div><p>Sin datos</p></div>`;
     }
 
-    // ============================================
-    // UTILITIES
-    // ============================================
+    // Utilities
     function getFlag(countryCode) {
         return countryFlags[countryCode] || '🌐';
     }
 
     function formatTime(timestamp) {
+        if (!timestamp) return '--';
         const now = Date.now();
         const diff = now - timestamp;
 
@@ -1007,6 +1149,21 @@
         return new Date(timestamp).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
     }
 
+    function formatDate(timestamp) {
+        if (!timestamp) return '--';
+        return new Date(timestamp).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    function formatDuration(ms) {
+        if (!ms || ms < 1000) return '0s';
+        const seconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+
+        if (hours > 0) return `${hours}h ${minutes % 60}m`;
+        if (minutes > 0) return `${minutes}m`;
+        return `${seconds}s`;
+    }
     </script>
 </body>
 </html>
