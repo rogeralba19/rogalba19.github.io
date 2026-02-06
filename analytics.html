@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ALBA STUDIO | Analytics Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a0f;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+
+        /* Login Screen */
+        .login-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a0f;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .login-screen.hidden {
+            display: none;
+        }
+
+        .login-box {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 40px;
+            border-radius: 16px;
+            border: 1px solid rgba(0, 200, 255, 0.2);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+
+        .login-box h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+            background: linear-gradient(90deg, #00aaff, #00ffaa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .login-box p {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 12px;
+            margin-bottom: 30px;
+        }
+
+        .login-box input {
+            width: 200px;
+            padding: 12px 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 18px;
+            text-align: center;
+            letter-spacing: 8px;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .login-box input:focus {
+            border-color: #00aaff;
+            box-shadow: 0 0 20px rgba(0, 170, 255, 0.3);
+        }
+
+        .login-box input.error {
+            border-color: #ff4466;
+            animation: shake 0.5s;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        .login-box button {
+            display: block;
+            width: 100%;
+            margin-top: 20px;
+            padding: 12px;
+            background: linear-gradient(90deg, #00aaff, #00ffaa);
+            border: none;
+            border-radius: 8px;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .login-box button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 170, 255, 0.4);
+        }
+
+        /* Dashboard */
+        .dashboard {
+            display: none;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .dashboard.visible {
+            display: block;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            background: linear-gradient(90deg, #00aaff, #00ffaa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .header .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #00ff88;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .logout-btn {
+            padding: 8px 16px;
+            background: rgba(255, 68, 102, 0.2);
+            border: 1px solid rgba(255, 68, 102, 0.3);
+            border-radius: 6px;
+            color: #ff4466;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255, 68, 102, 0.3);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 24px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(0, 170, 255, 0.3);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .stat-card .label {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: bold;
+            background: linear-gradient(90deg, #00aaff, #00ffaa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-card .change {
+            font-size: 12px;
+            color: #00ff88;
+            margin-top: 8px;
+        }
+
+        .stat-card .change.negative {
+            color: #ff4466;
+        }
+
+        /* Main Content */
+        .main-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Panels */
+        .panel {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-header h2 {
+            font-size: 14px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .panel-header .filter {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.4);
+            padding: 4px 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .panel-content {
+            padding: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .panel-content::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .panel-content::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .panel-content::-webkit-scrollbar-thumb {
+            background: rgba(0, 170, 255, 0.3);
+            border-radius: 3px;
+        }
+
+        /* Visitor List */
+        .visitor-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            transition: all 0.3s;
+        }
+
+        .visitor-item:hover {
+            background: rgba(0, 170, 255, 0.1);
+        }
+
+        .visitor-item .flag {
+            font-size: 24px;
+            margin-right: 12px;
+        }
+
+        .visitor-item .info {
+            flex: 1;
+        }
+
+        .visitor-item .info .location {
+            font-size: 13px;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .visitor-item .info .details {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .visitor-item .time {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.3);
+            text-align: right;
+        }
+
+        .visitor-item .visits {
+            background: rgba(0, 170, 255, 0.2);
+            color: #00aaff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-left: 10px;
+        }
+
+        /* Country Stats */
+        .country-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .country-item:last-child {
+            border-bottom: none;
+        }
+
+        .country-item .flag {
+            font-size: 20px;
+            margin-right: 12px;
+        }
+
+        .country-item .name {
+            flex: 1;
+            font-size: 13px;
+        }
+
+        .country-item .count {
+            font-size: 13px;
+            color: #00aaff;
+            font-weight: bold;
+        }
+
+        .country-item .bar {
+            width: 60px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            margin-left: 12px;
+            overflow: hidden;
+        }
+
+        .country-item .bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00aaff, #00ffaa);
+            border-radius: 2px;
+        }
+
+        /* Chart placeholder */
+        .chart-container {
+            height: 200px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-around;
+            padding: 20px 10px 10px;
+        }
+
+        .chart-bar {
+            width: 30px;
+            background: linear-gradient(180deg, #00aaff, #00ffaa);
+            border-radius: 4px 4px 0 0;
+            position: relative;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .chart-bar:hover {
+            opacity: 0.8;
+        }
+
+        .chart-bar .tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #000;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            white-space: nowrap;
+            opacity: 0;
+            transition: all 0.3s;
+            pointer-events: none;
+        }
+
+        .chart-bar:hover .tooltip {
+            opacity: 1;
+        }
+
+        .chart-label {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.4);
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        /* Device/Browser Stats */
+        .device-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .device-item {
+            text-align: center;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+
+        .device-item .icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .device-item .name {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 4px;
+        }
+
+        .device-item .percent {
+            font-size: 18px;
+            font-weight: bold;
+            color: #00aaff;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        /* Real-time indicator */
+        .realtime-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            border-radius: 20px;
+            font-size: 11px;
+            color: #00ff88;
+        }
+
+        .realtime-badge .dot {
+            width: 6px;
+            height: 6px;
+            background: #00ff88;
+            border-radius: 50%;
+            animation: pulse 1s infinite;
+        }
+
+        /* Loading */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(0, 170, 255, 0.2);
+            border-top-color: #00aaff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Firebase Config Notice */
+        .config-notice {
+            background: rgba(255, 170, 0, 0.1);
+            border: 1px solid rgba(255, 170, 0, 0.3);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .config-notice h3 {
+            color: #ffaa00;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .config-notice p {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            line-height: 1.6;
+        }
+
+        .config-notice code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div class="login-screen" id="loginScreen">
+        <div class="login-box">
+            <h1>ALBA STUDIO</h1>
+            <p>Analytics Dashboard</p>
+            <input type="password" id="passwordInput" placeholder="******" maxlength="6" autofocus>
+            <button onclick="attemptLogin()">ACCEDER</button>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div class="dashboard" id="dashboard">
+        <div class="header">
+            <div>
+                <h1>Analytics Dashboard</h1>
+                <div class="status">
+                    <span class="status-dot"></span>
+                    <span>Conectado a Firebase</span>
+                    <span class="realtime-badge"><span class="dot"></span> Real-time</span>
+                </div>
+            </div>
+            <button class="logout-btn" onclick="logout()">Cerrar Sesion</button>
+        </div>
+
+        <!-- Config Notice (shown when Firebase not configured) -->
+        <div class="config-notice" id="configNotice" style="display: none;">
+            <h3>Configuracion de Firebase Requerida</h3>
+            <p>
+                Para activar el tracking de visitantes, necesitas configurar Firebase:<br><br>
+                1. Ve a <code>console.firebase.google.com</code><br>
+                2. Crea un nuevo proyecto<br>
+                3. Activa Realtime Database<br>
+                4. Copia tu configuracion en este archivo y en <code>index.html</code>
+            </p>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="label">Total Visitas</div>
+                <div class="value" id="totalVisits">0</div>
+                <div class="change" id="visitsChange">-- hoy</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Visitantes Unicos</div>
+                <div class="value" id="uniqueVisitors">0</div>
+                <div class="change" id="uniqueChange">-- nuevos</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Activos Ahora</div>
+                <div class="value" id="activeNow">0</div>
+                <div class="change">tiempo real</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Paises</div>
+                <div class="value" id="totalCountries">0</div>
+                <div class="change">diferentes</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Promedio Visitas/Usuario</div>
+                <div class="value" id="avgVisits">0</div>
+                <div class="change">por persona</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Ultima Visita</div>
+                <div class="value" id="lastVisitTime" style="font-size: 18px;">--</div>
+                <div class="change" id="lastVisitCountry">--</div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Left Column -->
+            <div>
+                <!-- Visitors Panel -->
+                <div class="panel" style="margin-bottom: 20px;">
+                    <div class="panel-header">
+                        <h2>Visitantes Recientes</h2>
+                        <span class="filter" id="visitorCount">0 registros</span>
+                    </div>
+                    <div class="panel-content" id="visitorsList">
+                        <div class="loading"><div class="spinner"></div></div>
+                    </div>
+                </div>
+
+                <!-- Activity Chart -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Actividad por Hora (Ultimas 24h)</h2>
+                    </div>
+                    <div class="panel-content">
+                        <div class="chart-container" id="hourlyChart">
+                            <!-- Chart bars will be generated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div>
+                <!-- Countries Panel -->
+                <div class="panel" style="margin-bottom: 20px;">
+                    <div class="panel-header">
+                        <h2>Paises</h2>
+                    </div>
+                    <div class="panel-content" id="countriesList">
+                        <div class="loading"><div class="spinner"></div></div>
+                    </div>
+                </div>
+
+                <!-- Devices Panel -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Dispositivos y Navegadores</h2>
+                    </div>
+                    <div class="panel-content">
+                        <div class="device-stats" id="deviceStats">
+                            <div class="device-item">
+                                <div class="icon">💻</div>
+                                <div class="name">Desktop</div>
+                                <div class="percent" id="desktopPercent">0%</div>
+                            </div>
+                            <div class="device-item">
+                                <div class="icon">📱</div>
+                                <div class="name">Mobile</div>
+                                <div class="percent" id="mobilePercent">0%</div>
+                            </div>
+                            <div class="device-item">
+                                <div class="icon">🌐</div>
+                                <div class="name">Chrome</div>
+                                <div class="percent" id="chromePercent">0%</div>
+                            </div>
+                            <div class="device-item">
+                                <div class="icon">🦊</div>
+                                <div class="name">Firefox</div>
+                                <div class="percent" id="firefoxPercent">0%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+    <script>
+    // ============================================
+    // FIREBASE CONFIGURATION
+    // ============================================
+    // Firebase Configuration
+    const firebaseConfig = {
+        apiKey: "AIzaSyBvju4gyCpz6E6R3TsvO1uR1KZB7ZbW9VU",
+        authDomain: "albastudio-e0d5b.firebaseapp.com",
+        databaseURL: "https://albastudio-e0d5b-default-rtdb.firebaseio.com",
+        projectId: "albastudio-e0d5b",
+        storageBucket: "albastudio-e0d5b.firebasestorage.app",
+        messagingSenderId: "519359936167",
+        appId: "1:519359936167:web:8c2680ed1e4583def28d82"
+    };
+
+    // Password for access
+    const ACCESS_PASSWORD = '132435';
+
+    // Country code to flag emoji mapping
+    const countryFlags = {
+        'US': '🇺🇸', 'MX': '🇲🇽', 'ES': '🇪🇸', 'AR': '🇦🇷', 'CO': '🇨🇴',
+        'PE': '🇵🇪', 'CL': '🇨🇱', 'VE': '🇻🇪', 'EC': '🇪🇨', 'GT': '🇬🇹',
+        'CU': '🇨🇺', 'BO': '🇧🇴', 'DO': '🇩🇴', 'HN': '🇭🇳', 'PY': '🇵🇾',
+        'SV': '🇸🇻', 'NI': '🇳🇮', 'CR': '🇨🇷', 'PA': '🇵🇦', 'UY': '🇺🇾',
+        'PR': '🇵🇷', 'BR': '🇧🇷', 'GB': '🇬🇧', 'FR': '🇫🇷', 'DE': '🇩🇪',
+        'IT': '🇮🇹', 'PT': '🇵🇹', 'CA': '🇨🇦', 'AU': '🇦🇺', 'JP': '🇯🇵',
+        'CN': '🇨🇳', 'IN': '🇮🇳', 'RU': '🇷🇺', 'KR': '🇰🇷', 'NL': '🇳🇱',
+        'BE': '🇧🇪', 'CH': '🇨🇭', 'AT': '🇦🇹', 'SE': '🇸🇪', 'NO': '🇳🇴',
+        'DK': '🇩🇰', 'FI': '🇫🇮', 'PL': '🇵🇱', 'CZ': '🇨🇿', 'GR': '🇬🇷',
+        'TR': '🇹🇷', 'IL': '🇮🇱', 'AE': '🇦🇪', 'SA': '🇸🇦', 'EG': '🇪🇬',
+        'ZA': '🇿🇦', 'NG': '🇳🇬', 'KE': '🇰🇪', 'PH': '🇵🇭', 'ID': '🇮🇩',
+        'MY': '🇲🇾', 'SG': '🇸🇬', 'TH': '🇹🇭', 'VN': '🇻🇳', 'PK': '🇵🇰'
+    };
+
+    let db = null;
+    let visitorsRef = null;
+
+    // ============================================
+    // LOGIN FUNCTIONALITY
+    // ============================================
+    function attemptLogin() {
+        const input = document.getElementById('passwordInput');
+        if (input.value === ACCESS_PASSWORD) {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('dashboard').classList.add('visible');
+            initializeFirebase();
+        } else {
+            input.classList.add('error');
+            input.value = '';
+            setTimeout(() => input.classList.remove('error'), 500);
+        }
+    }
+
+    function logout() {
+        document.getElementById('loginScreen').classList.remove('hidden');
+        document.getElementById('dashboard').classList.remove('visible');
+        document.getElementById('passwordInput').value = '';
+    }
+
+    // Enter key to login
+    document.getElementById('passwordInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') attemptLogin();
+    });
+
+    // ============================================
+    // FIREBASE INITIALIZATION
+    // ============================================
+    function initializeFirebase() {
+        try {
+            // Check if config is set
+            if (firebaseConfig.apiKey === 'TU_API_KEY') {
+                document.getElementById('configNotice').style.display = 'block';
+                showDemoData();
+                return;
+            }
+
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.database();
+            visitorsRef = db.ref('visitors');
+
+            // Listen for real-time updates
+            visitorsRef.on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    processVisitorData(data);
+                } else {
+                    showEmptyState();
+                }
+            });
+
+        } catch (error) {
+            console.error('Firebase error:', error);
+            document.getElementById('configNotice').style.display = 'block';
+            showDemoData();
+        }
+    }
+
+    // ============================================
+    // DATA PROCESSING
+    // ============================================
+    function processVisitorData(data) {
+        const visitors = Object.values(data);
+        const now = Date.now();
+        const todayStart = new Date().setHours(0, 0, 0, 0);
+        const last24h = now - (24 * 60 * 60 * 1000);
+
+        // Calculate stats
+        let totalVisits = 0;
+        let todayVisits = 0;
+        let activeNow = 0;
+        let countries = {};
+        let devices = { desktop: 0, mobile: 0 };
+        let browsers = { chrome: 0, firefox: 0, safari: 0, other: 0 };
+        let hourlyData = new Array(24).fill(0);
+        let newToday = 0;
+
+        visitors.forEach(visitor => {
+            const visitCount = visitor.visitCount || 1;
+            totalVisits += visitCount;
+
+            // Check if visited today
+            if (visitor.lastVisit > todayStart) {
+                todayVisits++;
+            }
+
+            // Check if first visit was today (new user)
+            if (visitor.firstVisit > todayStart) {
+                newToday++;
+            }
+
+            // Active in last 5 minutes
+            if (visitor.lastVisit > (now - 5 * 60 * 1000)) {
+                activeNow++;
+            }
+
+            // Country stats
+            const country = visitor.country || 'Unknown';
+            countries[country] = (countries[country] || 0) + 1;
+
+            // Device stats
+            if (visitor.device === 'mobile' || visitor.device === 'tablet') {
+                devices.mobile++;
+            } else {
+                devices.desktop++;
+            }
+
+            // Browser stats
+            const browser = (visitor.browser || '').toLowerCase();
+            if (browser.includes('chrome')) browsers.chrome++;
+            else if (browser.includes('firefox')) browsers.firefox++;
+            else if (browser.includes('safari')) browsers.safari++;
+            else browsers.other++;
+
+            // Hourly activity (last 24h)
+            if (visitor.lastVisit > last24h) {
+                const hour = new Date(visitor.lastVisit).getHours();
+                hourlyData[hour]++;
+            }
+        });
+
+        // Update stats display
+        document.getElementById('totalVisits').textContent = totalVisits.toLocaleString();
+        document.getElementById('visitsChange').textContent = `+${todayVisits} hoy`;
+        document.getElementById('uniqueVisitors').textContent = visitors.length.toLocaleString();
+        document.getElementById('uniqueChange').textContent = `+${newToday} nuevos`;
+        document.getElementById('activeNow').textContent = activeNow;
+        document.getElementById('totalCountries').textContent = Object.keys(countries).length;
+        document.getElementById('avgVisits').textContent = (totalVisits / visitors.length).toFixed(1);
+        document.getElementById('visitorCount').textContent = `${visitors.length} registros`;
+
+        // Last visit
+        const sortedByTime = [...visitors].sort((a, b) => b.lastVisit - a.lastVisit);
+        if (sortedByTime.length > 0) {
+            const lastVisitor = sortedByTime[0];
+            document.getElementById('lastVisitTime').textContent = formatTime(lastVisitor.lastVisit);
+            document.getElementById('lastVisitCountry').textContent = `${getFlag(lastVisitor.countryCode)} ${lastVisitor.city || lastVisitor.country || 'Unknown'}`;
+        }
+
+        // Device percentages
+        const totalDevices = devices.desktop + devices.mobile;
+        document.getElementById('desktopPercent').textContent = `${Math.round((devices.desktop / totalDevices) * 100)}%`;
+        document.getElementById('mobilePercent').textContent = `${Math.round((devices.mobile / totalDevices) * 100)}%`;
+
+        // Browser percentages
+        const totalBrowsers = browsers.chrome + browsers.firefox + browsers.safari + browsers.other;
+        document.getElementById('chromePercent').textContent = `${Math.round((browsers.chrome / totalBrowsers) * 100)}%`;
+        document.getElementById('firefoxPercent').textContent = `${Math.round((browsers.firefox / totalBrowsers) * 100)}%`;
+
+        // Render visitors list
+        renderVisitorsList(sortedByTime.slice(0, 50));
+
+        // Render countries
+        renderCountriesList(countries);
+
+        // Render hourly chart
+        renderHourlyChart(hourlyData);
+    }
+
+    function renderVisitorsList(visitors) {
+        const container = document.getElementById('visitorsList');
+
+        if (visitors.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="icon">👥</div>
+                    <p>No hay visitantes registrados</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = visitors.map(v => `
+            <div class="visitor-item">
+                <span class="flag">${getFlag(v.countryCode)}</span>
+                <div class="info">
+                    <div class="location">${v.city || 'Unknown'}, ${v.country || 'Unknown'}</div>
+                    <div class="details">${v.browser || 'Unknown'} / ${v.device || 'Unknown'} / ${v.os || 'Unknown'}</div>
+                </div>
+                <div class="time">${formatTime(v.lastVisit)}</div>
+                <span class="visits">${v.visitCount || 1}x</span>
+            </div>
+        `).join('');
+    }
+
+    function renderCountriesList(countries) {
+        const container = document.getElementById('countriesList');
+        const sorted = Object.entries(countries).sort((a, b) => b[1] - a[1]);
+        const max = sorted[0] ? sorted[0][1] : 1;
+
+        if (sorted.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="icon">🌍</div>
+                    <p>No hay datos de paises</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = sorted.slice(0, 10).map(([country, count]) => `
+            <div class="country-item">
+                <span class="flag">${getFlag(country)}</span>
+                <span class="name">${country}</span>
+                <span class="count">${count}</span>
+                <div class="bar">
+                    <div class="bar-fill" style="width: ${(count / max) * 100}%"></div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function renderHourlyChart(data) {
+        const container = document.getElementById('hourlyChart');
+        const max = Math.max(...data, 1);
+
+        let html = '';
+        for (let i = 0; i < 24; i++) {
+            const height = (data[i] / max) * 150;
+            html += `
+                <div style="text-align: center;">
+                    <div class="chart-bar" style="height: ${Math.max(height, 4)}px;">
+                        <span class="tooltip">${data[i]} visitas</span>
+                    </div>
+                    <div class="chart-label">${i}h</div>
+                </div>
+            `;
+        }
+        container.innerHTML = html;
+    }
+
+    // ============================================
+    // DEMO DATA (when Firebase not configured)
+    // ============================================
+    function showDemoData() {
+        const demoData = {
+            'user1': { city: 'Ciudad de Mexico', country: 'Mexico', countryCode: 'MX', browser: 'Chrome', device: 'desktop', os: 'Windows', visitCount: 5, lastVisit: Date.now() - 60000, firstVisit: Date.now() - 86400000 },
+            'user2': { city: 'Madrid', country: 'Spain', countryCode: 'ES', browser: 'Firefox', device: 'mobile', os: 'Android', visitCount: 3, lastVisit: Date.now() - 120000, firstVisit: Date.now() - 172800000 },
+            'user3': { city: 'Buenos Aires', country: 'Argentina', countryCode: 'AR', browser: 'Chrome', device: 'desktop', os: 'MacOS', visitCount: 8, lastVisit: Date.now() - 300000, firstVisit: Date.now() - 604800000 },
+            'user4': { city: 'Bogota', country: 'Colombia', countryCode: 'CO', browser: 'Safari', device: 'mobile', os: 'iOS', visitCount: 2, lastVisit: Date.now() - 600000, firstVisit: Date.now() - 259200000 },
+            'user5': { city: 'Lima', country: 'Peru', countryCode: 'PE', browser: 'Chrome', device: 'desktop', os: 'Windows', visitCount: 4, lastVisit: Date.now() - 900000, firstVisit: Date.now() - 432000000 }
+        };
+        processVisitorData(demoData);
+    }
+
+    function showEmptyState() {
+        document.getElementById('visitorsList').innerHTML = `
+            <div class="empty-state">
+                <div class="icon">📊</div>
+                <p>Esperando visitantes...</p>
+            </div>
+        `;
+        document.getElementById('countriesList').innerHTML = `
+            <div class="empty-state">
+                <div class="icon">🌍</div>
+                <p>Sin datos aun</p>
+            </div>
+        `;
+    }
+
+    // ============================================
+    // UTILITIES
+    // ============================================
+    function getFlag(countryCode) {
+        return countryFlags[countryCode] || '🌐';
+    }
+
+    function formatTime(timestamp) {
+        const now = Date.now();
+        const diff = now - timestamp;
+
+        if (diff < 60000) return 'Ahora';
+        if (diff < 3600000) return `${Math.floor(diff / 60000)}m`;
+        if (diff < 86400000) return `${Math.floor(diff / 3600000)}h`;
+        return new Date(timestamp).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+    }
+
+    </script>
+</body>
+</html>
