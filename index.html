@@ -1252,6 +1252,7 @@
                 let device = 'desktop';
                 let browser = 'Unknown';
                 let os = 'Unknown';
+                let deviceModel = '';
 
                 if (/Mobile|Android|iPhone|iPad/.test(ua)) {
                     device = /iPad|Tablet/.test(ua) ? 'tablet' : 'mobile';
@@ -1265,11 +1266,53 @@
 
                 if (ua.includes('Windows')) os = 'Windows';
                 else if (ua.includes('Mac')) os = 'MacOS';
-                else if (ua.includes('Linux')) os = 'Linux';
+                else if (ua.includes('Linux') && !ua.includes('Android')) os = 'Linux';
                 else if (ua.includes('Android')) os = 'Android';
-                else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
+                else if (ua.includes('iPhone')) os = 'iOS';
+                else if (ua.includes('iPad')) os = 'iPadOS';
 
-                return { device, browser, os };
+                // Extract device model from User Agent (works for Android)
+                const androidMatch = ua.match(/Android[^;]*;\s*([^)]+)\)/);
+                if (androidMatch) {
+                    deviceModel = androidMatch[1].split(' Build')[0].trim();
+                }
+                // iPhone/iPad model detection (limited)
+                if (ua.includes('iPhone')) deviceModel = 'iPhone';
+                if (ua.includes('iPad')) deviceModel = 'iPad';
+
+                // Additional device capabilities
+                const deviceMemory = navigator.deviceMemory || null; // GB (Chrome only)
+                const cpuCores = navigator.hardwareConcurrency || null;
+                const maxTouchPoints = navigator.maxTouchPoints || 0;
+                const isTouch = maxTouchPoints > 0;
+
+                // Connection info
+                let connectionType = 'Unknown';
+                let connectionSpeed = null;
+                if (navigator.connection) {
+                    connectionType = navigator.connection.effectiveType || navigator.connection.type || 'Unknown';
+                    connectionSpeed = navigator.connection.downlink || null; // Mbps
+                }
+
+                // Screen orientation
+                const orientation = screen.orientation ? screen.orientation.type :
+                    (window.innerHeight > window.innerWidth ? 'portrait' : 'landscape');
+
+                return {
+                    device,
+                    browser,
+                    os,
+                    deviceModel: deviceModel || null,
+                    deviceMemory,
+                    cpuCores,
+                    isTouch,
+                    maxTouchPoints,
+                    connectionType,
+                    connectionSpeed,
+                    orientation,
+                    colorDepth: screen.colorDepth,
+                    platform: navigator.platform
+                };
             }
 
             // Get location via IP
