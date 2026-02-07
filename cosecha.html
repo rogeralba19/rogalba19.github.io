@@ -1,0 +1,1625 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Cosecha | ALBA STUDIO</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0a0a15 0%, #1a1a2e 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(0, 0, 0, 0.4);
+            border-bottom: 1px solid rgba(0, 170, 255, 0.2);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            color: #00aaff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header h1 span {
+            font-size: 24px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .back-btn {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            color: #fff;
+            text-decoration: none;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .add-btn {
+            padding: 10px 20px;
+            background: linear-gradient(90deg, #00aaff, #00ffaa);
+            border: none;
+            border-radius: 6px;
+            color: #000;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .add-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 170, 255, 0.4);
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-card.highlight {
+            border-color: rgba(0, 255, 136, 0.3);
+            background: rgba(0, 255, 136, 0.05);
+        }
+
+        .stat-card.pending {
+            border-color: rgba(255, 170, 0, 0.3);
+            background: rgba(255, 170, 0, 0.05);
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #00ff88;
+            margin-bottom: 5px;
+        }
+
+        .stat-card.pending .stat-value {
+            color: #ffaa00;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            overflow-x: auto;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+            border-bottom: 2px solid transparent;
+        }
+
+        .tab.active {
+            color: #00aaff;
+            border-bottom-color: #00aaff;
+        }
+
+        .tab:hover {
+            color: #fff;
+        }
+
+        /* Calendar */
+        .calendar-container {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .calendar-nav {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .calendar-nav button {
+            width: 36px;
+            height: 36px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            color: #fff;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .calendar-nav button:hover {
+            background: rgba(0, 170, 255, 0.3);
+        }
+
+        .calendar-month {
+            font-size: 18px;
+            font-weight: 600;
+            min-width: 180px;
+            text-align: center;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+        }
+
+        .calendar-day-header {
+            text-align: center;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.4);
+            padding: 10px 5px;
+            text-transform: uppercase;
+        }
+
+        .calendar-day {
+            aspect-ratio: 1;
+            min-height: 60px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .calendar-day:hover {
+            background: rgba(0, 170, 255, 0.1);
+            border-color: rgba(0, 170, 255, 0.3);
+        }
+
+        .calendar-day.other-month {
+            opacity: 0.3;
+        }
+
+        .calendar-day.today {
+            border-color: #00aaff;
+            background: rgba(0, 170, 255, 0.1);
+        }
+
+        .calendar-day.has-entries {
+            background: rgba(0, 255, 136, 0.1);
+            border-color: rgba(0, 255, 136, 0.3);
+        }
+
+        .calendar-day.has-pending {
+            background: rgba(255, 170, 0, 0.1);
+            border-color: rgba(255, 170, 0, 0.3);
+        }
+
+        .day-number {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 3px;
+        }
+
+        .day-amount {
+            font-size: 10px;
+            color: #00ff88;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .day-entries {
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Entries List */
+        .entries-container {
+            display: none;
+        }
+
+        .entries-container.active {
+            display: block;
+        }
+
+        .calendar-container.hidden {
+            display: none;
+        }
+
+        .filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .filter-select {
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .filter-select option {
+            background: #1a1a2e;
+        }
+
+        .entries-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .entry-card {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 15px;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 15px;
+            align-items: center;
+            transition: all 0.3s;
+        }
+
+        .entry-card:hover {
+            border-color: rgba(0, 170, 255, 0.3);
+        }
+
+        .entry-date {
+            text-align: center;
+            min-width: 50px;
+        }
+
+        .entry-date .day {
+            font-size: 24px;
+            font-weight: bold;
+            color: #00aaff;
+        }
+
+        .entry-date .month {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+        }
+
+        .entry-details {
+            flex: 1;
+        }
+
+        .entry-product {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .entry-type {
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 10px;
+            background: rgba(0, 170, 255, 0.2);
+            color: #00aaff;
+        }
+
+        .entry-type.daily {
+            background: rgba(138, 43, 226, 0.2);
+            color: #a855f7;
+        }
+
+        .entry-info {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .entry-amount {
+            text-align: right;
+        }
+
+        .entry-total {
+            font-size: 20px;
+            font-weight: bold;
+            color: #00ff88;
+        }
+
+        .entry-status {
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            margin-top: 5px;
+            display: inline-block;
+        }
+
+        .entry-status.paid {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+        }
+
+        .entry-status.pending {
+            background: rgba(255, 170, 0, 0.2);
+            color: #ffaa00;
+        }
+
+        .entry-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .entry-action-btn {
+            width: 32px;
+            height: 32px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 6px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .entry-action-btn:hover {
+            background: rgba(0, 170, 255, 0.3);
+        }
+
+        .entry-action-btn.delete:hover {
+            background: rgba(255, 68, 102, 0.3);
+            color: #ff4466;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .modal-overlay.visible {
+            display: flex;
+        }
+
+        .modal {
+            background: linear-gradient(135deg, #0a0a15 0%, #1a1a2e 100%);
+            border: 1px solid rgba(0, 170, 255, 0.3);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            background: linear-gradient(135deg, #0a0a15 0%, #1a1a2e 100%);
+            z-index: 1;
+        }
+
+        .modal-header h2 {
+            font-size: 18px;
+            color: #00aaff;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .modal-close:hover {
+            color: #ff4466;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #00aaff;
+            box-shadow: 0 0 15px rgba(0, 170, 255, 0.2);
+        }
+
+        .form-group select option {
+            background: #1a1a2e;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .work-type-selector {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .work-type-option {
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .work-type-option:hover {
+            border-color: rgba(0, 170, 255, 0.3);
+        }
+
+        .work-type-option.selected {
+            border-color: #00aaff;
+            background: rgba(0, 170, 255, 0.1);
+        }
+
+        .work-type-option .icon {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .work-type-option .label {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .work-type-option .desc {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-top: 3px;
+        }
+
+        .conditional-fields {
+            display: none;
+        }
+
+        .conditional-fields.visible {
+            display: block;
+        }
+
+        .payment-toggle {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .toggle-switch {
+            width: 50px;
+            height: 26px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 13px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .toggle-switch.active {
+            background: rgba(0, 255, 136, 0.3);
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: #fff;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: all 0.3s;
+        }
+
+        .toggle-switch.active::after {
+            left: 26px;
+            background: #00ff88;
+        }
+
+        .toggle-label {
+            font-size: 14px;
+        }
+
+        .modal-footer {
+            padding: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, #00aaff, #00ffaa);
+            border: none;
+            color: #000;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 170, 255, 0.4);
+        }
+
+        .btn-danger {
+            background: rgba(255, 68, 102, 0.2);
+            border: 1px solid rgba(255, 68, 102, 0.3);
+            color: #ff4466;
+        }
+
+        .btn-danger:hover {
+            background: rgba(255, 68, 102, 0.3);
+        }
+
+        /* Day Detail Modal */
+        .day-entries-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .day-entry-item {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .day-entry-info h4 {
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .day-entry-info p {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .day-entry-amount {
+            font-size: 18px;
+            font-weight: bold;
+            color: #00ff88;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .empty-state h3 {
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .empty-state p {
+            font-size: 13px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                padding: 12px 15px;
+            }
+
+            .header h1 {
+                font-size: 14px;
+            }
+
+            .container {
+                padding: 15px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+
+            .stat-card {
+                padding: 15px;
+            }
+
+            .stat-value {
+                font-size: 22px;
+            }
+
+            .calendar-day {
+                min-height: 50px;
+                padding: 3px;
+            }
+
+            .day-number {
+                font-size: 12px;
+            }
+
+            .day-amount {
+                font-size: 8px;
+            }
+
+            .calendar-day-header {
+                font-size: 9px;
+                padding: 5px 2px;
+            }
+
+            .entry-card {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .entry-date {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                text-align: left;
+            }
+
+            .entry-date .day {
+                font-size: 20px;
+            }
+
+            .entry-amount {
+                text-align: left;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .modal {
+                max-height: 95vh;
+                border-radius: 12px;
+            }
+
+            .modal-footer {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                text-align: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .stat-value {
+                font-size: 18px;
+            }
+
+            .stat-label {
+                font-size: 9px;
+            }
+
+            .calendar-grid {
+                gap: 3px;
+            }
+
+            .calendar-day {
+                min-height: 40px;
+                border-radius: 4px;
+            }
+
+            .day-amount,
+            .day-entries {
+                display: none;
+            }
+
+            .calendar-nav button {
+                width: 32px;
+                height: 32px;
+            }
+
+            .calendar-month {
+                font-size: 14px;
+                min-width: 140px;
+            }
+        }
+
+        /* Loading */
+        .loading {
+            display: flex;
+            justify-content: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(0, 170, 255, 0.2);
+            border-top-color: #00aaff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            background: rgba(0, 255, 136, 0.9);
+            color: #000;
+            border-radius: 8px;
+            font-weight: 600;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 2000;
+        }
+
+        .toast.visible {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast.error {
+            background: rgba(255, 68, 102, 0.9);
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1><span>🌾</span> Registro de Cosecha</h1>
+        <div class="header-actions">
+            <a href="index.html" class="back-btn">← Volver</a>
+            <button class="add-btn" onclick="openAddModal()">+ Agregar</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card highlight">
+                <div class="stat-value" id="totalEarnings">$0</div>
+                <div class="stat-label">Total del Mes</div>
+            </div>
+            <div class="stat-card pending">
+                <div class="stat-value" id="pendingAmount">$0</div>
+                <div class="stat-label">Pendiente</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalDays">0</div>
+                <div class="stat-label">Dias Trabajados</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalUnits">0</div>
+                <div class="stat-label">Unidades</div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('calendar')">Calendario</button>
+            <button class="tab" onclick="switchTab('list')">Lista</button>
+        </div>
+
+        <!-- Calendar View -->
+        <div class="calendar-container" id="calendarView">
+            <div class="calendar-header">
+                <div class="calendar-nav">
+                    <button onclick="changeMonth(-1)">‹</button>
+                    <span class="calendar-month" id="currentMonth">Enero 2024</span>
+                    <button onclick="changeMonth(1)">›</button>
+                </div>
+            </div>
+            <div class="calendar-grid" id="calendarGrid">
+                <!-- Days will be generated by JS -->
+            </div>
+        </div>
+
+        <!-- List View -->
+        <div class="entries-container" id="listView">
+            <div class="filters">
+                <select class="filter-select" id="filterMonth" onchange="filterEntries()">
+                    <option value="">Todos los meses</option>
+                </select>
+                <select class="filter-select" id="filterStatus" onchange="filterEntries()">
+                    <option value="">Todo</option>
+                    <option value="paid">Pagado</option>
+                    <option value="pending">Pendiente</option>
+                </select>
+                <select class="filter-select" id="filterProduct" onchange="filterEntries()">
+                    <option value="">Todos los productos</option>
+                </select>
+            </div>
+            <div class="entries-list" id="entriesList">
+                <!-- Entries will be generated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div class="modal-overlay" id="entryModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="modalTitle">Agregar Registro</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="entryId">
+
+                <div class="form-group">
+                    <label>Fecha</label>
+                    <input type="date" id="entryDate" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Tipo de Trabajo</label>
+                    <div class="work-type-selector">
+                        <div class="work-type-option selected" onclick="selectWorkType('trato')" id="typeTrato">
+                            <div class="icon">📦</div>
+                            <div class="label">Al Trato</div>
+                            <div class="desc">Por unidad cosechada</div>
+                        </div>
+                        <div class="work-type-option" onclick="selectWorkType('dia')" id="typeDia">
+                            <div class="icon">📅</div>
+                            <div class="label">Al Dia</div>
+                            <div class="desc">Pago fijo por jornada</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Producto</label>
+                    <select id="entryProduct">
+                        <option value="">Seleccionar producto</option>
+                        <option value="Fresa">Fresa</option>
+                        <option value="Frambuesa">Frambuesa</option>
+                        <option value="Arandano">Arandano</option>
+                        <option value="Mora">Mora</option>
+                        <option value="Uva">Uva</option>
+                        <option value="Tomate">Tomate</option>
+                        <option value="Pimiento">Pimiento</option>
+                        <option value="Pepino">Pepino</option>
+                        <option value="Lechuga">Lechuga</option>
+                        <option value="Otro">Otro</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="customProductGroup" style="display: none;">
+                    <label>Especificar Producto</label>
+                    <input type="text" id="customProduct" placeholder="Nombre del producto">
+                </div>
+
+                <!-- Campos para "Al Trato" -->
+                <div class="conditional-fields visible" id="tratoFields">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Cantidad</label>
+                            <input type="number" id="quantity" placeholder="0" min="0" step="0.5" oninput="calculateTotal()">
+                        </div>
+                        <div class="form-group">
+                            <label>Unidad</label>
+                            <select id="unit">
+                                <option value="cajas">Cajas</option>
+                                <option value="kilos">Kilos</option>
+                                <option value="libras">Libras</option>
+                                <option value="cubetas">Cubetas</option>
+                                <option value="bandejas">Bandejas</option>
+                                <option value="bultos">Bultos</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Precio por Unidad ($)</label>
+                        <input type="number" id="pricePerUnit" placeholder="0.00" min="0" step="0.01" oninput="calculateTotal()">
+                    </div>
+                </div>
+
+                <!-- Campos para "Al Dia" -->
+                <div class="conditional-fields" id="diaFields">
+                    <div class="form-group">
+                        <label>Pago del Dia ($)</label>
+                        <input type="number" id="dailyRate" placeholder="0.00" min="0" step="0.01" oninput="calculateTotal()">
+                    </div>
+                    <div class="form-group">
+                        <label>Horas Trabajadas (opcional)</label>
+                        <input type="number" id="hoursWorked" placeholder="8" min="0" step="0.5">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Total Calculado</label>
+                    <div style="font-size: 28px; font-weight: bold; color: #00ff88; padding: 10px 0;" id="calculatedTotal">$0.00</div>
+                </div>
+
+                <div class="form-group">
+                    <label>Estado de Pago</label>
+                    <div class="payment-toggle">
+                        <div class="toggle-switch" id="paymentToggle" onclick="togglePayment()"></div>
+                        <span class="toggle-label" id="paymentLabel">Pendiente de pago</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Empleador / Finca (opcional)</label>
+                    <input type="text" id="employer" placeholder="Nombre del empleador o finca">
+                </div>
+
+                <div class="form-group">
+                    <label>Notas (opcional)</label>
+                    <textarea id="notes" placeholder="Observaciones adicionales..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" id="deleteBtn" style="display: none;" onclick="deleteEntry()">Eliminar</button>
+                <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveEntry()">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Day Detail Modal -->
+    <div class="modal-overlay" id="dayModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="dayModalTitle">Registros del dia</h2>
+                <button class="modal-close" onclick="closeDayModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="dayEntriesList" class="day-entries-list">
+                    <!-- Day entries will be listed here -->
+                </div>
+                <button class="btn btn-primary" style="width: 100%; margin-top: 15px;" onclick="closeDayModal(); openAddModal();">
+                    + Agregar registro para este dia
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+
+    <script>
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyBvju4gyCpz6E6R3TsvO1uR1KZB7ZbW9VU",
+            authDomain: "albastudio-e0d5b.firebaseapp.com",
+            databaseURL: "https://albastudio-e0d5b-default-rtdb.firebaseio.com",
+            projectId: "albastudio-e0d5b",
+            storageBucket: "albastudio-e0d5b.firebasestorage.app",
+            messagingSenderId: "519359936167",
+            appId: "1:519359936167:web:8c2680ed1e4583def28d82"
+        };
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+
+        const auth = firebase.auth();
+        const db = firebase.database();
+
+        // State
+        let currentUser = null;
+        let entries = [];
+        let currentDate = new Date();
+        let selectedDate = null;
+        let workType = 'trato';
+        let isPaid = false;
+        let editingEntryId = null;
+
+        // Auth listener
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                currentUser = user;
+                loadEntries();
+            } else {
+                // Redirect to login
+                window.location.href = 'index.html';
+            }
+        });
+
+        // Load entries from Firebase
+        function loadEntries() {
+            if (!currentUser) return;
+
+            const entriesRef = db.ref(`harvest/${currentUser.uid}`);
+            entriesRef.on('value', (snapshot) => {
+                entries = [];
+                snapshot.forEach((child) => {
+                    entries.push({ id: child.key, ...child.val() });
+                });
+                entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+                updateStats();
+                renderCalendar();
+                renderEntries();
+                populateFilters();
+            });
+        }
+
+        // Update statistics
+        function updateStats() {
+            const now = new Date();
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+
+            const monthEntries = entries.filter(e => {
+                const d = new Date(e.date);
+                return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+            });
+
+            const totalEarnings = monthEntries.reduce((sum, e) => sum + (e.total || 0), 0);
+            const pendingAmount = monthEntries.filter(e => !e.paid).reduce((sum, e) => sum + (e.total || 0), 0);
+            const totalDays = new Set(monthEntries.map(e => e.date)).size;
+            const totalUnits = monthEntries.filter(e => e.workType === 'trato').reduce((sum, e) => sum + (e.quantity || 0), 0);
+
+            document.getElementById('totalEarnings').textContent = '$' + totalEarnings.toFixed(2);
+            document.getElementById('pendingAmount').textContent = '$' + pendingAmount.toFixed(2);
+            document.getElementById('totalDays').textContent = totalDays;
+            document.getElementById('totalUnits').textContent = totalUnits;
+        }
+
+        // Calendar functions
+        function renderCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+
+            const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                              'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            document.getElementById('currentMonth').textContent = `${monthNames[month]} ${year}`;
+
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const startDay = firstDay.getDay();
+            const daysInMonth = lastDay.getDate();
+
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+
+            // Day headers
+            const dayNames = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
+            dayNames.forEach(day => {
+                const header = document.createElement('div');
+                header.className = 'calendar-day-header';
+                header.textContent = day;
+                grid.appendChild(header);
+            });
+
+            // Previous month days
+            const prevMonth = new Date(year, month, 0);
+            for (let i = startDay - 1; i >= 0; i--) {
+                const day = document.createElement('div');
+                day.className = 'calendar-day other-month';
+                day.innerHTML = `<span class="day-number">${prevMonth.getDate() - i}</span>`;
+                grid.appendChild(day);
+            }
+
+            // Current month days
+            const today = new Date();
+            for (let i = 1; i <= daysInMonth; i++) {
+                const day = document.createElement('div');
+                day.className = 'calendar-day';
+
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                const dayEntries = entries.filter(e => e.date === dateStr);
+                const dayTotal = dayEntries.reduce((sum, e) => sum + (e.total || 0), 0);
+                const hasPending = dayEntries.some(e => !e.paid);
+
+                if (today.getDate() === i && today.getMonth() === month && today.getFullYear() === year) {
+                    day.classList.add('today');
+                }
+                if (dayEntries.length > 0) {
+                    day.classList.add(hasPending ? 'has-pending' : 'has-entries');
+                }
+
+                day.innerHTML = `
+                    <span class="day-number">${i}</span>
+                    ${dayTotal > 0 ? `<span class="day-amount">$${dayTotal.toFixed(0)}</span>` : ''}
+                    ${dayEntries.length > 0 ? `<span class="day-entries">${dayEntries.length} reg.</span>` : ''}
+                `;
+
+                day.onclick = () => openDayModal(dateStr, dayEntries);
+                grid.appendChild(day);
+            }
+
+            // Next month days
+            const remainingDays = 42 - (startDay + daysInMonth);
+            for (let i = 1; i <= remainingDays; i++) {
+                const day = document.createElement('div');
+                day.className = 'calendar-day other-month';
+                day.innerHTML = `<span class="day-number">${i}</span>`;
+                grid.appendChild(day);
+            }
+        }
+
+        function changeMonth(delta) {
+            currentDate.setMonth(currentDate.getMonth() + delta);
+            renderCalendar();
+        }
+
+        // Entries list
+        function renderEntries() {
+            const list = document.getElementById('entriesList');
+            const filteredEntries = getFilteredEntries();
+
+            if (filteredEntries.length === 0) {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">📋</div>
+                        <h3>No hay registros</h3>
+                        <p>Agrega tu primer registro de cosecha</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+            list.innerHTML = filteredEntries.map(entry => {
+                const date = new Date(entry.date + 'T12:00:00');
+                return `
+                    <div class="entry-card" onclick="editEntry('${entry.id}')">
+                        <div class="entry-date">
+                            <div class="day">${date.getDate()}</div>
+                            <div class="month">${monthNames[date.getMonth()]}</div>
+                        </div>
+                        <div class="entry-details">
+                            <div class="entry-product">
+                                ${entry.product || 'Sin producto'}
+                                <span class="entry-type ${entry.workType === 'dia' ? 'daily' : ''}">${entry.workType === 'dia' ? 'Al Dia' : 'Al Trato'}</span>
+                            </div>
+                            <div class="entry-info">
+                                ${entry.workType === 'trato' ? `<span>${entry.quantity} ${entry.unit} × $${entry.pricePerUnit}</span>` : `<span>${entry.hoursWorked ? entry.hoursWorked + ' horas' : 'Jornada completa'}</span>`}
+                                ${entry.employer ? `<span>📍 ${entry.employer}</span>` : ''}
+                            </div>
+                        </div>
+                        <div class="entry-amount">
+                            <div class="entry-total">$${(entry.total || 0).toFixed(2)}</div>
+                            <span class="entry-status ${entry.paid ? 'paid' : 'pending'}">${entry.paid ? '✓ Pagado' : 'Pendiente'}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function getFilteredEntries() {
+            let filtered = [...entries];
+
+            const monthFilter = document.getElementById('filterMonth').value;
+            const statusFilter = document.getElementById('filterStatus').value;
+            const productFilter = document.getElementById('filterProduct').value;
+
+            if (monthFilter) {
+                filtered = filtered.filter(e => e.date.startsWith(monthFilter));
+            }
+            if (statusFilter === 'paid') {
+                filtered = filtered.filter(e => e.paid);
+            } else if (statusFilter === 'pending') {
+                filtered = filtered.filter(e => !e.paid);
+            }
+            if (productFilter) {
+                filtered = filtered.filter(e => e.product === productFilter);
+            }
+
+            return filtered;
+        }
+
+        function filterEntries() {
+            renderEntries();
+        }
+
+        function populateFilters() {
+            // Month filter
+            const months = [...new Set(entries.map(e => e.date.substring(0, 7)))].sort().reverse();
+            const monthSelect = document.getElementById('filterMonth');
+            const currentMonthVal = monthSelect.value;
+            monthSelect.innerHTML = '<option value="">Todos los meses</option>' +
+                months.map(m => {
+                    const [year, month] = m.split('-');
+                    const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+                    return `<option value="${m}">${monthNames[parseInt(month) - 1]} ${year}</option>`;
+                }).join('');
+            monthSelect.value = currentMonthVal;
+
+            // Product filter
+            const products = [...new Set(entries.map(e => e.product).filter(Boolean))].sort();
+            const productSelect = document.getElementById('filterProduct');
+            const currentProductVal = productSelect.value;
+            productSelect.innerHTML = '<option value="">Todos los productos</option>' +
+                products.map(p => `<option value="${p}">${p}</option>`).join('');
+            productSelect.value = currentProductVal;
+        }
+
+        // Tab switching
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
+
+            if (tab === 'calendar') {
+                document.getElementById('calendarView').classList.remove('hidden');
+                document.getElementById('listView').classList.remove('active');
+            } else {
+                document.getElementById('calendarView').classList.add('hidden');
+                document.getElementById('listView').classList.add('active');
+            }
+        }
+
+        // Modal functions
+        function openAddModal(dateStr = null) {
+            editingEntryId = null;
+            document.getElementById('modalTitle').textContent = 'Agregar Registro';
+            document.getElementById('deleteBtn').style.display = 'none';
+            document.getElementById('entryId').value = '';
+
+            // Reset form
+            document.getElementById('entryDate').value = dateStr || new Date().toISOString().split('T')[0];
+            document.getElementById('entryProduct').value = '';
+            document.getElementById('customProduct').value = '';
+            document.getElementById('quantity').value = '';
+            document.getElementById('pricePerUnit').value = '';
+            document.getElementById('dailyRate').value = '';
+            document.getElementById('hoursWorked').value = '';
+            document.getElementById('employer').value = '';
+            document.getElementById('notes').value = '';
+
+            selectWorkType('trato');
+            isPaid = false;
+            updatePaymentToggle();
+            calculateTotal();
+
+            document.getElementById('entryModal').classList.add('visible');
+        }
+
+        function editEntry(id) {
+            const entry = entries.find(e => e.id === id);
+            if (!entry) return;
+
+            editingEntryId = id;
+            document.getElementById('modalTitle').textContent = 'Editar Registro';
+            document.getElementById('deleteBtn').style.display = 'block';
+            document.getElementById('entryId').value = id;
+
+            document.getElementById('entryDate').value = entry.date;
+            document.getElementById('entryProduct').value = entry.product || '';
+            if (entry.customProduct) {
+                document.getElementById('entryProduct').value = 'Otro';
+                document.getElementById('customProduct').value = entry.customProduct;
+            }
+            document.getElementById('quantity').value = entry.quantity || '';
+            document.getElementById('unit').value = entry.unit || 'cajas';
+            document.getElementById('pricePerUnit').value = entry.pricePerUnit || '';
+            document.getElementById('dailyRate').value = entry.dailyRate || '';
+            document.getElementById('hoursWorked').value = entry.hoursWorked || '';
+            document.getElementById('employer').value = entry.employer || '';
+            document.getElementById('notes').value = entry.notes || '';
+
+            selectWorkType(entry.workType || 'trato');
+            isPaid = entry.paid || false;
+            updatePaymentToggle();
+            calculateTotal();
+
+            document.getElementById('entryModal').classList.add('visible');
+        }
+
+        function closeModal() {
+            document.getElementById('entryModal').classList.remove('visible');
+        }
+
+        function selectWorkType(type) {
+            workType = type;
+            document.getElementById('typeTrato').classList.toggle('selected', type === 'trato');
+            document.getElementById('typeDia').classList.toggle('selected', type === 'dia');
+            document.getElementById('tratoFields').classList.toggle('visible', type === 'trato');
+            document.getElementById('diaFields').classList.toggle('visible', type === 'dia');
+            calculateTotal();
+        }
+
+        function togglePayment() {
+            isPaid = !isPaid;
+            updatePaymentToggle();
+        }
+
+        function updatePaymentToggle() {
+            const toggle = document.getElementById('paymentToggle');
+            const label = document.getElementById('paymentLabel');
+            toggle.classList.toggle('active', isPaid);
+            label.textContent = isPaid ? 'Pagado' : 'Pendiente de pago';
+        }
+
+        function calculateTotal() {
+            let total = 0;
+            if (workType === 'trato') {
+                const quantity = parseFloat(document.getElementById('quantity').value) || 0;
+                const price = parseFloat(document.getElementById('pricePerUnit').value) || 0;
+                total = quantity * price;
+            } else {
+                total = parseFloat(document.getElementById('dailyRate').value) || 0;
+            }
+            document.getElementById('calculatedTotal').textContent = '$' + total.toFixed(2);
+            return total;
+        }
+
+        // Product change handler
+        document.getElementById('entryProduct').addEventListener('change', function() {
+            const customGroup = document.getElementById('customProductGroup');
+            customGroup.style.display = this.value === 'Otro' ? 'block' : 'none';
+        });
+
+        // Save entry
+        async function saveEntry() {
+            if (!currentUser) {
+                showToast('Debes iniciar sesion', 'error');
+                return;
+            }
+
+            const date = document.getElementById('entryDate').value;
+            let product = document.getElementById('entryProduct').value;
+            const customProduct = document.getElementById('customProduct').value;
+
+            if (!date) {
+                showToast('Selecciona una fecha', 'error');
+                return;
+            }
+
+            if (product === 'Otro' && customProduct) {
+                product = customProduct;
+            }
+
+            const total = calculateTotal();
+
+            const entryData = {
+                date,
+                product,
+                workType,
+                total,
+                paid: isPaid,
+                employer: document.getElementById('employer').value,
+                notes: document.getElementById('notes').value,
+                updatedAt: Date.now()
+            };
+
+            if (workType === 'trato') {
+                entryData.quantity = parseFloat(document.getElementById('quantity').value) || 0;
+                entryData.unit = document.getElementById('unit').value;
+                entryData.pricePerUnit = parseFloat(document.getElementById('pricePerUnit').value) || 0;
+            } else {
+                entryData.dailyRate = parseFloat(document.getElementById('dailyRate').value) || 0;
+                entryData.hoursWorked = parseFloat(document.getElementById('hoursWorked').value) || null;
+            }
+
+            try {
+                if (editingEntryId) {
+                    await db.ref(`harvest/${currentUser.uid}/${editingEntryId}`).update(entryData);
+                    showToast('Registro actualizado');
+                } else {
+                    entryData.createdAt = Date.now();
+                    await db.ref(`harvest/${currentUser.uid}`).push(entryData);
+                    showToast('Registro guardado');
+                }
+                closeModal();
+            } catch (error) {
+                showToast('Error al guardar', 'error');
+                console.error(error);
+            }
+        }
+
+        // Delete entry
+        async function deleteEntry() {
+            if (!editingEntryId || !currentUser) return;
+
+            if (confirm('¿Eliminar este registro?')) {
+                try {
+                    await db.ref(`harvest/${currentUser.uid}/${editingEntryId}`).remove();
+                    showToast('Registro eliminado');
+                    closeModal();
+                } catch (error) {
+                    showToast('Error al eliminar', 'error');
+                }
+            }
+        }
+
+        // Day modal
+        function openDayModal(dateStr, dayEntries) {
+            selectedDate = dateStr;
+            const date = new Date(dateStr + 'T12:00:00');
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('dayModalTitle').textContent = date.toLocaleDateString('es-ES', options);
+
+            const list = document.getElementById('dayEntriesList');
+            if (dayEntries.length === 0) {
+                list.innerHTML = '<p style="text-align: center; color: rgba(255,255,255,0.5);">No hay registros para este dia</p>';
+            } else {
+                list.innerHTML = dayEntries.map(e => `
+                    <div class="day-entry-item" onclick="closeDayModal(); editEntry('${e.id}')">
+                        <div class="day-entry-info">
+                            <h4>${e.product || 'Sin producto'} ${e.workType === 'dia' ? '(Al Dia)' : ''}</h4>
+                            <p>${e.workType === 'trato' ? `${e.quantity} ${e.unit} × $${e.pricePerUnit}` : 'Jornada'} ${e.paid ? '• Pagado' : '• Pendiente'}</p>
+                        </div>
+                        <div class="day-entry-amount">$${(e.total || 0).toFixed(2)}</div>
+                    </div>
+                `).join('');
+            }
+
+            document.getElementById('dayModal').classList.add('visible');
+        }
+
+        function closeDayModal() {
+            document.getElementById('dayModal').classList.remove('visible');
+            if (selectedDate) {
+                document.getElementById('entryDate').value = selectedDate;
+            }
+        }
+
+        // Toast notification
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast visible' + (type === 'error' ? ' error' : '');
+            setTimeout(() => {
+                toast.classList.remove('visible');
+            }, 3000);
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            renderCalendar();
+        });
+    </script>
+</body>
+</html>
