@@ -46,9 +46,10 @@
             display: flex;
             gap: 10px;
             align-items: center;
+            flex-wrap: wrap;
         }
 
-        .back-btn {
+        .back-btn, .action-btn {
             padding: 8px 16px;
             background: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
@@ -56,50 +57,46 @@
             color: #fff;
             text-decoration: none;
             font-size: 13px;
-            transition: all 0.3s;
-        }
-
-        .back-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
-
-        .add-btn {
-            padding: 10px 20px;
-            background: linear-gradient(90deg, #00aaff, #00ffaa);
-            border: none;
-            border-radius: 6px;
-            color: #000;
-            font-size: 14px;
-            font-weight: bold;
             cursor: pointer;
             transition: all 0.3s;
         }
 
-        .add-btn:hover {
+        .back-btn:hover, .action-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .action-btn.primary {
+            background: linear-gradient(90deg, #00aaff, #00ffaa);
+            border: none;
+            color: #000;
+            font-weight: bold;
+        }
+
+        .action-btn.primary:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 20px rgba(0, 170, 255, 0.4);
         }
 
-        /* Main Container */
+        /* Container */
         .container {
             max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
         }
 
-        /* Stats Cards */
+        /* Stats */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-bottom: 25px;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
         }
 
         .stat-card {
             background: rgba(0, 0, 0, 0.3);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
-            padding: 20px;
+            padding: 15px;
             text-align: center;
         }
 
@@ -114,10 +111,9 @@
         }
 
         .stat-value {
-            font-size: 28px;
+            font-size: 24px;
             font-weight: bold;
             color: #00ff88;
-            margin-bottom: 5px;
         }
 
         .stat-card.pending .stat-value {
@@ -125,10 +121,11 @@
         }
 
         .stat-label {
-            font-size: 11px;
+            font-size: 10px;
             color: rgba(255, 255, 255, 0.5);
             text-transform: uppercase;
             letter-spacing: 1px;
+            margin-top: 4px;
         }
 
         /* Tabs */
@@ -157,8 +154,103 @@
             border-bottom-color: #00aaff;
         }
 
-        .tab:hover {
-            color: #fff;
+        /* Section */
+        .section {
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        /* Trabajos (Jobs) List */
+        .jobs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .job-card {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .job-card:hover {
+            border-color: rgba(0, 170, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .job-card.active {
+            border-color: #00ff88;
+            background: rgba(0, 255, 136, 0.05);
+        }
+
+        .job-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .job-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .job-status {
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+        }
+
+        .job-status.inactive {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .job-details {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .job-details span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .job-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .job-stat {
+            text-align: center;
+        }
+
+        .job-stat-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #00aaff;
+        }
+
+        .job-stat-label {
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.4);
+            text-transform: uppercase;
         }
 
         /* Calendar */
@@ -167,7 +259,7 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
             padding: 20px;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
 
         .calendar-header {
@@ -216,13 +308,13 @@
             text-align: center;
             font-size: 11px;
             color: rgba(255, 255, 255, 0.4);
-            padding: 10px 5px;
+            padding: 8px 5px;
             text-transform: uppercase;
         }
 
         .calendar-day {
             aspect-ratio: 1;
-            min-height: 60px;
+            min-height: 55px;
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid rgba(255, 255, 255, 0.05);
             border-radius: 8px;
@@ -231,7 +323,6 @@
             transition: all 0.3s;
             display: flex;
             flex-direction: column;
-            overflow: hidden;
         }
 
         .calendar-day:hover {
@@ -261,56 +352,15 @@
         .day-number {
             font-size: 14px;
             font-weight: 600;
-            margin-bottom: 3px;
         }
 
         .day-amount {
             font-size: 10px;
             color: #00ff88;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .day-entries {
-            font-size: 9px;
-            color: rgba(255, 255, 255, 0.5);
+            margin-top: auto;
         }
 
         /* Entries List */
-        .entries-container {
-            display: none;
-        }
-
-        .entries-container.active {
-            display: block;
-        }
-
-        .calendar-container.hidden {
-            display: none;
-        }
-
-        .filters {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-        }
-
-        .filter-select {
-            padding: 8px 12px;
-            background: rgba(0, 0, 0, 0.4);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 6px;
-            color: #fff;
-            font-size: 13px;
-            cursor: pointer;
-        }
-
-        .filter-select option {
-            background: #1a1a2e;
-        }
-
         .entries-list {
             display: flex;
             flex-direction: column;
@@ -322,10 +372,11 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
             padding: 15px;
-            display: grid;
-            grid-template-columns: auto 1fr auto;
-            gap: 15px;
+            display: flex;
+            justify-content: space-between;
             align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
             transition: all 0.3s;
         }
 
@@ -333,55 +384,21 @@
             border-color: rgba(0, 170, 255, 0.3);
         }
 
+        .entry-info {
+            flex: 1;
+            min-width: 200px;
+        }
+
         .entry-date {
-            text-align: center;
-            min-width: 50px;
-        }
-
-        .entry-date .day {
-            font-size: 24px;
-            font-weight: bold;
+            font-size: 14px;
+            font-weight: 600;
             color: #00aaff;
-        }
-
-        .entry-date .month {
-            font-size: 10px;
-            color: rgba(255, 255, 255, 0.5);
-            text-transform: uppercase;
+            margin-bottom: 4px;
         }
 
         .entry-details {
-            flex: 1;
-        }
-
-        .entry-product {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 5px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .entry-type {
-            font-size: 10px;
-            padding: 3px 8px;
-            border-radius: 10px;
-            background: rgba(0, 170, 255, 0.2);
-            color: #00aaff;
-        }
-
-        .entry-type.daily {
-            background: rgba(138, 43, 226, 0.2);
-            color: #a855f7;
-        }
-
-        .entry-info {
             font-size: 12px;
             color: rgba(255, 255, 255, 0.6);
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
         }
 
         .entry-amount {
@@ -395,11 +412,11 @@
         }
 
         .entry-status {
-            font-size: 11px;
+            font-size: 10px;
             padding: 4px 10px;
-            border-radius: 12px;
-            margin-top: 5px;
+            border-radius: 10px;
             display: inline-block;
+            margin-top: 4px;
         }
 
         .entry-status.paid {
@@ -414,26 +431,26 @@
 
         .entry-actions {
             display: flex;
-            gap: 5px;
+            gap: 8px;
         }
 
-        .entry-action-btn {
-            width: 32px;
-            height: 32px;
+        .icon-btn {
+            width: 36px;
+            height: 36px;
             background: rgba(255, 255, 255, 0.1);
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             color: #fff;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 16px;
             transition: all 0.3s;
         }
 
-        .entry-action-btn:hover {
+        .icon-btn:hover {
             background: rgba(0, 170, 255, 0.3);
         }
 
-        .entry-action-btn.delete:hover {
+        .icon-btn.delete:hover {
             background: rgba(255, 68, 102, 0.3);
             color: #ff4466;
         }
@@ -466,7 +483,6 @@
             max-width: 500px;
             max-height: 90vh;
             overflow-y: auto;
-            position: relative;
         }
 
         .modal-header {
@@ -492,7 +508,6 @@
             color: rgba(255, 255, 255, 0.5);
             font-size: 24px;
             cursor: pointer;
-            transition: all 0.3s;
         }
 
         .modal-close:hover {
@@ -503,15 +518,24 @@
             padding: 20px;
         }
 
+        .modal-footer {
+            padding: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+        }
+
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 18px;
         }
 
         .form-group label {
             display: block;
-            font-size: 12px;
+            font-size: 11px;
             color: rgba(255, 255, 255, 0.6);
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
@@ -526,30 +550,22 @@
             border-radius: 8px;
             color: #fff;
             font-size: 14px;
-            transition: all 0.3s;
         }
 
         .form-group input:focus,
-        .form-group select:focus,
-        .form-group textarea:focus {
+        .form-group select:focus {
             outline: none;
             border-color: #00aaff;
-            box-shadow: 0 0 15px rgba(0, 170, 255, 0.2);
         }
 
         .form-group select option {
             background: #1a1a2e;
         }
 
-        .form-group textarea {
-            resize: vertical;
-            min-height: 80px;
-        }
-
         .form-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 15px;
+            gap: 12px;
         }
 
         .work-type-selector {
@@ -587,24 +603,22 @@
             font-weight: 600;
         }
 
-        .work-type-option .desc {
-            font-size: 10px;
-            color: rgba(255, 255, 255, 0.5);
-            margin-top: 3px;
-        }
-
         .conditional-fields {
             display: none;
+            margin-top: 15px;
         }
 
         .conditional-fields.visible {
             display: block;
         }
 
-        .payment-toggle {
+        .toggle-row {
             display: flex;
             align-items: center;
-            gap: 15px;
+            justify-content: space-between;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
         }
 
         .toggle-switch {
@@ -638,16 +652,15 @@
             background: #00ff88;
         }
 
-        .toggle-label {
-            font-size: 14px;
-        }
-
-        .modal-footer {
+        .calculated-total {
+            font-size: 32px;
+            font-weight: bold;
+            color: #00ff88;
+            text-align: center;
             padding: 20px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            display: flex;
-            gap: 10px;
-            justify-content: flex-end;
+            background: rgba(0, 255, 136, 0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(0, 255, 136, 0.2);
         }
 
         .btn {
@@ -657,6 +670,7 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
+            border: none;
         }
 
         .btn-secondary {
@@ -665,13 +679,8 @@
             color: #fff;
         }
 
-        .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
-
         .btn-primary {
             background: linear-gradient(90deg, #00aaff, #00ffaa);
-            border: none;
             color: #000;
         }
 
@@ -682,46 +691,7 @@
 
         .btn-danger {
             background: rgba(255, 68, 102, 0.2);
-            border: 1px solid rgba(255, 68, 102, 0.3);
             color: #ff4466;
-        }
-
-        .btn-danger:hover {
-            background: rgba(255, 68, 102, 0.3);
-        }
-
-        /* Day Detail Modal */
-        .day-entries-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .day-entry-item {
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            padding: 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .day-entry-info h4 {
-            font-size: 14px;
-            margin-bottom: 4px;
-        }
-
-        .day-entry-info p {
-            font-size: 11px;
-            color: rgba(255, 255, 255, 0.5);
-        }
-
-        .day-entry-amount {
-            font-size: 18px;
-            font-weight: bold;
-            color: #00ff88;
         }
 
         /* Empty State */
@@ -738,160 +708,66 @@
 
         .empty-state h3 {
             font-size: 18px;
-            margin-bottom: 10px;
             color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 10px;
         }
 
-        .empty-state p {
-            font-size: 13px;
+        /* Quick add from job */
+        .quick-add-bar {
+            background: rgba(0, 170, 255, 0.1);
+            border: 1px solid rgba(0, 170, 255, 0.3);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: none;
         }
 
-        /* Responsive */
-        @media (max-width: 768px) {
-            .header {
-                padding: 12px 15px;
-            }
-
-            .header h1 {
-                font-size: 14px;
-            }
-
-            .container {
-                padding: 15px;
-            }
-
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 10px;
-            }
-
-            .stat-card {
-                padding: 15px;
-            }
-
-            .stat-value {
-                font-size: 22px;
-            }
-
-            .calendar-day {
-                min-height: 50px;
-                padding: 3px;
-            }
-
-            .day-number {
-                font-size: 12px;
-            }
-
-            .day-amount {
-                font-size: 8px;
-            }
-
-            .calendar-day-header {
-                font-size: 9px;
-                padding: 5px 2px;
-            }
-
-            .entry-card {
-                grid-template-columns: 1fr;
-                gap: 10px;
-            }
-
-            .entry-date {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                text-align: left;
-            }
-
-            .entry-date .day {
-                font-size: 20px;
-            }
-
-            .entry-amount {
-                text-align: left;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-            }
-
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-
-            .modal {
-                max-height: 95vh;
-                border-radius: 12px;
-            }
-
-            .modal-footer {
-                flex-direction: column;
-            }
-
-            .btn {
-                width: 100%;
-                text-align: center;
-            }
+        .quick-add-bar.visible {
+            display: block;
         }
 
-        @media (max-width: 480px) {
-            .stats-grid {
-                grid-template-columns: 1fr 1fr;
-            }
-
-            .stat-value {
-                font-size: 18px;
-            }
-
-            .stat-label {
-                font-size: 9px;
-            }
-
-            .calendar-grid {
-                gap: 3px;
-            }
-
-            .calendar-day {
-                min-height: 40px;
-                border-radius: 4px;
-            }
-
-            .day-amount,
-            .day-entries {
-                display: none;
-            }
-
-            .calendar-nav button {
-                width: 32px;
-                height: 32px;
-            }
-
-            .calendar-month {
-                font-size: 14px;
-                min-width: 140px;
-            }
-        }
-
-        /* Loading */
-        .loading {
+        .quick-add-header {
             display: flex;
-            justify-content: center;
-            padding: 40px;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
         }
 
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid rgba(0, 170, 255, 0.2);
-            border-top-color: #00aaff;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
+        .quick-add-title {
+            font-size: 14px;
+            font-weight: 600;
         }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        .quick-add-close {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            font-size: 18px;
         }
 
-        /* Toast notifications */
+        .quick-add-form {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+
+        .quick-add-form .form-group {
+            margin: 0;
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .quick-add-form .form-group label {
+            font-size: 10px;
+        }
+
+        .quick-add-form input {
+            padding: 10px;
+        }
+
+        /* Toast */
         .toast {
             position: fixed;
             bottom: 20px;
@@ -916,14 +792,93 @@
             background: rgba(255, 68, 102, 0.9);
             color: #fff;
         }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                padding: 12px 15px;
+            }
+
+            .header h1 {
+                font-size: 14px;
+            }
+
+            .container {
+                padding: 15px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .calendar-day {
+                min-height: 45px;
+            }
+
+            .day-number {
+                font-size: 12px;
+            }
+
+            .day-amount {
+                font-size: 9px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .modal-footer {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                text-align: center;
+            }
+
+            .entry-card {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .entry-amount {
+                text-align: left;
+                width: 100%;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .calendar-grid {
+                gap: 3px;
+            }
+
+            .calendar-day {
+                min-height: 38px;
+                border-radius: 4px;
+                padding: 3px;
+            }
+
+            .calendar-day-header {
+                font-size: 9px;
+                padding: 5px 2px;
+            }
+
+            .jobs-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
     <header class="header">
-        <h1><span>🌾</span> Registro de Cosecha</h1>
+        <h1><span>🍎</span> Registro de Cosecha</h1>
         <div class="header-actions">
             <a href="index.html" class="back-btn">← Volver</a>
-            <button class="add-btn" onclick="openAddModal()">+ Agregar</button>
+            <button class="action-btn" onclick="openJobModal()">+ Trabajo</button>
+            <button class="action-btn primary" onclick="openEntryModal()">+ Registro</button>
         </div>
     </header>
 
@@ -932,7 +887,7 @@
         <div class="stats-grid">
             <div class="stat-card highlight">
                 <div class="stat-value" id="totalEarnings">$0</div>
-                <div class="stat-label">Total del Mes</div>
+                <div class="stat-label">Total Mes</div>
             </div>
             <div class="stat-card pending">
                 <div class="stat-value" id="pendingAmount">$0</div>
@@ -940,7 +895,7 @@
             </div>
             <div class="stat-card">
                 <div class="stat-value" id="totalDays">0</div>
-                <div class="stat-label">Dias Trabajados</div>
+                <div class="stat-label">Dias</div>
             </div>
             <div class="stat-card">
                 <div class="stat-value" id="totalUnits">0</div>
@@ -948,169 +903,211 @@
             </div>
         </div>
 
+        <!-- Quick Add Bar (when job is selected) -->
+        <div class="quick-add-bar" id="quickAddBar">
+            <div class="quick-add-header">
+                <span class="quick-add-title" id="quickAddTitle">Agregar a: Trabajo X</span>
+                <button class="quick-add-close" onclick="closeQuickAdd()">&times;</button>
+            </div>
+            <div class="quick-add-form">
+                <div class="form-group">
+                    <label>Fecha</label>
+                    <input type="date" id="quickDate">
+                </div>
+                <div class="form-group">
+                    <label>Cantidad</label>
+                    <input type="number" id="quickQuantity" placeholder="0" step="0.5">
+                </div>
+                <button class="btn btn-primary" onclick="quickAddEntry()">Agregar</button>
+            </div>
+        </div>
+
         <!-- Tabs -->
         <div class="tabs">
-            <button class="tab active" onclick="switchTab('calendar')">Calendario</button>
-            <button class="tab" onclick="switchTab('list')">Lista</button>
+            <button class="tab active" onclick="switchTab('trabajos')">Trabajos</button>
+            <button class="tab" onclick="switchTab('calendario')">Calendario</button>
+            <button class="tab" onclick="switchTab('registros')">Registros</button>
         </div>
 
-        <!-- Calendar View -->
-        <div class="calendar-container" id="calendarView">
-            <div class="calendar-header">
-                <div class="calendar-nav">
-                    <button onclick="changeMonth(-1)">‹</button>
-                    <span class="calendar-month" id="currentMonth">Enero 2024</span>
-                    <button onclick="changeMonth(1)">›</button>
+        <!-- Trabajos Section -->
+        <div class="section active" id="trabajosSection">
+            <div class="jobs-grid" id="jobsGrid">
+                <!-- Jobs will be rendered here -->
+            </div>
+        </div>
+
+        <!-- Calendario Section -->
+        <div class="section" id="calendarioSection">
+            <div class="calendar-container">
+                <div class="calendar-header">
+                    <div class="calendar-nav">
+                        <button onclick="changeMonth(-1)">‹</button>
+                        <span class="calendar-month" id="currentMonth">Enero 2024</span>
+                        <button onclick="changeMonth(1)">›</button>
+                    </div>
                 </div>
-            </div>
-            <div class="calendar-grid" id="calendarGrid">
-                <!-- Days will be generated by JS -->
+                <div class="calendar-grid" id="calendarGrid"></div>
             </div>
         </div>
 
-        <!-- List View -->
-        <div class="entries-container" id="listView">
-            <div class="filters">
-                <select class="filter-select" id="filterMonth" onchange="filterEntries()">
-                    <option value="">Todos los meses</option>
-                </select>
-                <select class="filter-select" id="filterStatus" onchange="filterEntries()">
-                    <option value="">Todo</option>
-                    <option value="paid">Pagado</option>
-                    <option value="pending">Pendiente</option>
-                </select>
-                <select class="filter-select" id="filterProduct" onchange="filterEntries()">
-                    <option value="">Todos los productos</option>
-                </select>
-            </div>
-            <div class="entries-list" id="entriesList">
-                <!-- Entries will be generated by JS -->
-            </div>
+        <!-- Registros Section -->
+        <div class="section" id="registrosSection">
+            <div class="entries-list" id="entriesList"></div>
         </div>
     </div>
 
-    <!-- Add/Edit Modal -->
-    <div class="modal-overlay" id="entryModal">
+    <!-- Job Modal -->
+    <div class="modal-overlay" id="jobModal">
         <div class="modal">
             <div class="modal-header">
-                <h2 id="modalTitle">Agregar Registro</h2>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <h2 id="jobModalTitle">Nuevo Trabajo</h2>
+                <button class="modal-close" onclick="closeJobModal()">&times;</button>
             </div>
             <div class="modal-body">
-                <input type="hidden" id="entryId">
+                <input type="hidden" id="jobId">
 
                 <div class="form-group">
-                    <label>Fecha</label>
-                    <input type="date" id="entryDate" required>
+                    <label>Nombre del Trabajo</label>
+                    <input type="text" id="jobName" placeholder="Ej: Cosecha Manzanas Finca X">
+                </div>
+
+                <div class="form-group">
+                    <label>Producto</label>
+                    <select id="jobProduct">
+                        <option value="">Seleccionar fruta</option>
+                        <option value="Fresa">Fresa</option>
+                        <option value="Frambuesa">Frambuesa</option>
+                        <option value="Arandano">Arandano</option>
+                        <option value="Mora">Mora</option>
+                        <option value="Cereza">Cereza</option>
+                        <option value="Ciruela">Ciruela</option>
+                        <option value="Manzana">Manzana</option>
+                        <option value="Pera">Pera</option>
+                        <option value="Uva">Uva</option>
+                    </select>
                 </div>
 
                 <div class="form-group">
                     <label>Tipo de Trabajo</label>
                     <div class="work-type-selector">
-                        <div class="work-type-option selected" onclick="selectWorkType('trato')" id="typeTrato">
+                        <div class="work-type-option selected" onclick="selectJobType('trato')" id="jobTypeTrato">
                             <div class="icon">📦</div>
                             <div class="label">Al Trato</div>
-                            <div class="desc">Por unidad cosechada</div>
                         </div>
-                        <div class="work-type-option" onclick="selectWorkType('dia')" id="typeDia">
+                        <div class="work-type-option" onclick="selectJobType('dia')" id="jobTypeDia">
                             <div class="icon">📅</div>
                             <div class="label">Al Dia</div>
-                            <div class="desc">Pago fijo por jornada</div>
                         </div>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label>Producto</label>
-                    <select id="entryProduct">
-                        <option value="">Seleccionar producto</option>
-                        <option value="Fresa">Fresa</option>
-                        <option value="Frambuesa">Frambuesa</option>
-                        <option value="Arandano">Arandano</option>
-                        <option value="Mora">Mora</option>
-                        <option value="Uva">Uva</option>
-                        <option value="Tomate">Tomate</option>
-                        <option value="Pimiento">Pimiento</option>
-                        <option value="Pepino">Pepino</option>
-                        <option value="Lechuga">Lechuga</option>
-                        <option value="Otro">Otro</option>
-                    </select>
-                </div>
-
-                <div class="form-group" id="customProductGroup" style="display: none;">
-                    <label>Especificar Producto</label>
-                    <input type="text" id="customProduct" placeholder="Nombre del producto">
-                </div>
-
-                <!-- Campos para "Al Trato" -->
-                <div class="conditional-fields visible" id="tratoFields">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Cantidad</label>
-                            <input type="number" id="quantity" placeholder="0" min="0" step="0.5" oninput="calculateTotal()">
-                        </div>
-                        <div class="form-group">
-                            <label>Unidad</label>
-                            <select id="unit">
-                                <option value="cajas">Cajas</option>
-                                <option value="kilos">Kilos</option>
-                                <option value="libras">Libras</option>
-                                <option value="cubetas">Cubetas</option>
-                                <option value="bandejas">Bandejas</option>
-                                <option value="bultos">Bultos</option>
-                            </select>
-                        </div>
+                <div class="conditional-fields visible" id="jobTratoFields">
+                    <div class="form-group">
+                        <label>Recipiente / Unidad</label>
+                        <select id="jobUnit">
+                            <option value="totens">Totens</option>
+                            <option value="capacho_grande">Capacho Grande</option>
+                            <option value="capacho_pequeno">Capacho Pequeño</option>
+                            <option value="kilo">Kilo</option>
+                            <option value="bandeja">Bandeja</option>
+                            <option value="bins">Bins (grupo)</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label>Precio por Unidad ($)</label>
-                        <input type="number" id="pricePerUnit" placeholder="0.00" min="0" step="0.01" oninput="calculateTotal()">
+                        <input type="number" id="jobPrice" placeholder="0.00" step="0.01">
                     </div>
                 </div>
 
-                <!-- Campos para "Al Dia" -->
-                <div class="conditional-fields" id="diaFields">
+                <div class="conditional-fields" id="jobDiaFields">
                     <div class="form-group">
-                        <label>Pago del Dia ($)</label>
-                        <input type="number" id="dailyRate" placeholder="0.00" min="0" step="0.01" oninput="calculateTotal()">
+                        <label>Pago por Dia ($)</label>
+                        <input type="number" id="jobDailyRate" placeholder="0.00" step="0.01">
                     </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Empleador / Finca</label>
+                    <input type="text" id="jobEmployer" placeholder="Nombre del empleador o finca">
+                </div>
+
+                <div class="form-group">
+                    <div class="toggle-row">
+                        <span>Trabajo Activo</span>
+                        <div class="toggle-switch active" id="jobActiveToggle" onclick="toggleJobActive()"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" id="deleteJobBtn" style="display: none;" onclick="deleteJob()">Eliminar</button>
+                <button class="btn btn-secondary" onclick="closeJobModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveJob()">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Entry Modal -->
+    <div class="modal-overlay" id="entryModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="entryModalTitle">Nuevo Registro</h2>
+                <button class="modal-close" onclick="closeEntryModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="entryId">
+
+                <div class="form-group">
+                    <label>Trabajo</label>
+                    <select id="entryJob" onchange="onJobSelect()">
+                        <option value="">Seleccionar trabajo</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Fecha</label>
+                    <input type="date" id="entryDate">
+                </div>
+
+                <div id="entryTratoFields" class="conditional-fields visible">
                     <div class="form-group">
-                        <label>Horas Trabajadas (opcional)</label>
-                        <input type="number" id="hoursWorked" placeholder="8" min="0" step="0.5">
+                        <label>Cantidad <span id="entryUnitLabel">(unidades)</span></label>
+                        <input type="number" id="entryQuantity" placeholder="0" step="0.5" oninput="calculateEntryTotal()">
+                    </div>
+                </div>
+
+                <div id="entryDiaFields" class="conditional-fields">
+                    <div class="form-group">
+                        <label>Horas trabajadas (opcional)</label>
+                        <input type="number" id="entryHours" placeholder="8" step="0.5">
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label>Total Calculado</label>
-                    <div style="font-size: 28px; font-weight: bold; color: #00ff88; padding: 10px 0;" id="calculatedTotal">$0.00</div>
+                    <label>Total</label>
+                    <div class="calculated-total" id="entryTotal">$0.00</div>
                 </div>
 
                 <div class="form-group">
-                    <label>Estado de Pago</label>
-                    <div class="payment-toggle">
-                        <div class="toggle-switch" id="paymentToggle" onclick="togglePayment()"></div>
-                        <span class="toggle-label" id="paymentLabel">Pendiente de pago</span>
+                    <div class="toggle-row">
+                        <span id="entryPaidLabel">Pendiente de pago</span>
+                        <div class="toggle-switch" id="entryPaidToggle" onclick="toggleEntryPaid()"></div>
                     </div>
-                </div>
-
-                <div class="form-group">
-                    <label>Empleador / Finca (opcional)</label>
-                    <input type="text" id="employer" placeholder="Nombre del empleador o finca">
                 </div>
 
                 <div class="form-group">
                     <label>Notas (opcional)</label>
-                    <textarea id="notes" placeholder="Observaciones adicionales..."></textarea>
+                    <textarea id="entryNotes" rows="2" placeholder="Observaciones..."></textarea>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-danger" id="deleteBtn" style="display: none;" onclick="deleteEntry()">Eliminar</button>
-                <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+                <button class="btn btn-danger" id="deleteEntryBtn" style="display: none;" onclick="deleteEntry()">Eliminar</button>
+                <button class="btn btn-secondary" onclick="closeEntryModal()">Cancelar</button>
                 <button class="btn btn-primary" onclick="saveEntry()">Guardar</button>
             </div>
         </div>
     </div>
 
-    <!-- Day Detail Modal -->
+    <!-- Day Modal -->
     <div class="modal-overlay" id="dayModal">
         <div class="modal">
             <div class="modal-header">
@@ -1118,11 +1115,9 @@
                 <button class="modal-close" onclick="closeDayModal()">&times;</button>
             </div>
             <div class="modal-body">
-                <div id="dayEntriesList" class="day-entries-list">
-                    <!-- Day entries will be listed here -->
-                </div>
-                <button class="btn btn-primary" style="width: 100%; margin-top: 15px;" onclick="closeDayModal(); openAddModal();">
-                    + Agregar registro para este dia
+                <div id="dayEntriesList"></div>
+                <button class="btn btn-primary" style="width: 100%; margin-top: 15px;" onclick="addEntryForDay()">
+                    + Agregar registro
                 </button>
             </div>
         </div>
@@ -1131,13 +1126,13 @@
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
-    <!-- Firebase SDK -->
+    <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 
     <script>
-        // Firebase config
+        // Firebase Config
         const firebaseConfig = {
             apiKey: "AIzaSyBvju4gyCpz6E6R3TsvO1uR1KZB7ZbW9VU",
             authDomain: "albastudio-e0d5b.firebaseapp.com",
@@ -1157,30 +1152,45 @@
 
         // State
         let currentUser = null;
+        let jobs = [];
         let entries = [];
         let currentDate = new Date();
-        let selectedDate = null;
-        let workType = 'trato';
-        let isPaid = false;
-        let editingEntryId = null;
+        let selectedJob = null;
+        let selectedDayDate = null;
 
-        // Auth listener
+        // Job modal state
+        let jobType = 'trato';
+        let jobActive = true;
+
+        // Entry modal state
+        let entryPaid = false;
+
+        // Auth
         auth.onAuthStateChanged((user) => {
             if (user) {
                 currentUser = user;
-                loadEntries();
+                loadData();
             } else {
-                // Redirect to login
                 window.location.href = 'index.html';
             }
         });
 
-        // Load entries from Firebase
-        function loadEntries() {
+        // Load data
+        function loadData() {
             if (!currentUser) return;
 
-            const entriesRef = db.ref(`harvest/${currentUser.uid}`);
-            entriesRef.on('value', (snapshot) => {
+            // Load jobs
+            db.ref(`jobs/${currentUser.uid}`).on('value', (snapshot) => {
+                jobs = [];
+                snapshot.forEach((child) => {
+                    jobs.push({ id: child.key, ...child.val() });
+                });
+                renderJobs();
+                updateJobSelect();
+            });
+
+            // Load entries
+            db.ref(`harvest/${currentUser.uid}`).on('value', (snapshot) => {
                 entries = [];
                 snapshot.forEach((child) => {
                     entries.push({ id: child.key, ...child.val() });
@@ -1189,33 +1199,431 @@
                 updateStats();
                 renderCalendar();
                 renderEntries();
-                populateFilters();
             });
         }
 
-        // Update statistics
+        // Stats
         function updateStats() {
             const now = new Date();
-            const currentMonth = now.getMonth();
-            const currentYear = now.getFullYear();
+            const month = now.getMonth();
+            const year = now.getFullYear();
 
             const monthEntries = entries.filter(e => {
                 const d = new Date(e.date);
-                return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+                return d.getMonth() === month && d.getFullYear() === year;
             });
 
-            const totalEarnings = monthEntries.reduce((sum, e) => sum + (e.total || 0), 0);
-            const pendingAmount = monthEntries.filter(e => !e.paid).reduce((sum, e) => sum + (e.total || 0), 0);
-            const totalDays = new Set(monthEntries.map(e => e.date)).size;
-            const totalUnits = monthEntries.filter(e => e.workType === 'trato').reduce((sum, e) => sum + (e.quantity || 0), 0);
+            const total = monthEntries.reduce((sum, e) => sum + (e.total || 0), 0);
+            const pending = monthEntries.filter(e => !e.paid).reduce((sum, e) => sum + (e.total || 0), 0);
+            const days = new Set(monthEntries.map(e => e.date)).size;
+            const units = monthEntries.reduce((sum, e) => sum + (e.quantity || 0), 0);
 
-            document.getElementById('totalEarnings').textContent = '$' + totalEarnings.toFixed(2);
-            document.getElementById('pendingAmount').textContent = '$' + pendingAmount.toFixed(2);
-            document.getElementById('totalDays').textContent = totalDays;
-            document.getElementById('totalUnits').textContent = totalUnits;
+            document.getElementById('totalEarnings').textContent = '$' + total.toFixed(2);
+            document.getElementById('pendingAmount').textContent = '$' + pending.toFixed(2);
+            document.getElementById('totalDays').textContent = days;
+            document.getElementById('totalUnits').textContent = Math.round(units);
         }
 
-        // Calendar functions
+        // Tabs
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
+            document.getElementById(tab + 'Section').classList.add('active');
+        }
+
+        // Jobs
+        function renderJobs() {
+            const grid = document.getElementById('jobsGrid');
+
+            if (jobs.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1/-1;">
+                        <div class="icon">💼</div>
+                        <h3>No hay trabajos</h3>
+                        <p>Crea un trabajo para empezar a registrar tu cosecha</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const unitNames = {
+                'totens': 'Totens',
+                'capacho_grande': 'Capacho Grande',
+                'capacho_pequeno': 'Capacho Pequeño',
+                'kilo': 'Kilos',
+                'bandeja': 'Bandejas',
+                'bins': 'Bins'
+            };
+
+            grid.innerHTML = jobs.map(job => {
+                const jobEntries = entries.filter(e => e.jobId === job.id);
+                const totalEarned = jobEntries.reduce((sum, e) => sum + (e.total || 0), 0);
+                const totalUnits = jobEntries.reduce((sum, e) => sum + (e.quantity || 0), 0);
+                const daysWorked = new Set(jobEntries.map(e => e.date)).size;
+
+                return `
+                    <div class="job-card ${job.active !== false ? 'active' : ''}" onclick="selectJobForQuickAdd('${job.id}')">
+                        <div class="job-header">
+                            <span class="job-title">${job.name || job.product}</span>
+                            <span class="job-status ${job.active === false ? 'inactive' : ''}">${job.active === false ? 'Inactivo' : 'Activo'}</span>
+                        </div>
+                        <div class="job-details">
+                            <span>🍎 ${job.product}</span>
+                            <span>📍 ${job.employer || 'Sin especificar'}</span>
+                            <span>${job.type === 'dia' ? '📅 Al Dia - $' + job.dailyRate : '📦 ' + (unitNames[job.unit] || job.unit) + ' - $' + job.price}</span>
+                        </div>
+                        <div class="job-stats">
+                            <div class="job-stat">
+                                <div class="job-stat-value">${daysWorked}</div>
+                                <div class="job-stat-label">Dias</div>
+                            </div>
+                            <div class="job-stat">
+                                <div class="job-stat-value">${Math.round(totalUnits)}</div>
+                                <div class="job-stat-label">Unidades</div>
+                            </div>
+                            <div class="job-stat">
+                                <div class="job-stat-value" style="color: #00ff88;">$${totalEarned.toFixed(0)}</div>
+                                <div class="job-stat-label">Total</div>
+                            </div>
+                        </div>
+                        <button class="icon-btn" style="position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; font-size: 12px;" onclick="event.stopPropagation(); editJob('${job.id}')">✏️</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectJobForQuickAdd(jobId) {
+            const job = jobs.find(j => j.id === jobId);
+            if (!job || job.type === 'dia') {
+                openEntryModal(null, jobId);
+                return;
+            }
+
+            selectedJob = job;
+            document.getElementById('quickAddTitle').textContent = `Agregar a: ${job.name || job.product}`;
+            document.getElementById('quickDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('quickQuantity').value = '';
+            document.getElementById('quickAddBar').classList.add('visible');
+        }
+
+        function closeQuickAdd() {
+            selectedJob = null;
+            document.getElementById('quickAddBar').classList.remove('visible');
+        }
+
+        async function quickAddEntry() {
+            if (!selectedJob || !currentUser) return;
+
+            const date = document.getElementById('quickDate').value;
+            const quantity = parseFloat(document.getElementById('quickQuantity').value) || 0;
+
+            if (!date || quantity <= 0) {
+                showToast('Completa fecha y cantidad', 'error');
+                return;
+            }
+
+            const total = quantity * (selectedJob.price || 0);
+
+            try {
+                await db.ref(`harvest/${currentUser.uid}`).push({
+                    jobId: selectedJob.id,
+                    date,
+                    quantity,
+                    total,
+                    paid: false,
+                    createdAt: Date.now()
+                });
+                showToast('Registro agregado');
+                document.getElementById('quickQuantity').value = '';
+            } catch (error) {
+                showToast('Error al guardar', 'error');
+            }
+        }
+
+        // Job Modal
+        function openJobModal(jobId = null) {
+            document.getElementById('jobId').value = '';
+            document.getElementById('jobName').value = '';
+            document.getElementById('jobProduct').value = '';
+            document.getElementById('jobUnit').value = 'totens';
+            document.getElementById('jobPrice').value = '';
+            document.getElementById('jobDailyRate').value = '';
+            document.getElementById('jobEmployer').value = '';
+            jobType = 'trato';
+            jobActive = true;
+            updateJobTypeUI();
+            updateJobActiveUI();
+            document.getElementById('deleteJobBtn').style.display = 'none';
+            document.getElementById('jobModalTitle').textContent = 'Nuevo Trabajo';
+
+            if (jobId) {
+                const job = jobs.find(j => j.id === jobId);
+                if (job) {
+                    document.getElementById('jobId').value = job.id;
+                    document.getElementById('jobName').value = job.name || '';
+                    document.getElementById('jobProduct').value = job.product || '';
+                    document.getElementById('jobUnit').value = job.unit || 'totens';
+                    document.getElementById('jobPrice').value = job.price || '';
+                    document.getElementById('jobDailyRate').value = job.dailyRate || '';
+                    document.getElementById('jobEmployer').value = job.employer || '';
+                    jobType = job.type || 'trato';
+                    jobActive = job.active !== false;
+                    updateJobTypeUI();
+                    updateJobActiveUI();
+                    document.getElementById('deleteJobBtn').style.display = 'block';
+                    document.getElementById('jobModalTitle').textContent = 'Editar Trabajo';
+                }
+            }
+
+            document.getElementById('jobModal').classList.add('visible');
+        }
+
+        function editJob(jobId) {
+            openJobModal(jobId);
+        }
+
+        function closeJobModal() {
+            document.getElementById('jobModal').classList.remove('visible');
+        }
+
+        function selectJobType(type) {
+            jobType = type;
+            updateJobTypeUI();
+        }
+
+        function updateJobTypeUI() {
+            document.getElementById('jobTypeTrato').classList.toggle('selected', jobType === 'trato');
+            document.getElementById('jobTypeDia').classList.toggle('selected', jobType === 'dia');
+            document.getElementById('jobTratoFields').classList.toggle('visible', jobType === 'trato');
+            document.getElementById('jobDiaFields').classList.toggle('visible', jobType === 'dia');
+        }
+
+        function toggleJobActive() {
+            jobActive = !jobActive;
+            updateJobActiveUI();
+        }
+
+        function updateJobActiveUI() {
+            document.getElementById('jobActiveToggle').classList.toggle('active', jobActive);
+        }
+
+        async function saveJob() {
+            if (!currentUser) return;
+
+            const id = document.getElementById('jobId').value;
+            const data = {
+                name: document.getElementById('jobName').value,
+                product: document.getElementById('jobProduct').value,
+                type: jobType,
+                employer: document.getElementById('jobEmployer').value,
+                active: jobActive,
+                updatedAt: Date.now()
+            };
+
+            if (jobType === 'trato') {
+                data.unit = document.getElementById('jobUnit').value;
+                data.price = parseFloat(document.getElementById('jobPrice').value) || 0;
+            } else {
+                data.dailyRate = parseFloat(document.getElementById('jobDailyRate').value) || 0;
+            }
+
+            if (!data.product) {
+                showToast('Selecciona un producto', 'error');
+                return;
+            }
+
+            try {
+                if (id) {
+                    await db.ref(`jobs/${currentUser.uid}/${id}`).update(data);
+                } else {
+                    data.createdAt = Date.now();
+                    await db.ref(`jobs/${currentUser.uid}`).push(data);
+                }
+                showToast('Trabajo guardado');
+                closeJobModal();
+            } catch (error) {
+                showToast('Error al guardar', 'error');
+            }
+        }
+
+        async function deleteJob() {
+            const id = document.getElementById('jobId').value;
+            if (!id || !currentUser) return;
+
+            if (confirm('¿Eliminar este trabajo? Los registros asociados no se eliminaran.')) {
+                try {
+                    await db.ref(`jobs/${currentUser.uid}/${id}`).remove();
+                    showToast('Trabajo eliminado');
+                    closeJobModal();
+                } catch (error) {
+                    showToast('Error al eliminar', 'error');
+                }
+            }
+        }
+
+        // Entry Modal
+        function openEntryModal(entryId = null, preselectedJobId = null) {
+            document.getElementById('entryId').value = '';
+            document.getElementById('entryJob').value = preselectedJobId || '';
+            document.getElementById('entryDate').value = selectedDayDate || new Date().toISOString().split('T')[0];
+            document.getElementById('entryQuantity').value = '';
+            document.getElementById('entryHours').value = '';
+            document.getElementById('entryNotes').value = '';
+            entryPaid = false;
+            updateEntryPaidUI();
+            document.getElementById('deleteEntryBtn').style.display = 'none';
+            document.getElementById('entryModalTitle').textContent = 'Nuevo Registro';
+            onJobSelect();
+
+            if (entryId) {
+                const entry = entries.find(e => e.id === entryId);
+                if (entry) {
+                    document.getElementById('entryId').value = entry.id;
+                    document.getElementById('entryJob').value = entry.jobId || '';
+                    document.getElementById('entryDate').value = entry.date;
+                    document.getElementById('entryQuantity').value = entry.quantity || '';
+                    document.getElementById('entryHours').value = entry.hours || '';
+                    document.getElementById('entryNotes').value = entry.notes || '';
+                    entryPaid = entry.paid || false;
+                    updateEntryPaidUI();
+                    document.getElementById('deleteEntryBtn').style.display = 'block';
+                    document.getElementById('entryModalTitle').textContent = 'Editar Registro';
+                    onJobSelect();
+                }
+            }
+
+            document.getElementById('entryModal').classList.add('visible');
+        }
+
+        function closeEntryModal() {
+            document.getElementById('entryModal').classList.remove('visible');
+            selectedDayDate = null;
+        }
+
+        function updateJobSelect() {
+            const select = document.getElementById('entryJob');
+            const currentVal = select.value;
+            select.innerHTML = '<option value="">Seleccionar trabajo</option>' +
+                jobs.filter(j => j.active !== false).map(j =>
+                    `<option value="${j.id}">${j.name || j.product} - ${j.employer || ''}</option>`
+                ).join('');
+            select.value = currentVal;
+        }
+
+        function onJobSelect() {
+            const jobId = document.getElementById('entryJob').value;
+            const job = jobs.find(j => j.id === jobId);
+
+            if (job) {
+                const unitNames = {
+                    'totens': 'totens',
+                    'capacho_grande': 'capachos grandes',
+                    'capacho_pequeno': 'capachos pequeños',
+                    'kilo': 'kilos',
+                    'bandeja': 'bandejas',
+                    'bins': 'bins'
+                };
+
+                if (job.type === 'dia') {
+                    document.getElementById('entryTratoFields').classList.remove('visible');
+                    document.getElementById('entryDiaFields').classList.add('visible');
+                    document.getElementById('entryTotal').textContent = '$' + (job.dailyRate || 0).toFixed(2);
+                } else {
+                    document.getElementById('entryTratoFields').classList.add('visible');
+                    document.getElementById('entryDiaFields').classList.remove('visible');
+                    document.getElementById('entryUnitLabel').textContent = `(${unitNames[job.unit] || 'unidades'})`;
+                    calculateEntryTotal();
+                }
+            }
+        }
+
+        function calculateEntryTotal() {
+            const jobId = document.getElementById('entryJob').value;
+            const job = jobs.find(j => j.id === jobId);
+            const quantity = parseFloat(document.getElementById('entryQuantity').value) || 0;
+
+            let total = 0;
+            if (job) {
+                if (job.type === 'dia') {
+                    total = job.dailyRate || 0;
+                } else {
+                    total = quantity * (job.price || 0);
+                }
+            }
+            document.getElementById('entryTotal').textContent = '$' + total.toFixed(2);
+            return total;
+        }
+
+        function toggleEntryPaid() {
+            entryPaid = !entryPaid;
+            updateEntryPaidUI();
+        }
+
+        function updateEntryPaidUI() {
+            document.getElementById('entryPaidToggle').classList.toggle('active', entryPaid);
+            document.getElementById('entryPaidLabel').textContent = entryPaid ? 'Pagado' : 'Pendiente de pago';
+        }
+
+        async function saveEntry() {
+            if (!currentUser) return;
+
+            const id = document.getElementById('entryId').value;
+            const jobId = document.getElementById('entryJob').value;
+            const job = jobs.find(j => j.id === jobId);
+            const date = document.getElementById('entryDate').value;
+
+            if (!jobId || !date) {
+                showToast('Selecciona trabajo y fecha', 'error');
+                return;
+            }
+
+            const data = {
+                jobId,
+                date,
+                paid: entryPaid,
+                notes: document.getElementById('entryNotes').value,
+                updatedAt: Date.now()
+            };
+
+            if (job.type === 'dia') {
+                data.total = job.dailyRate || 0;
+                data.hours = parseFloat(document.getElementById('entryHours').value) || null;
+            } else {
+                data.quantity = parseFloat(document.getElementById('entryQuantity').value) || 0;
+                data.total = data.quantity * (job.price || 0);
+            }
+
+            try {
+                if (id) {
+                    await db.ref(`harvest/${currentUser.uid}/${id}`).update(data);
+                } else {
+                    data.createdAt = Date.now();
+                    await db.ref(`harvest/${currentUser.uid}`).push(data);
+                }
+                showToast('Registro guardado');
+                closeEntryModal();
+            } catch (error) {
+                showToast('Error al guardar', 'error');
+            }
+        }
+
+        async function deleteEntry() {
+            const id = document.getElementById('entryId').value;
+            if (!id || !currentUser) return;
+
+            if (confirm('¿Eliminar este registro?')) {
+                try {
+                    await db.ref(`harvest/${currentUser.uid}/${id}`).remove();
+                    showToast('Registro eliminado');
+                    closeEntryModal();
+                } catch (error) {
+                    showToast('Error al eliminar', 'error');
+                }
+            }
+        }
+
+        // Calendar
         function renderCalendar() {
             const year = currentDate.getFullYear();
             const month = currentDate.getMonth();
@@ -1232,7 +1640,6 @@
             const grid = document.getElementById('calendarGrid');
             grid.innerHTML = '';
 
-            // Day headers
             const dayNames = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
             dayNames.forEach(day => {
                 const header = document.createElement('div');
@@ -1241,7 +1648,6 @@
                 grid.appendChild(header);
             });
 
-            // Previous month days
             const prevMonth = new Date(year, month, 0);
             for (let i = startDay - 1; i >= 0; i--) {
                 const day = document.createElement('div');
@@ -1250,7 +1656,6 @@
                 grid.appendChild(day);
             }
 
-            // Current month days
             const today = new Date();
             for (let i = 1; i <= daysInMonth; i++) {
                 const day = document.createElement('div');
@@ -1271,14 +1676,12 @@
                 day.innerHTML = `
                     <span class="day-number">${i}</span>
                     ${dayTotal > 0 ? `<span class="day-amount">$${dayTotal.toFixed(0)}</span>` : ''}
-                    ${dayEntries.length > 0 ? `<span class="day-entries">${dayEntries.length} reg.</span>` : ''}
                 `;
 
                 day.onclick = () => openDayModal(dateStr, dayEntries);
                 grid.appendChild(day);
             }
 
-            // Next month days
             const remainingDays = 42 - (startDay + daysInMonth);
             for (let i = 1; i <= remainingDays; i++) {
                 const day = document.createElement('div');
@@ -1293,12 +1696,48 @@
             renderCalendar();
         }
 
-        // Entries list
+        // Day Modal
+        function openDayModal(dateStr, dayEntries) {
+            selectedDayDate = dateStr;
+            const date = new Date(dateStr + 'T12:00:00');
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('dayModalTitle').textContent = date.toLocaleDateString('es-ES', options);
+
+            const list = document.getElementById('dayEntriesList');
+            if (dayEntries.length === 0) {
+                list.innerHTML = '<p style="text-align: center; color: rgba(255,255,255,0.5); padding: 20px;">No hay registros para este dia</p>';
+            } else {
+                list.innerHTML = dayEntries.map(e => {
+                    const job = jobs.find(j => j.id === e.jobId);
+                    return `
+                        <div class="entry-card" onclick="closeDayModal(); openEntryModal('${e.id}')">
+                            <div class="entry-info">
+                                <div class="entry-date">${job ? (job.name || job.product) : 'Trabajo eliminado'}</div>
+                                <div class="entry-details">${e.quantity ? e.quantity + ' unidades' : 'Jornada'} ${e.paid ? '• Pagado' : '• Pendiente'}</div>
+                            </div>
+                            <div class="entry-total">$${(e.total || 0).toFixed(2)}</div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            document.getElementById('dayModal').classList.add('visible');
+        }
+
+        function closeDayModal() {
+            document.getElementById('dayModal').classList.remove('visible');
+        }
+
+        function addEntryForDay() {
+            closeDayModal();
+            openEntryModal();
+        }
+
+        // Entries List
         function renderEntries() {
             const list = document.getElementById('entriesList');
-            const filteredEntries = getFilteredEntries();
 
-            if (filteredEntries.length === 0) {
+            if (entries.length === 0) {
                 list.innerHTML = `
                     <div class="empty-state">
                         <div class="icon">📋</div>
@@ -1311,312 +1750,33 @@
 
             const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
-            list.innerHTML = filteredEntries.map(entry => {
-                const date = new Date(entry.date + 'T12:00:00');
+            list.innerHTML = entries.slice(0, 50).map(e => {
+                const job = jobs.find(j => j.id === e.jobId);
+                const date = new Date(e.date + 'T12:00:00');
                 return `
-                    <div class="entry-card" onclick="editEntry('${entry.id}')">
-                        <div class="entry-date">
-                            <div class="day">${date.getDate()}</div>
-                            <div class="month">${monthNames[date.getMonth()]}</div>
-                        </div>
-                        <div class="entry-details">
-                            <div class="entry-product">
-                                ${entry.product || 'Sin producto'}
-                                <span class="entry-type ${entry.workType === 'dia' ? 'daily' : ''}">${entry.workType === 'dia' ? 'Al Dia' : 'Al Trato'}</span>
-                            </div>
-                            <div class="entry-info">
-                                ${entry.workType === 'trato' ? `<span>${entry.quantity} ${entry.unit} × $${entry.pricePerUnit}</span>` : `<span>${entry.hoursWorked ? entry.hoursWorked + ' horas' : 'Jornada completa'}</span>`}
-                                ${entry.employer ? `<span>📍 ${entry.employer}</span>` : ''}
-                            </div>
+                    <div class="entry-card" onclick="openEntryModal('${e.id}')">
+                        <div class="entry-info">
+                            <div class="entry-date">${date.getDate()} ${monthNames[date.getMonth()]} - ${job ? (job.name || job.product) : 'Trabajo eliminado'}</div>
+                            <div class="entry-details">${e.quantity ? e.quantity + ' unidades' : 'Jornada'} ${job?.employer ? '• ' + job.employer : ''}</div>
                         </div>
                         <div class="entry-amount">
-                            <div class="entry-total">$${(entry.total || 0).toFixed(2)}</div>
-                            <span class="entry-status ${entry.paid ? 'paid' : 'pending'}">${entry.paid ? '✓ Pagado' : 'Pendiente'}</span>
+                            <div class="entry-total">$${(e.total || 0).toFixed(2)}</div>
+                            <span class="entry-status ${e.paid ? 'paid' : 'pending'}">${e.paid ? 'Pagado' : 'Pendiente'}</span>
                         </div>
                     </div>
                 `;
             }).join('');
         }
 
-        function getFilteredEntries() {
-            let filtered = [...entries];
-
-            const monthFilter = document.getElementById('filterMonth').value;
-            const statusFilter = document.getElementById('filterStatus').value;
-            const productFilter = document.getElementById('filterProduct').value;
-
-            if (monthFilter) {
-                filtered = filtered.filter(e => e.date.startsWith(monthFilter));
-            }
-            if (statusFilter === 'paid') {
-                filtered = filtered.filter(e => e.paid);
-            } else if (statusFilter === 'pending') {
-                filtered = filtered.filter(e => !e.paid);
-            }
-            if (productFilter) {
-                filtered = filtered.filter(e => e.product === productFilter);
-            }
-
-            return filtered;
-        }
-
-        function filterEntries() {
-            renderEntries();
-        }
-
-        function populateFilters() {
-            // Month filter
-            const months = [...new Set(entries.map(e => e.date.substring(0, 7)))].sort().reverse();
-            const monthSelect = document.getElementById('filterMonth');
-            const currentMonthVal = monthSelect.value;
-            monthSelect.innerHTML = '<option value="">Todos los meses</option>' +
-                months.map(m => {
-                    const [year, month] = m.split('-');
-                    const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-                    return `<option value="${m}">${monthNames[parseInt(month) - 1]} ${year}</option>`;
-                }).join('');
-            monthSelect.value = currentMonthVal;
-
-            // Product filter
-            const products = [...new Set(entries.map(e => e.product).filter(Boolean))].sort();
-            const productSelect = document.getElementById('filterProduct');
-            const currentProductVal = productSelect.value;
-            productSelect.innerHTML = '<option value="">Todos los productos</option>' +
-                products.map(p => `<option value="${p}">${p}</option>`).join('');
-            productSelect.value = currentProductVal;
-        }
-
-        // Tab switching
-        function switchTab(tab) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
-
-            if (tab === 'calendar') {
-                document.getElementById('calendarView').classList.remove('hidden');
-                document.getElementById('listView').classList.remove('active');
-            } else {
-                document.getElementById('calendarView').classList.add('hidden');
-                document.getElementById('listView').classList.add('active');
-            }
-        }
-
-        // Modal functions
-        function openAddModal(dateStr = null) {
-            editingEntryId = null;
-            document.getElementById('modalTitle').textContent = 'Agregar Registro';
-            document.getElementById('deleteBtn').style.display = 'none';
-            document.getElementById('entryId').value = '';
-
-            // Reset form
-            document.getElementById('entryDate').value = dateStr || new Date().toISOString().split('T')[0];
-            document.getElementById('entryProduct').value = '';
-            document.getElementById('customProduct').value = '';
-            document.getElementById('quantity').value = '';
-            document.getElementById('pricePerUnit').value = '';
-            document.getElementById('dailyRate').value = '';
-            document.getElementById('hoursWorked').value = '';
-            document.getElementById('employer').value = '';
-            document.getElementById('notes').value = '';
-
-            selectWorkType('trato');
-            isPaid = false;
-            updatePaymentToggle();
-            calculateTotal();
-
-            document.getElementById('entryModal').classList.add('visible');
-        }
-
-        function editEntry(id) {
-            const entry = entries.find(e => e.id === id);
-            if (!entry) return;
-
-            editingEntryId = id;
-            document.getElementById('modalTitle').textContent = 'Editar Registro';
-            document.getElementById('deleteBtn').style.display = 'block';
-            document.getElementById('entryId').value = id;
-
-            document.getElementById('entryDate').value = entry.date;
-            document.getElementById('entryProduct').value = entry.product || '';
-            if (entry.customProduct) {
-                document.getElementById('entryProduct').value = 'Otro';
-                document.getElementById('customProduct').value = entry.customProduct;
-            }
-            document.getElementById('quantity').value = entry.quantity || '';
-            document.getElementById('unit').value = entry.unit || 'cajas';
-            document.getElementById('pricePerUnit').value = entry.pricePerUnit || '';
-            document.getElementById('dailyRate').value = entry.dailyRate || '';
-            document.getElementById('hoursWorked').value = entry.hoursWorked || '';
-            document.getElementById('employer').value = entry.employer || '';
-            document.getElementById('notes').value = entry.notes || '';
-
-            selectWorkType(entry.workType || 'trato');
-            isPaid = entry.paid || false;
-            updatePaymentToggle();
-            calculateTotal();
-
-            document.getElementById('entryModal').classList.add('visible');
-        }
-
-        function closeModal() {
-            document.getElementById('entryModal').classList.remove('visible');
-        }
-
-        function selectWorkType(type) {
-            workType = type;
-            document.getElementById('typeTrato').classList.toggle('selected', type === 'trato');
-            document.getElementById('typeDia').classList.toggle('selected', type === 'dia');
-            document.getElementById('tratoFields').classList.toggle('visible', type === 'trato');
-            document.getElementById('diaFields').classList.toggle('visible', type === 'dia');
-            calculateTotal();
-        }
-
-        function togglePayment() {
-            isPaid = !isPaid;
-            updatePaymentToggle();
-        }
-
-        function updatePaymentToggle() {
-            const toggle = document.getElementById('paymentToggle');
-            const label = document.getElementById('paymentLabel');
-            toggle.classList.toggle('active', isPaid);
-            label.textContent = isPaid ? 'Pagado' : 'Pendiente de pago';
-        }
-
-        function calculateTotal() {
-            let total = 0;
-            if (workType === 'trato') {
-                const quantity = parseFloat(document.getElementById('quantity').value) || 0;
-                const price = parseFloat(document.getElementById('pricePerUnit').value) || 0;
-                total = quantity * price;
-            } else {
-                total = parseFloat(document.getElementById('dailyRate').value) || 0;
-            }
-            document.getElementById('calculatedTotal').textContent = '$' + total.toFixed(2);
-            return total;
-        }
-
-        // Product change handler
-        document.getElementById('entryProduct').addEventListener('change', function() {
-            const customGroup = document.getElementById('customProductGroup');
-            customGroup.style.display = this.value === 'Otro' ? 'block' : 'none';
-        });
-
-        // Save entry
-        async function saveEntry() {
-            if (!currentUser) {
-                showToast('Debes iniciar sesion', 'error');
-                return;
-            }
-
-            const date = document.getElementById('entryDate').value;
-            let product = document.getElementById('entryProduct').value;
-            const customProduct = document.getElementById('customProduct').value;
-
-            if (!date) {
-                showToast('Selecciona una fecha', 'error');
-                return;
-            }
-
-            if (product === 'Otro' && customProduct) {
-                product = customProduct;
-            }
-
-            const total = calculateTotal();
-
-            const entryData = {
-                date,
-                product,
-                workType,
-                total,
-                paid: isPaid,
-                employer: document.getElementById('employer').value,
-                notes: document.getElementById('notes').value,
-                updatedAt: Date.now()
-            };
-
-            if (workType === 'trato') {
-                entryData.quantity = parseFloat(document.getElementById('quantity').value) || 0;
-                entryData.unit = document.getElementById('unit').value;
-                entryData.pricePerUnit = parseFloat(document.getElementById('pricePerUnit').value) || 0;
-            } else {
-                entryData.dailyRate = parseFloat(document.getElementById('dailyRate').value) || 0;
-                entryData.hoursWorked = parseFloat(document.getElementById('hoursWorked').value) || null;
-            }
-
-            try {
-                if (editingEntryId) {
-                    await db.ref(`harvest/${currentUser.uid}/${editingEntryId}`).update(entryData);
-                    showToast('Registro actualizado');
-                } else {
-                    entryData.createdAt = Date.now();
-                    await db.ref(`harvest/${currentUser.uid}`).push(entryData);
-                    showToast('Registro guardado');
-                }
-                closeModal();
-            } catch (error) {
-                showToast('Error al guardar', 'error');
-                console.error(error);
-            }
-        }
-
-        // Delete entry
-        async function deleteEntry() {
-            if (!editingEntryId || !currentUser) return;
-
-            if (confirm('¿Eliminar este registro?')) {
-                try {
-                    await db.ref(`harvest/${currentUser.uid}/${editingEntryId}`).remove();
-                    showToast('Registro eliminado');
-                    closeModal();
-                } catch (error) {
-                    showToast('Error al eliminar', 'error');
-                }
-            }
-        }
-
-        // Day modal
-        function openDayModal(dateStr, dayEntries) {
-            selectedDate = dateStr;
-            const date = new Date(dateStr + 'T12:00:00');
-            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-            document.getElementById('dayModalTitle').textContent = date.toLocaleDateString('es-ES', options);
-
-            const list = document.getElementById('dayEntriesList');
-            if (dayEntries.length === 0) {
-                list.innerHTML = '<p style="text-align: center; color: rgba(255,255,255,0.5);">No hay registros para este dia</p>';
-            } else {
-                list.innerHTML = dayEntries.map(e => `
-                    <div class="day-entry-item" onclick="closeDayModal(); editEntry('${e.id}')">
-                        <div class="day-entry-info">
-                            <h4>${e.product || 'Sin producto'} ${e.workType === 'dia' ? '(Al Dia)' : ''}</h4>
-                            <p>${e.workType === 'trato' ? `${e.quantity} ${e.unit} × $${e.pricePerUnit}` : 'Jornada'} ${e.paid ? '• Pagado' : '• Pendiente'}</p>
-                        </div>
-                        <div class="day-entry-amount">$${(e.total || 0).toFixed(2)}</div>
-                    </div>
-                `).join('');
-            }
-
-            document.getElementById('dayModal').classList.add('visible');
-        }
-
-        function closeDayModal() {
-            document.getElementById('dayModal').classList.remove('visible');
-            if (selectedDate) {
-                document.getElementById('entryDate').value = selectedDate;
-            }
-        }
-
-        // Toast notification
+        // Toast
         function showToast(message, type = 'success') {
             const toast = document.getElementById('toast');
             toast.textContent = message;
             toast.className = 'toast visible' + (type === 'error' ? ' error' : '');
-            setTimeout(() => {
-                toast.classList.remove('visible');
-            }, 3000);
+            setTimeout(() => toast.classList.remove('visible'), 3000);
         }
 
-        // Initialize
+        // Init
         document.addEventListener('DOMContentLoaded', () => {
             renderCalendar();
         });
