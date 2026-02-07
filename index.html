@@ -95,6 +95,278 @@
         .cursor-blink {
             animation: blink 1s infinite;
         }
+
+        /* Auth UI Styles */
+        .auth-container {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .auth-btn {
+            padding: 8px 16px;
+            background: rgba(0, 170, 255, 0.15);
+            border: 1px solid rgba(0, 170, 255, 0.3);
+            border-radius: 6px;
+            color: #00aaff;
+            font-size: 11px;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .auth-btn:hover {
+            background: rgba(0, 170, 255, 0.25);
+            border-color: #00aaff;
+            box-shadow: 0 0 15px rgba(0, 170, 255, 0.3);
+        }
+
+        .user-menu {
+            display: none;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-menu.visible {
+            display: flex;
+        }
+
+        .user-email {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 10px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .menu-links {
+            display: flex;
+            gap: 8px;
+        }
+
+        .menu-link {
+            padding: 6px 12px;
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            border-radius: 4px;
+            color: #00ff88;
+            font-size: 10px;
+            font-family: 'Courier New', monospace;
+            text-decoration: none;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        .menu-link:hover {
+            background: rgba(0, 255, 136, 0.2);
+            border-color: #00ff88;
+        }
+
+        .logout-btn {
+            padding: 6px 12px;
+            background: rgba(255, 68, 102, 0.1);
+            border: 1px solid rgba(255, 68, 102, 0.2);
+            border-radius: 4px;
+            color: #ff4466;
+            font-size: 10px;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255, 68, 102, 0.2);
+        }
+
+        /* Auth Modal */
+        .auth-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+
+        .auth-modal-overlay.visible {
+            display: flex;
+        }
+
+        .auth-modal {
+            background: linear-gradient(135deg, #0a0a15 0%, #1a1a2e 100%);
+            border: 1px solid rgba(0, 170, 255, 0.3);
+            border-radius: 12px;
+            padding: 30px;
+            width: 90%;
+            max-width: 360px;
+            position: relative;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(0, 170, 255, 0.1);
+        }
+
+        .auth-modal-close {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .auth-modal-close:hover {
+            color: #ff4466;
+        }
+
+        .auth-modal h2 {
+            text-align: center;
+            font-size: 18px;
+            color: #fff;
+            margin-bottom: 8px;
+            font-family: 'Courier New', monospace;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .auth-modal .subtitle {
+            text-align: center;
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.4);
+            margin-bottom: 24px;
+        }
+
+        .auth-tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 10px;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 11px;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        .auth-tab.active {
+            color: #00aaff;
+            border-bottom: 2px solid #00aaff;
+        }
+
+        .auth-form {
+            display: none;
+        }
+
+        .auth-form.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus {
+            border-color: #00aaff;
+            box-shadow: 0 0 15px rgba(0, 170, 255, 0.2);
+        }
+
+        .form-group input::placeholder {
+            color: rgba(255, 255, 255, 0.2);
+        }
+
+        .auth-submit {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(90deg, #00aaff, #00ffaa);
+            border: none;
+            border-radius: 6px;
+            color: #000;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s;
+        }
+
+        .auth-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 170, 255, 0.4);
+        }
+
+        .auth-submit:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .auth-error {
+            background: rgba(255, 68, 102, 0.1);
+            border: 1px solid rgba(255, 68, 102, 0.3);
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 16px;
+            color: #ff4466;
+            font-size: 11px;
+            display: none;
+        }
+
+        .auth-error.visible {
+            display: block;
+        }
+
+        .auth-success {
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 16px;
+            color: #00ff88;
+            font-size: 11px;
+            display: none;
+        }
+
+        .auth-success.visible {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -109,7 +381,69 @@
         <p><span class="label">SYNAPSES:</span> <span class="value" id="synapses">0</span></p>
     </div>
 
-    <div class="ui-layer architecture" id="arch-info">
+    <!-- Auth UI -->
+    <div class="auth-container" id="authContainer">
+        <!-- Login Button (shown when not logged in) -->
+        <button class="auth-btn" id="loginBtn" onclick="openAuthModal()">Iniciar Sesion</button>
+
+        <!-- User Menu (shown when logged in) -->
+        <div class="user-menu" id="userMenu">
+            <span class="user-email" id="userEmail"></span>
+            <div class="menu-links">
+                <a href="analytics.html" class="menu-link">Panel</a>
+            </div>
+            <button class="logout-btn" onclick="logoutUser()">Salir</button>
+        </div>
+    </div>
+
+    <!-- Auth Modal -->
+    <div class="auth-modal-overlay" id="authModalOverlay" onclick="closeAuthModal(event)">
+        <div class="auth-modal" onclick="event.stopPropagation()">
+            <button class="auth-modal-close" onclick="closeAuthModal()">&times;</button>
+            <h2>ALBA STUDIO</h2>
+            <p class="subtitle">Accede a herramientas exclusivas</p>
+
+            <div class="auth-tabs">
+                <button class="auth-tab active" onclick="switchAuthTab('login')">Iniciar Sesion</button>
+                <button class="auth-tab" onclick="switchAuthTab('register')">Registrarse</button>
+            </div>
+
+            <div class="auth-error" id="authError"></div>
+            <div class="auth-success" id="authSuccess"></div>
+
+            <!-- Login Form -->
+            <form class="auth-form active" id="loginForm" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label>Correo Electronico</label>
+                    <input type="email" id="loginEmail" placeholder="tu@correo.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Contrasena</label>
+                    <input type="password" id="loginPassword" placeholder="********" required>
+                </div>
+                <button type="submit" class="auth-submit" id="loginSubmit">Entrar</button>
+            </form>
+
+            <!-- Register Form -->
+            <form class="auth-form" id="registerForm" onsubmit="handleRegister(event)">
+                <div class="form-group">
+                    <label>Correo Electronico</label>
+                    <input type="email" id="registerEmail" placeholder="tu@correo.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Contrasena</label>
+                    <input type="password" id="registerPassword" placeholder="Minimo 6 caracteres" minlength="6" required>
+                </div>
+                <div class="form-group">
+                    <label>Confirmar Contrasena</label>
+                    <input type="password" id="registerPasswordConfirm" placeholder="Repetir contrasena" required>
+                </div>
+                <button type="submit" class="auth-submit" id="registerSubmit">Crear Cuenta</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="ui-layer architecture" id="arch-info" style="top: 60px;">
         <p>MULTILAYER PERCEPTRON</p>
         <p>ACTIVATION: SIGMOID / RELU</p>
         <p>OPTIMIZER: VISUAL SGD</p>
@@ -1213,28 +1547,174 @@
     })();
     </script>
 
-    <!-- Firebase SDK for Analytics -->
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+
+    <script>
+    // ============================================
+    // FIREBASE INITIALIZATION & AUTH
+    // ============================================
+    const firebaseConfig = {
+        apiKey: "AIzaSyBvju4gyCpz6E6R3TsvO1uR1KZB7ZbW9VU",
+        authDomain: "albastudio-e0d5b.firebaseapp.com",
+        databaseURL: "https://albastudio-e0d5b-default-rtdb.firebaseio.com",
+        projectId: "albastudio-e0d5b",
+        storageBucket: "albastudio-e0d5b.firebasestorage.app",
+        messagingSenderId: "519359936167",
+        appId: "1:519359936167:web:8c2680ed1e4583def28d82"
+    };
+
+    // Initialize Firebase once
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
+
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    // Auth state listener
+    auth.onAuthStateChanged((user) => {
+        if (user) {
+            // User is signed in
+            document.getElementById('loginBtn').style.display = 'none';
+            document.getElementById('userMenu').classList.add('visible');
+            document.getElementById('userEmail').textContent = user.email;
+        } else {
+            // User is signed out
+            document.getElementById('loginBtn').style.display = 'block';
+            document.getElementById('userMenu').classList.remove('visible');
+        }
+    });
+
+    // Auth Modal Functions
+    function openAuthModal() {
+        document.getElementById('authModalOverlay').classList.add('visible');
+        document.getElementById('authError').classList.remove('visible');
+        document.getElementById('authSuccess').classList.remove('visible');
+    }
+
+    function closeAuthModal(event) {
+        if (!event || event.target === document.getElementById('authModalOverlay')) {
+            document.getElementById('authModalOverlay').classList.remove('visible');
+            // Reset forms
+            document.getElementById('loginForm').reset();
+            document.getElementById('registerForm').reset();
+        }
+    }
+
+    function switchAuthTab(tab) {
+        const tabs = document.querySelectorAll('.auth-tab');
+        const forms = document.querySelectorAll('.auth-form');
+
+        tabs.forEach(t => t.classList.remove('active'));
+        forms.forEach(f => f.classList.remove('active'));
+
+        if (tab === 'login') {
+            tabs[0].classList.add('active');
+            document.getElementById('loginForm').classList.add('active');
+        } else {
+            tabs[1].classList.add('active');
+            document.getElementById('registerForm').classList.add('active');
+        }
+
+        document.getElementById('authError').classList.remove('visible');
+        document.getElementById('authSuccess').classList.remove('visible');
+    }
+
+    function showAuthError(message) {
+        const errorEl = document.getElementById('authError');
+        errorEl.textContent = message;
+        errorEl.classList.add('visible');
+        document.getElementById('authSuccess').classList.remove('visible');
+    }
+
+    function showAuthSuccess(message) {
+        const successEl = document.getElementById('authSuccess');
+        successEl.textContent = message;
+        successEl.classList.add('visible');
+        document.getElementById('authError').classList.remove('visible');
+    }
+
+    // Login Handler
+    async function handleLogin(event) {
+        event.preventDefault();
+        const email = document.getElementById('loginEmail').value;
+        const password = document.getElementById('loginPassword').value;
+        const submitBtn = document.getElementById('loginSubmit');
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Entrando...';
+
+        try {
+            await auth.signInWithEmailAndPassword(email, password);
+            showAuthSuccess('Sesion iniciada correctamente');
+            setTimeout(() => closeAuthModal(), 1000);
+        } catch (error) {
+            let message = 'Error al iniciar sesion';
+            if (error.code === 'auth/user-not-found') message = 'Usuario no encontrado';
+            else if (error.code === 'auth/wrong-password') message = 'Contrasena incorrecta';
+            else if (error.code === 'auth/invalid-email') message = 'Correo invalido';
+            else if (error.code === 'auth/too-many-requests') message = 'Demasiados intentos. Intenta mas tarde';
+            showAuthError(message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Entrar';
+        }
+    }
+
+    // Register Handler
+    async function handleRegister(event) {
+        event.preventDefault();
+        const email = document.getElementById('registerEmail').value;
+        const password = document.getElementById('registerPassword').value;
+        const passwordConfirm = document.getElementById('registerPasswordConfirm').value;
+        const submitBtn = document.getElementById('registerSubmit');
+
+        if (password !== passwordConfirm) {
+            showAuthError('Las contrasenas no coinciden');
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Creando cuenta...';
+
+        try {
+            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+            // Save user to database
+            await db.ref('users/' + userCredential.user.uid).set({
+                email: email,
+                createdAt: Date.now(),
+                role: 'user'
+            });
+            showAuthSuccess('Cuenta creada exitosamente');
+            setTimeout(() => closeAuthModal(), 1000);
+        } catch (error) {
+            let message = 'Error al crear cuenta';
+            if (error.code === 'auth/email-already-in-use') message = 'Este correo ya esta registrado';
+            else if (error.code === 'auth/invalid-email') message = 'Correo invalido';
+            else if (error.code === 'auth/weak-password') message = 'La contrasena es muy debil';
+            showAuthError(message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Crear Cuenta';
+        }
+    }
+
+    // Logout Handler
+    function logoutUser() {
+        auth.signOut();
+    }
+    </script>
+
     <script>
     // ============================================
     // VISITOR TRACKING
     // ============================================
     (function() {
-        // Firebase Configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyBvju4gyCpz6E6R3TsvO1uR1KZB7ZbW9VU",
-            authDomain: "albastudio-e0d5b.firebaseapp.com",
-            databaseURL: "https://albastudio-e0d5b-default-rtdb.firebaseio.com",
-            projectId: "albastudio-e0d5b",
-            storageBucket: "albastudio-e0d5b.firebasestorage.app",
-            messagingSenderId: "519359936167",
-            appId: "1:519359936167:web:8c2680ed1e4583def28d82"
-        };
-
         try {
-            firebase.initializeApp(firebaseConfig);
-            const db = firebase.database();
+            // Use already initialized db
 
             // Generate or get visitor ID
             let visitorId = localStorage.getItem('alba_visitor_id');
