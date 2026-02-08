@@ -1,0 +1,975 @@
+/**
+ * Neural Network Visualization
+ * WebGL + Canvas 2D Hybrid rendering
+ */
+
+(function() {
+    'use strict';
+
+    // Canvas setup
+    const glCanvas = document.getElementById('webgl-canvas');
+    const overlayCanvas = document.getElementById('overlay-canvas');
+
+    if (!glCanvas || !overlayCanvas) return;
+
+    const gl = glCanvas.getContext('webgl2', {
+        antialias: true,
+        alpha: true,
+        premultipliedAlpha: false
+    }) || glCanvas.getContext('webgl', { antialias: true, alpha: true });
+
+    const ctx = overlayCanvas.getContext('2d');
+
+    if (!gl) {
+        console.error('WebGL not supported');
+        return;
+    }
+
+    // State variables
+    let width, height, aspect;
+    let mouseX = 0, mouseY = 0;
+    let mouseInfluence = 0;
+    let time = 0;
+    let epoch = 0;
+    let convergence = 0;
+    let trainingPhase = 0;
+
+    // ============================================
+    // SHADER SOURCES
+    // ============================================
+    const neuronVertexShader = `
+        attribute vec3 aPosition;
+        attribute float aActivation;
+        attribute float aLayer;
+        attribute float aType;
+
+        uniform mat4 uProjection;
+        uniform mat4 uView;
+        uniform mat4 uModel;
+        uniform float uTime;
+        uniform float uConvergence;
+
+        varying float vActivation;
+        varying float vLayer;
+        varying float vType;
+        varying vec3 vWorldPos;
+
+        void main() {
+            vec3 pos = aPosition;
+            float pulse = sin(uTime * 3.0 + aActivation * 6.28) * 0.1 * aActivation;
+            pos *= 1.0 + pulse;
+
+            vec4 worldPos = uModel * vec4(pos, 1.0);
+            vWorldPos = worldPos.xyz;
+
+            gl_Position = uProjection * uView * worldPos;
+            gl_PointSize = (14.0 + aActivation * 20.0) * (1.0 - gl_Position.z * 0.12);
+
+            vActivation = aActivation;
+            vLayer = aLayer;
+            vType = aType;
+        }
+    `;
+
+    const neuronFragmentShader = `
+        precision highp float;
+
+        varying float vActivation;
+        varying float vLayer;
+        varying float vType;
+        varying vec3 vWorldPos;
+
+        uniform float uTime;
+        uniform float uConvergence;
+
+        void main() {
+            vec2 coord = gl_PointCoord - vec2(0.5);
+            float dist = length(coord);
+
+            if (dist > 0.5) discard;
+
+            float core = 1.0 - smoothstep(0.0, 0.15, dist);
+            float glow = 1.0 - smoothstep(0.05, 0.5, dist);
+            float outerGlow = 1.0 - smoothstep(0.2, 0.5, dist);
+
+            vec3 baseColor;
+            if (vType < 0.5) {
+                baseColor = mix(vec3(1.0, 0.3, 0.1), vec3(1.0, 0.9, 0.7), vActivation);
+            } else {
+                baseColor = mix(vec3(0.1, 0.5, 1.0), vec3(0.7, 1.0, 1.0), vActivation);
+            }
+
+            float layerFade = 0.6 + vLayer * 0.1;
+            baseColor *= layerFade;
+
+            float pulse = sin(uTime * 4.0 + vLayer * 2.0) * 0.15 + 0.85;
+
+            vec3 color = baseColor * (core * 3.5 + glow * 1.5 + outerGlow * 0.8) * vActivation * pulse;
+            float alpha = (core * 1.0 + glow * 0.8 + outerGlow * 0.4) * (0.5 + vActivation * 0.5);
+
+            color += vec3(1.0) * uConvergence * core * 0.8;
+            color += baseColor * outerGlow * 0.5;
+
+            gl_FragColor = vec4(color, alpha);
+        }
+    `;
+
+    const synapseVertexShader = `
+        attribute vec3 aStart;
+        attribute vec3 aEnd;
+        attribute float aWeight;
+        attribute float aPulsePhase;
+        attribute float aProgress;
+
+        uniform mat4 uProjection;
+        uniform mat4 uView;
+        uniform float uTime;
+
+        varying float vWeight;
+        varying float vPulsePhase;
+        varying float vProgress;
+        varying float vDepth;
+
+        void main() {
+            vec3 pos = mix(aStart, aEnd, aProgress);
+            vec3 mid = (aStart + aEnd) * 0.5;
+            float curve = sin(aProgress * 3.14159) * 0.15 * length(aEnd - aStart);
+            pos.y += curve;
+
+            vec4 viewPos = uView * vec4(pos, 1.0);
+            gl_Position = uProjection * viewPos;
+            gl_PointSize = 4.0 + aWeight * 6.0;
+
+            vWeight = aWeight;
+            vPulsePhase = aPulsePhase;
+            vProgress = aProgress;
+            vDepth = -viewPos.z;
+        }
+    `;
+
+    const synapseFragmentShader = `
+        precision highp float;
+
+        varying float vWeight;
+        varying float vPulsePhase;
+        varying float vProgress;
+        varying float vDepth;
+
+        uniform float uTime;
+
+        void main() {
+            vec2 coord = gl_PointCoord - vec2(0.5);
+            float dist = length(coord);
+
+            if (dist > 0.5) discard;
+
+            float pulsePos = fract(uTime * 0.8 + vPulsePhase);
+            float pulseDist = abs(vProgress - pulsePos);
+            float pulse = exp(-pulseDist * pulseDist * 30.0) * vWeight * 1.5;
+
+            float baseGlow = (1.0 - dist * 2.0) * 0.35 * vWeight;
+
+            vec3 color;
+            if (vWeight > 0.0) {
+                color = mix(vec3(0.2, 0.6, 1.0), vec3(1.0, 1.0, 1.0), pulse);
+            } else {
+                color = mix(vec3(1.0, 0.2, 0.3), vec3(1.0, 0.8, 0.8), pulse);
+            }
+
+            float intensity = baseGlow + pulse * 1.2;
+            float alpha = intensity * (1.0 - smoothstep(0.0, 0.5, dist)) * 1.5;
+
+            float depthFade = 1.0 / (1.0 + vDepth * 0.03);
+
+            gl_FragColor = vec4(color * intensity * depthFade * 1.3, alpha * depthFade);
+        }
+    `;
+
+    const bgVertexShader = `
+        attribute vec2 aPosition;
+        varying vec2 vUv;
+        void main() {
+            vUv = aPosition * 0.5 + 0.5;
+            gl_Position = vec4(aPosition, 0.0, 1.0);
+        }
+    `;
+
+    const bgFragmentShader = `
+        precision highp float;
+        varying vec2 vUv;
+        uniform float uTime;
+        uniform vec2 uMouse;
+        uniform float uConvergence;
+
+        vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+        vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+        vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
+
+        float snoise(vec2 v) {
+            const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
+            vec2 i  = floor(v + dot(v, C.yy));
+            vec2 x0 = v - i + dot(i, C.xx);
+            vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+            vec4 x12 = x0.xyxy + C.xxzz;
+            x12.xy -= i1;
+            i = mod289(i);
+            vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
+            vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+            m = m*m; m = m*m;
+            vec3 x = 2.0 * fract(p * C.www) - 1.0;
+            vec3 h = abs(x) - 0.5;
+            vec3 ox = floor(x + 0.5);
+            vec3 a0 = x - ox;
+            m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
+            vec3 g;
+            g.x = a0.x * x0.x + h.x * x0.y;
+            g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+            return 130.0 * dot(m, g);
+        }
+
+        void main() {
+            vec2 uv = vUv;
+
+            float noise1 = snoise(uv * 3.0 + uTime * 0.05) * 0.5 + 0.5;
+            float noise2 = snoise(uv * 6.0 - uTime * 0.08) * 0.5 + 0.5;
+            float noise3 = snoise(uv * 12.0 + uTime * 0.1) * 0.5 + 0.5;
+
+            float field = noise1 * 0.5 + noise2 * 0.3 + noise3 * 0.2;
+
+            float mouseDist = length(uv - uMouse);
+            float mouseGlow = exp(-mouseDist * mouseDist * 8.0) * 0.15;
+
+            vec3 color = vec3(0.02, 0.02, 0.04);
+            color += vec3(0.03, 0.05, 0.08) * field;
+            color += vec3(0.1, 0.2, 0.4) * mouseGlow;
+
+            float vignette = 1.0 - length(uv - 0.5) * 0.8;
+            color *= vignette;
+
+            color += vec3(0.05, 0.08, 0.12) * uConvergence;
+
+            gl_FragColor = vec4(color, 1.0);
+        }
+    `;
+
+    // ============================================
+    // SHADER COMPILATION
+    // ============================================
+    function createShader(type, source) {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            console.error('Shader compile error:', gl.getShaderInfoLog(shader));
+            gl.deleteShader(shader);
+            return null;
+        }
+        return shader;
+    }
+
+    function createProgram(vertSrc, fragSrc) {
+        const vert = createShader(gl.VERTEX_SHADER, vertSrc);
+        const frag = createShader(gl.FRAGMENT_SHADER, fragSrc);
+        const program = gl.createProgram();
+        gl.attachShader(program, vert);
+        gl.attachShader(program, frag);
+        gl.linkProgram(program);
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            console.error('Program link error:', gl.getProgramInfoLog(program));
+            return null;
+        }
+        return program;
+    }
+
+    const neuronProgram = createProgram(neuronVertexShader, neuronFragmentShader);
+    const synapseProgram = createProgram(synapseVertexShader, synapseFragmentShader);
+    const bgProgram = createProgram(bgVertexShader, bgFragmentShader);
+
+    // ============================================
+    // MATRIX UTILITIES
+    // ============================================
+    function mat4Perspective(fov, aspect, near, far) {
+        const f = 1.0 / Math.tan(fov / 2);
+        const nf = 1 / (near - far);
+        return new Float32Array([
+            f / aspect, 0, 0, 0,
+            0, f, 0, 0,
+            0, 0, (far + near) * nf, -1,
+            0, 0, 2 * far * near * nf, 0
+        ]);
+    }
+
+    function mat4LookAt(eye, target, up) {
+        const zAxis = normalize([eye[0] - target[0], eye[1] - target[1], eye[2] - target[2]]);
+        const xAxis = normalize(cross(up, zAxis));
+        const yAxis = cross(zAxis, xAxis);
+
+        return new Float32Array([
+            xAxis[0], yAxis[0], zAxis[0], 0,
+            xAxis[1], yAxis[1], zAxis[1], 0,
+            xAxis[2], yAxis[2], zAxis[2], 0,
+            -dot(xAxis, eye), -dot(yAxis, eye), -dot(zAxis, eye), 1
+        ]);
+    }
+
+    function mat4Identity() {
+        return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
+    }
+
+    function mat4RotateY(m, angle) {
+        const c = Math.cos(angle);
+        const s = Math.sin(angle);
+        const result = new Float32Array(16);
+        result[0] = m[0] * c + m[8] * s;
+        result[1] = m[1] * c + m[9] * s;
+        result[2] = m[2] * c + m[10] * s;
+        result[3] = m[3] * c + m[11] * s;
+        result[4] = m[4];
+        result[5] = m[5];
+        result[6] = m[6];
+        result[7] = m[7];
+        result[8] = m[8] * c - m[0] * s;
+        result[9] = m[9] * c - m[1] * s;
+        result[10] = m[10] * c - m[2] * s;
+        result[11] = m[11] * c - m[3] * s;
+        result[12] = m[12];
+        result[13] = m[13];
+        result[14] = m[14];
+        result[15] = m[15];
+        return result;
+    }
+
+    function normalize(v) {
+        const len = Math.sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
+        return [v[0]/len, v[1]/len, v[2]/len];
+    }
+
+    function cross(a, b) {
+        return [
+            a[1]*b[2] - a[2]*b[1],
+            a[2]*b[0] - a[0]*b[2],
+            a[0]*b[1] - a[1]*b[0]
+        ];
+    }
+
+    function dot(a, b) {
+        return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+    }
+
+    // ============================================
+    // NEURAL NETWORK CLASSES
+    // ============================================
+    class Neuron {
+        constructor(x, y, z, layer, activationType) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.baseX = x;
+            this.baseY = y;
+            this.baseZ = z;
+            this.targetX = x;
+            this.targetY = y;
+            this.targetZ = z;
+            this.layer = layer;
+            this.activationType = activationType;
+            this.activation = Math.random() * 0.3;
+            this.input = 0;
+            this.bias = (Math.random() - 0.5) * 0.5;
+            this.connections = [];
+            this.pulsePhase = Math.random() * Math.PI * 2;
+        }
+
+        sigmoid(x) { return 1 / (1 + Math.exp(-x)); }
+        relu(x) { return Math.max(0, x); }
+        leakyRelu(x) { return x > 0 ? x : 0.01 * x; }
+
+        activate() {
+            const input = this.input + this.bias;
+            if (this.activationType === 0) {
+                this.activation = this.sigmoid(input);
+            } else {
+                this.activation = Math.min(1, this.leakyRelu(input) * 0.5);
+            }
+            this.input = 0;
+        }
+
+        update(dt, time, mouseX, mouseY, mouseInfluence) {
+            const noiseX = Math.sin(time * 0.1 + this.pulsePhase) * 0.2;
+            const noiseY = Math.cos(time * 0.08 + this.pulsePhase * 1.3) * 0.15;
+            const noiseZ = Math.sin(time * 0.12 + this.pulsePhase * 0.7) * 0.2;
+
+            this.targetX = this.baseX + noiseX;
+            this.targetY = this.baseY + noiseY;
+            this.targetZ = this.baseZ + noiseZ;
+
+            if (mouseInfluence > 0.1) {
+                const dx = mouseX * 4 - this.x;
+                const dy = mouseY * 3 - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 3) {
+                    const force = (1 - dist / 3) * mouseInfluence * 0.5;
+                    this.targetX += dx * force * 0.3;
+                    this.targetY += dy * force * 0.3;
+                }
+            }
+
+            this.x += (this.targetX - this.x) * 0.02;
+            this.y += (this.targetY - this.y) * 0.02;
+            this.z += (this.targetZ - this.z) * 0.02;
+            this.activation *= 0.98;
+        }
+    }
+
+    class Synapse {
+        constructor(from, to) {
+            this.from = from;
+            this.to = to;
+            this.weight = (Math.random() - 0.5) * 2;
+            this.pulsePhase = Math.random();
+            this.pulseStrength = 0;
+            this.plasticity = 0.001;
+        }
+
+        transmit(signal) {
+            const output = signal * this.weight;
+            this.to.input += output;
+            this.pulseStrength = Math.abs(signal * this.weight);
+            return output;
+        }
+
+        updateWeight(learningRate) {
+            const delta = this.from.activation * this.to.activation * learningRate;
+            this.weight += delta * this.plasticity;
+            this.weight = Math.max(-2, Math.min(2, this.weight));
+        }
+    }
+
+    class NeuralNetwork {
+        constructor() {
+            this.neurons = [];
+            this.synapses = [];
+            this.layers = [];
+            this.targetPattern = [];
+            this.buildNetwork();
+            this.generateTargetPattern();
+        }
+
+        buildNetwork() {
+            const layerSizes = [25, 40, 50, 40, 35];
+            const layerSpacing = 2.5;
+            const startZ = -layerSizes.length * layerSpacing / 2;
+
+            for (let l = 0; l < layerSizes.length; l++) {
+                const layer = [];
+                const size = layerSizes[l];
+                const cols = Math.ceil(Math.sqrt(size));
+                const rows = Math.ceil(size / cols);
+                const spacing = 0.8;
+                const offsetX = -cols * spacing / 2;
+                const offsetY = -rows * spacing / 2;
+
+                for (let i = 0; i < size; i++) {
+                    const col = i % cols;
+                    const row = Math.floor(i / cols);
+                    const x = offsetX + col * spacing + (Math.random() - 0.5) * 0.3;
+                    const y = offsetY + row * spacing + (Math.random() - 0.5) * 0.3;
+                    const z = startZ + l * layerSpacing + (Math.random() - 0.5) * 0.4;
+
+                    const activationType = (l % 2 === 0) ? 0 : 1;
+                    const neuron = new Neuron(x, y, z, l, activationType);
+                    layer.push(neuron);
+                    this.neurons.push(neuron);
+                }
+                this.layers.push(layer);
+            }
+
+            // Connections between adjacent layers
+            for (let l = 0; l < this.layers.length - 1; l++) {
+                const fromLayer = this.layers[l];
+                const toLayer = this.layers[l + 1];
+
+                for (const from of fromLayer) {
+                    const connectionCount = Math.floor(toLayer.length * 0.4);
+                    const shuffled = [...toLayer].sort(() => Math.random() - 0.5);
+
+                    for (let i = 0; i < connectionCount; i++) {
+                        const synapse = new Synapse(from, shuffled[i]);
+                        this.synapses.push(synapse);
+                        from.connections.push(synapse);
+                    }
+                }
+            }
+
+            // Skip connections
+            for (let l = 0; l < this.layers.length - 2; l++) {
+                const fromLayer = this.layers[l];
+                const toLayer = this.layers[l + 2];
+
+                for (let i = 0; i < fromLayer.length; i += 4) {
+                    const to = toLayer[Math.floor(Math.random() * toLayer.length)];
+                    const synapse = new Synapse(fromLayer[i], to);
+                    synapse.weight *= 0.5;
+                    this.synapses.push(synapse);
+                    fromLayer[i].connections.push(synapse);
+                }
+            }
+        }
+
+        generateTargetPattern() {
+            const outputLayer = this.layers[this.layers.length - 1];
+            for (let i = 0; i < outputLayer.length; i++) {
+                this.targetPattern.push(Math.sin(i * 0.5) * 0.5 + 0.5);
+            }
+        }
+
+        forwardPropagate() {
+            const inputLayer = this.layers[0];
+            for (let i = 0; i < inputLayer.length; i++) {
+                inputLayer[i].activation = 0.3 + Math.sin(time * 2 + i * 0.5) * 0.3 + Math.random() * 0.2;
+            }
+
+            for (let l = 0; l < this.layers.length - 1; l++) {
+                const fromLayer = this.layers[l];
+
+                for (const neuron of fromLayer) {
+                    for (const synapse of neuron.connections) {
+                        synapse.transmit(neuron.activation);
+                    }
+                }
+
+                const toLayer = this.layers[l + 1];
+                for (const neuron of toLayer) {
+                    neuron.activate();
+                }
+            }
+        }
+
+        calculateLoss() {
+            const outputLayer = this.layers[this.layers.length - 1];
+            let loss = 0;
+            for (let i = 0; i < outputLayer.length; i++) {
+                const diff = outputLayer[i].activation - this.targetPattern[i];
+                loss += diff * diff;
+            }
+            return loss / outputLayer.length;
+        }
+
+        train(learningRate) {
+            for (const synapse of this.synapses) {
+                synapse.updateWeight(learningRate);
+            }
+        }
+
+        update(dt, mouseX, mouseY, mouseInfluence) {
+            for (const neuron of this.neurons) {
+                neuron.update(dt, time, mouseX, mouseY, mouseInfluence);
+            }
+        }
+    }
+
+    // ============================================
+    // BUFFERS AND RENDERING
+    // ============================================
+    let network;
+    let neuronPositions, neuronActivations, neuronLayers, neuronTypes;
+    let synapseStarts, synapseEnds, synapseWeights, synapsePulsePhases, synapseProgress;
+    let neuronBuffer, activationBuffer, layerBuffer, typeBuffer;
+    let synapseStartBuffer, synapseEndBuffer, synapseWeightBuffer, synapsePulseBuffer, synapseProgressBuffer;
+    let bgBuffer;
+
+    function initBuffers() {
+        network = new NeuralNetwork();
+
+        const neuronCount = network.neurons.length;
+        neuronPositions = new Float32Array(neuronCount * 3);
+        neuronActivations = new Float32Array(neuronCount);
+        neuronLayers = new Float32Array(neuronCount);
+        neuronTypes = new Float32Array(neuronCount);
+
+        neuronBuffer = gl.createBuffer();
+        activationBuffer = gl.createBuffer();
+        layerBuffer = gl.createBuffer();
+        typeBuffer = gl.createBuffer();
+
+        const pointsPerSynapse = 20;
+        const totalSynapsePoints = network.synapses.length * pointsPerSynapse;
+
+        synapseStarts = new Float32Array(totalSynapsePoints * 3);
+        synapseEnds = new Float32Array(totalSynapsePoints * 3);
+        synapseWeights = new Float32Array(totalSynapsePoints);
+        synapsePulsePhases = new Float32Array(totalSynapsePoints);
+        synapseProgress = new Float32Array(totalSynapsePoints);
+
+        synapseStartBuffer = gl.createBuffer();
+        synapseEndBuffer = gl.createBuffer();
+        synapseWeightBuffer = gl.createBuffer();
+        synapsePulseBuffer = gl.createBuffer();
+        synapseProgressBuffer = gl.createBuffer();
+
+        let idx = 0;
+        for (const synapse of network.synapses) {
+            for (let p = 0; p < pointsPerSynapse; p++) {
+                const progress = p / (pointsPerSynapse - 1);
+                synapseProgress[idx] = progress;
+                synapsePulsePhases[idx] = synapse.pulsePhase;
+                idx++;
+            }
+        }
+
+        bgBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, bgBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+            -1, -1, 1, -1, -1, 1,
+            -1, 1, 1, -1, 1, 1
+        ]), gl.STATIC_DRAW);
+
+        // Update DOM
+        const neuronsEl = document.getElementById('neurons');
+        const synapsesEl = document.getElementById('synapses');
+        if (neuronsEl) neuronsEl.textContent = neuronCount;
+        if (synapsesEl) synapsesEl.textContent = network.synapses.length;
+    }
+
+    function updateBuffers() {
+        for (let i = 0; i < network.neurons.length; i++) {
+            const n = network.neurons[i];
+            neuronPositions[i * 3] = n.x;
+            neuronPositions[i * 3 + 1] = n.y;
+            neuronPositions[i * 3 + 2] = n.z;
+            neuronActivations[i] = n.activation;
+            neuronLayers[i] = n.layer / (network.layers.length - 1);
+            neuronTypes[i] = n.activationType;
+        }
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, neuronBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, neuronPositions, gl.DYNAMIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, activationBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, neuronActivations, gl.DYNAMIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, layerBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, neuronLayers, gl.DYNAMIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, typeBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, neuronTypes, gl.DYNAMIC_DRAW);
+
+        const pointsPerSynapse = 20;
+        let idx = 0;
+        for (const synapse of network.synapses) {
+            for (let p = 0; p < pointsPerSynapse; p++) {
+                synapseStarts[idx * 3] = synapse.from.x;
+                synapseStarts[idx * 3 + 1] = synapse.from.y;
+                synapseStarts[idx * 3 + 2] = synapse.from.z;
+                synapseEnds[idx * 3] = synapse.to.x;
+                synapseEnds[idx * 3 + 1] = synapse.to.y;
+                synapseEnds[idx * 3 + 2] = synapse.to.z;
+                synapseWeights[idx] = Math.abs(synapse.weight) * synapse.pulseStrength;
+                idx++;
+            }
+        }
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, synapseStartBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, synapseStarts, gl.DYNAMIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, synapseEndBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, synapseEnds, gl.DYNAMIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, synapseWeightBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, synapseWeights, gl.DYNAMIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, synapsePulseBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, synapsePulsePhases, gl.DYNAMIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, synapseProgressBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, synapseProgress, gl.DYNAMIC_DRAW);
+    }
+
+    // ============================================
+    // CANVAS 2D OVERLAY
+    // ============================================
+    function renderOverlay() {
+        ctx.clearRect(0, 0, width, height);
+
+        const titleAlpha = Math.min(1, convergence * 2);
+        if (titleAlpha > 0.01) {
+            ctx.save();
+            ctx.globalAlpha = titleAlpha;
+
+            ctx.shadowBlur = 30 * convergence;
+            ctx.shadowColor = 'rgba(0, 200, 255, 0.8)';
+
+            const albaFontSize = Math.min(width / 5, 180);
+            ctx.font = `bold ${albaFontSize}px 'Arial Narrow', Arial, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            const albaWidth = ctx.measureText('ALBA').width;
+
+            const gradient = ctx.createLinearGradient(
+                width / 2 - 200, height / 2,
+                width / 2 + 200, height / 2
+            );
+            gradient.addColorStop(0, '#00aaff');
+            gradient.addColorStop(0.5, '#ffffff');
+            gradient.addColorStop(1, '#00ffaa');
+
+            ctx.fillStyle = gradient;
+
+            const glitchIntensity = convergence < 0.9 ? (1 - convergence) * 12 : 3;
+            const glitchOffset = glitchIntensity * (Math.random() - 0.5);
+
+            if (Math.random() > 0.92) {
+                ctx.fillStyle = '#ff0066';
+                ctx.fillText('ALBA', width / 2 + glitchOffset * 2, height / 2 - 60);
+            }
+            if (Math.random() > 0.94) {
+                ctx.fillStyle = '#00ffaa';
+                ctx.fillText('ALBA', width / 2 - glitchOffset * 1.5, height / 2 - 60);
+            }
+            ctx.fillStyle = gradient;
+            ctx.fillText('ALBA', width / 2, height / 2 - 60);
+
+            const studioFontSize = Math.min(width / 12, 80);
+            ctx.font = `bold ${studioFontSize}px 'Arial Narrow', Arial, sans-serif`;
+
+            function drawSpacedText(text, x, y, targetWidth) {
+                const baseWidth = ctx.measureText(text).width;
+                const extraSpace = (targetWidth - baseWidth) / (text.length - 1);
+                let currentX = x - targetWidth / 2;
+
+                for (let i = 0; i < text.length; i++) {
+                    const char = text[i];
+                    const charWidth = ctx.measureText(char).width;
+                    ctx.fillText(char, currentX + charWidth / 2, y);
+                    currentX += charWidth + extraSpace;
+                }
+            }
+
+            if (Math.random() > 0.93) {
+                ctx.fillStyle = '#ff0066';
+                drawSpacedText('STUDIO', width / 2 + glitchOffset * 1.5, height / 2 + 40, albaWidth);
+            }
+            ctx.fillStyle = gradient;
+            drawSpacedText('STUDIO', width / 2, height / 2 + 40, albaWidth);
+
+            ctx.restore();
+        }
+
+        // Training status
+        ctx.save();
+        ctx.font = '14px "Courier New", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = `rgba(0, 255, 136, ${0.4 + Math.sin(time * 3) * 0.2})`;
+
+        const statusText = convergence < 0.95 ? 'TRAINING CREATIVE SYSTEMS...' : 'CONVERGENCE ACHIEVED';
+        ctx.fillText(statusText, width / 2, height / 2 + 100);
+
+        if (Math.sin(time * 4) > 0) {
+            ctx.fillText('_', width / 2 + ctx.measureText(statusText).width / 2 + 5, height / 2 + 100);
+        }
+        ctx.restore();
+
+        // Subtitle
+        ctx.save();
+        ctx.font = '11px "Courier New", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.fillText('UNDER DEVELOPMENT', width / 2, height / 2 + 130);
+        ctx.restore();
+
+        // Progress bar
+        const barWidth = 200;
+        const barHeight = 2;
+        const barX = (width - barWidth) / 2;
+        const barY = height / 2 + 150;
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.fillRect(barX, barY, barWidth, barHeight);
+        ctx.fillStyle = `rgba(0, 200, 255, ${0.6 + Math.sin(time * 5) * 0.2})`;
+        ctx.fillRect(barX, barY, barWidth * convergence, barHeight);
+        ctx.restore();
+
+        // Activity lines
+        ctx.save();
+        ctx.strokeStyle = 'rgba(0, 150, 255, 0.2)';
+        ctx.lineWidth = 1;
+
+        for (let i = 0; i < 5; i++) {
+            const yOffset = 150 + i * 15;
+            ctx.beginPath();
+            ctx.moveTo(20, yOffset);
+            for (let x = 0; x < 80; x += 2) {
+                const activity = network.layers[i % network.layers.length][0].activation;
+                const wave = Math.sin(x * 0.2 + time * 5 + i) * 5 * activity;
+                ctx.lineTo(20 + x, yOffset + wave);
+            }
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+
+    // ============================================
+    // MAIN RENDER LOOP
+    // ============================================
+    function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        aspect = width / height;
+
+        glCanvas.width = width;
+        glCanvas.height = height;
+        overlayCanvas.width = width;
+        overlayCanvas.height = height;
+
+        gl.viewport(0, 0, width, height);
+    }
+
+    let lastTime = 0;
+    function render(timestamp) {
+        const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
+        lastTime = timestamp;
+        time += dt;
+
+        if (Math.floor(time * 2) > epoch) {
+            epoch = Math.floor(time * 2);
+            const epochEl = document.getElementById('epoch');
+            if (epochEl) epochEl.textContent = epoch;
+        }
+
+        trainingPhase += dt * 0.5;
+        network.forwardPropagate();
+        network.train(0.001 * Math.sin(trainingPhase) + 0.001);
+
+        const loss = network.calculateLoss();
+        convergence = Math.min(1, convergence + dt * 0.005 * (1 - loss));
+
+        const lossEl = document.getElementById('loss');
+        const accuracyEl = document.getElementById('accuracy');
+        if (lossEl) lossEl.textContent = (1 - convergence).toFixed(4);
+        if (accuracyEl) accuracyEl.textContent = (convergence * 100).toFixed(2) + '%';
+
+        mouseInfluence *= 0.98;
+
+        network.update(dt, mouseX, mouseY, mouseInfluence);
+        updateBuffers();
+
+        const camRadius = 12;
+        const camHeight = 2 + Math.sin(time * 0.2) * 0.5;
+        const camAngle = time * 0.15 + mouseX * 0.3;
+        const camX = Math.sin(camAngle) * camRadius;
+        const camZ = Math.cos(camAngle) * camRadius;
+
+        const projection = mat4Perspective(Math.PI / 4, aspect, 0.1, 100);
+        const view = mat4LookAt([camX, camHeight, camZ], [0, 0, 0], [0, 1, 0]);
+        let model = mat4Identity();
+        model = mat4RotateY(model, mouseY * 0.2);
+
+        gl.clearColor(0, 0, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+
+        // Background
+        gl.useProgram(bgProgram);
+        gl.uniform1f(gl.getUniformLocation(bgProgram, 'uTime'), time);
+        gl.uniform2f(gl.getUniformLocation(bgProgram, 'uMouse'), mouseX * 0.5 + 0.5, mouseY * 0.5 + 0.5);
+        gl.uniform1f(gl.getUniformLocation(bgProgram, 'uConvergence'), convergence);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, bgBuffer);
+        const bgPosLoc = gl.getAttribLocation(bgProgram, 'aPosition');
+        gl.enableVertexAttribArray(bgPosLoc);
+        gl.vertexAttribPointer(bgPosLoc, 2, gl.FLOAT, false, 0, 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+        gl.enable(gl.DEPTH_TEST);
+        gl.depthFunc(gl.LEQUAL);
+
+        // Synapses
+        gl.useProgram(synapseProgram);
+        gl.uniformMatrix4fv(gl.getUniformLocation(synapseProgram, 'uProjection'), false, projection);
+        gl.uniformMatrix4fv(gl.getUniformLocation(synapseProgram, 'uView'), false, view);
+        gl.uniform1f(gl.getUniformLocation(synapseProgram, 'uTime'), time);
+
+        const synapseAttribs = ['aStart', 'aEnd', 'aWeight', 'aPulsePhase', 'aProgress'];
+        const synapseBuffers = [synapseStartBuffer, synapseEndBuffer, synapseWeightBuffer, synapsePulseBuffer, synapseProgressBuffer];
+        const synapseSizes = [3, 3, 1, 1, 1];
+
+        for (let i = 0; i < synapseAttribs.length; i++) {
+            const loc = gl.getAttribLocation(synapseProgram, synapseAttribs[i]);
+            if (loc >= 0) {
+                gl.bindBuffer(gl.ARRAY_BUFFER, synapseBuffers[i]);
+                gl.enableVertexAttribArray(loc);
+                gl.vertexAttribPointer(loc, synapseSizes[i], gl.FLOAT, false, 0, 0);
+            }
+        }
+
+        gl.drawArrays(gl.POINTS, 0, network.synapses.length * 20);
+
+        // Neurons
+        gl.useProgram(neuronProgram);
+        gl.uniformMatrix4fv(gl.getUniformLocation(neuronProgram, 'uProjection'), false, projection);
+        gl.uniformMatrix4fv(gl.getUniformLocation(neuronProgram, 'uView'), false, view);
+        gl.uniformMatrix4fv(gl.getUniformLocation(neuronProgram, 'uModel'), false, model);
+        gl.uniform1f(gl.getUniformLocation(neuronProgram, 'uTime'), time);
+        gl.uniform1f(gl.getUniformLocation(neuronProgram, 'uConvergence'), convergence);
+
+        const posLoc = gl.getAttribLocation(neuronProgram, 'aPosition');
+        gl.bindBuffer(gl.ARRAY_BUFFER, neuronBuffer);
+        gl.enableVertexAttribArray(posLoc);
+        gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 0, 0);
+
+        const actLoc = gl.getAttribLocation(neuronProgram, 'aActivation');
+        gl.bindBuffer(gl.ARRAY_BUFFER, activationBuffer);
+        gl.enableVertexAttribArray(actLoc);
+        gl.vertexAttribPointer(actLoc, 1, gl.FLOAT, false, 0, 0);
+
+        const layLoc = gl.getAttribLocation(neuronProgram, 'aLayer');
+        gl.bindBuffer(gl.ARRAY_BUFFER, layerBuffer);
+        gl.enableVertexAttribArray(layLoc);
+        gl.vertexAttribPointer(layLoc, 1, gl.FLOAT, false, 0, 0);
+
+        const typLoc = gl.getAttribLocation(neuronProgram, 'aType');
+        gl.bindBuffer(gl.ARRAY_BUFFER, typeBuffer);
+        gl.enableVertexAttribArray(typLoc);
+        gl.vertexAttribPointer(typLoc, 1, gl.FLOAT, false, 0, 0);
+
+        gl.drawArrays(gl.POINTS, 0, network.neurons.length);
+
+        renderOverlay();
+
+        requestAnimationFrame(render);
+    }
+
+    // ============================================
+    // EVENT HANDLERS
+    // ============================================
+    function onMouseMove(e) {
+        mouseX = (e.clientX / width) * 2 - 1;
+        mouseY = -((e.clientY / height) * 2 - 1);
+        mouseInfluence = 1;
+    }
+
+    function onTouchMove(e) {
+        if (e.touches.length > 0) {
+            mouseX = (e.touches[0].clientX / width) * 2 - 1;
+            mouseY = -((e.touches[0].clientY / height) * 2 - 1);
+            mouseInfluence = 1;
+        }
+    }
+
+    function onClick() {
+        const inputLayer = network.layers[0];
+        for (const neuron of inputLayer) {
+            neuron.activation = 1;
+        }
+        mouseInfluence = 2;
+    }
+
+    // ============================================
+    // INITIALIZATION
+    // ============================================
+    window.addEventListener('resize', resize);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('touchmove', onTouchMove, { passive: true });
+    window.addEventListener('click', onClick);
+    window.addEventListener('touchstart', onClick, { passive: true });
+
+    resize();
+    initBuffers();
+    requestAnimationFrame(render);
+
+})();
