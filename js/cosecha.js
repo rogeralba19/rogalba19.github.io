@@ -366,12 +366,21 @@ function closeEntryModal() {
 
 function updateJobSelect() {
     const select = document.getElementById('entryJob');
+    if (!select) return;
+
     const currentVal = select.value;
-    select.innerHTML = '<option value="">Seleccionar trabajo</option>' +
-        jobs.filter(j => j.active !== false).map(j =>
-            `<option value="${j.id}">${j.name || j.product} - ${j.employer || ''}</option>`
-        ).join('');
-    select.value = currentVal;
+    let options = '<option value="">Seleccionar trabajo</option>';
+
+    // Show all jobs - indicate inactive ones in label
+    jobs.forEach(j => {
+        const name = j.name || j.product || 'Sin nombre';
+        const employer = j.employer ? ` - ${j.employer}` : '';
+        const inactive = j.active === false ? ' (Inactivo)' : '';
+        options += `<option value="${j.id}">${name}${employer}${inactive}</option>`;
+    });
+
+    select.innerHTML = options;
+    if (currentVal) select.value = currentVal;
 }
 
 function onJobSelect() {
