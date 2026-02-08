@@ -1,972 +1,307 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ALBA STUDIO | Coming Soon</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cosecha | Nuevo registro</title>
+  <style>
+    :root {
+      --bg: #f4f6fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --primary: #2f7d32;
+      --primary-soft: #e8f5e9;
+      --border: #dbe2ea;
+      --sat: #eef3ff;
+      --sun: #f7f9ff;
+    }
 
-        body {
-            background: #000;
-            overflow: hidden;
-            font-family: 'Courier New', monospace;
-        }
+    * { box-sizing: border-box; }
 
-        canvas {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-        }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: linear-gradient(180deg, #f8fafc 0%, var(--bg) 100%);
+      color: var(--text);
+      padding: 24px;
+    }
 
-        .ui {
-            position: fixed;
-            z-index: 10;
-            color: rgba(255, 255, 255, 0.6);
-            font-size: 10px;
-            letter-spacing: 2px;
-            pointer-events: none;
-        }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(280px, 380px) minmax(420px, 1fr);
+      gap: 20px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
 
-        .metrics {
-            top: 20px;
-            left: 20px;
-        }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 6px 20px rgba(18, 36, 53, 0.07);
+    }
 
-        .metrics p {
-            margin: 4px 0;
-        }
+    h1, h2 { margin: 0 0 14px; }
+    h1 { font-size: 1.4rem; }
+    h2 { font-size: 1.1rem; }
 
-        .metrics .value {
-            color: #00ff88;
-        }
+    .muted { color: var(--muted); font-size: .9rem; }
 
-        .metrics .label {
-            color: rgba(255, 255, 255, 0.4);
-        }
+    .field { margin-bottom: 12px; }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: .86rem;
+      font-weight: 600;
+    }
 
-        .title-container {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            z-index: 5;
-            pointer-events: none;
-        }
+    select, input, textarea, button {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font: inherit;
+    }
 
-        .main-title {
-            font-size: clamp(32px, 8vw, 100px);
-            font-weight: bold;
-            color: transparent;
-            background: linear-gradient(135deg, #00aaff, #ffffff, #00ffaa);
-            -webkit-background-clip: text;
-            background-clip: text;
-            opacity: 0;
-            transition: opacity 2s ease;
-            text-shadow: 0 0 60px rgba(0, 170, 255, 0.5);
-        }
+    select {
+      background: #fff;
+      cursor: pointer;
+    }
 
-        .main-title.visible {
-            opacity: 1;
-        }
+    select:focus, input:focus, textarea:focus {
+      outline: 2px solid #cde8cf;
+      border-color: #84c287;
+    }
 
-        .subtitle {
-            font-size: clamp(10px, 2vw, 14px);
-            color: rgba(0, 255, 136, 0.7);
-            margin-top: 20px;
-            letter-spacing: 4px;
-            opacity: 0;
-            transition: opacity 2s ease 0.5s;
-        }
+    button {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform .08s ease, box-shadow .15s ease;
+    }
 
-        .subtitle.visible {
-            opacity: 1;
-        }
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 14px rgba(47, 125, 50, .25);
+    }
 
-        .progress-container {
-            margin-top: 30px;
-            opacity: 0;
-            transition: opacity 1s ease;
-        }
+    .job-list {
+      margin: 14px 0 0;
+      padding: 0;
+      list-style: none;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
 
-        .progress-container.visible {
-            opacity: 1;
-        }
+    .job-list li {
+      background: var(--primary-soft);
+      color: #2a6e2e;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: .82rem;
+      font-weight: 600;
+    }
 
-        .progress-bar {
-            width: 200px;
-            height: 2px;
-            background: rgba(255, 255, 255, 0.1);
-            margin: 0 auto;
-            position: relative;
-            overflow: hidden;
-        }
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 10px;
+    }
 
-        .progress-fill {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, #00aaff, #00ffaa);
-            transition: width 0.3s ease;
-            box-shadow: 0 0 10px #00aaff;
-        }
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(56px, 1fr));
+      gap: 8px;
+    }
 
-        .status {
-            font-size: 9px;
-            color: rgba(255, 255, 255, 0.4);
-            margin-top: 10px;
-            letter-spacing: 3px;
-        }
+    .day-name, .day-cell {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      text-align: center;
+      padding: 10px 6px;
+    }
 
-        .architecture {
-            top: 20px;
-            right: 20px;
-            text-align: right;
-        }
+    .day-name {
+      background: #f8fafc;
+      color: #475569;
+      font-size: .8rem;
+      font-weight: 700;
+    }
 
-        .architecture p {
-            margin: 3px 0;
-            font-size: 9px;
-            color: rgba(255, 255, 255, 0.3);
-        }
+    .day-cell {
+      min-height: 74px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      font-weight: 600;
+      background: #fff;
+      color: #334155;
+      box-shadow: 0 1px 0 rgba(15, 23, 42, .03);
+    }
 
-        .footer {
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            text-align: center;
-            font-size: 9px;
-            color: rgba(255, 255, 255, 0.2);
-        }
+    .day-cell.empty { opacity: 0; pointer-events: none; }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 0.3; }
-            50% { opacity: 1; }
-        }
+    .day-cell.saturday {
+      background: var(--sat);
+      border-color: #d8e2ff;
+    }
 
-        .cursor {
-            animation: pulse 1s infinite;
-        }
-    </style>
+    .day-cell.sunday {
+      background: var(--sun);
+      border-color: #e6ecff;
+      color: #64748b;
+    }
+
+    .badge {
+      align-self: center;
+      margin-top: 6px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: .7rem;
+      background: #ecfdf3;
+      color: #15803d;
+      border: 1px solid #c6f6d5;
+    }
+
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 <body>
-    <canvas id="canvas"></canvas>
+  <main class="layout">
+    <section class="card">
+      <h1>Cosecha · Nuevo registro</h1>
+      <p class="muted">Ahora el selector de trabajos se llena correctamente con la lista disponible.</p>
 
-    <div class="ui metrics">
-        <p><span class="label">EPOCH:</span> <span class="value" id="epoch">0</span></p>
-        <p><span class="label">LOSS:</span> <span class="value" id="loss">1.0000</span></p>
-        <p><span class="label">CONVERGENCE:</span> <span class="value" id="conv">0.00%</span></p>
-        <p><span class="label">NEURONS:</span> <span class="value" id="neurons">0</span></p>
-        <p><span class="label">SYNAPSES:</span> <span class="value" id="synapses">0</span></p>
-    </div>
-
-    <div class="title-container" id="title-container">
-        <div class="main-title" id="main-title">ALBA STUDIO</div>
-        <div class="subtitle" id="subtitle">TRAINING DIGITAL SYSTEMS</div>
-        <div class="progress-container" id="progress-container">
-            <div class="progress-bar">
-                <div class="progress-fill" id="progress-fill"></div>
-            </div>
-            <div class="status" id="status">INITIALIZING NEURAL NETWORK<span class="cursor">_</span></div>
+      <form id="registro-form">
+        <div class="field">
+          <label for="trabajo">Trabajo</label>
+          <select id="trabajo" name="trabajo" required></select>
         </div>
-    </div>
 
-    <div class="ui architecture">
-        <p>SELF-ORGANIZING NETWORK</p>
-        <p>ACTIVATION: SIGMOID</p>
-        <p>TOPOLOGY: ADAPTIVE</p>
-        <p>TARGET: TEXT FORMATION</p>
-    </div>
-
-    <div class="ui footer">
-        <p>PURE WEBGL | NO FRAMEWORKS</p>
-    </div>
-
-    <!-- Vertex Shader for Neurons -->
-    <script id="neuron-vs" type="x-shader/x-vertex">
-        attribute vec3 aPosition;
-        attribute float aActivation;
-        attribute float aSize;
-
-        uniform mat4 uProjection;
-        uniform mat4 uView;
-        uniform float uTime;
-
-        varying float vActivation;
-        varying float vDepth;
-
-        void main() {
-            vec4 viewPos = uView * vec4(aPosition, 1.0);
-            gl_Position = uProjection * viewPos;
-
-            float pulse = sin(uTime * 3.0 + aActivation * 6.28) * 0.3 + 0.7;
-            float baseSize = aSize * (5.0 + aActivation * 15.0);
-            gl_PointSize = baseSize * pulse * (1.0 / (1.0 + (-viewPos.z) * 0.05));
-
-            vActivation = aActivation;
-            vDepth = -viewPos.z;
-        }
-    </script>
-
-    <!-- Fragment Shader for Neurons -->
-    <script id="neuron-fs" type="x-shader/x-fragment">
-        precision highp float;
-
-        varying float vActivation;
-        varying float vDepth;
-
-        uniform float uTime;
-
-        void main() {
-            vec2 coord = gl_PointCoord - vec2(0.5);
-            float dist = length(coord);
-
-            if (dist > 0.5) discard;
-
-            float core = 1.0 - smoothstep(0.0, 0.15, dist);
-            float glow = 1.0 - smoothstep(0.1, 0.5, dist);
-
-            // Color gradient based on activation
-            vec3 coldColor = vec3(0.0, 0.4, 0.8);
-            vec3 hotColor = vec3(0.0, 1.0, 0.6);
-            vec3 whiteCore = vec3(1.0, 1.0, 1.0);
-
-            vec3 baseColor = mix(coldColor, hotColor, vActivation);
-            vec3 finalColor = mix(baseColor, whiteCore, core * vActivation);
-
-            float pulse = sin(uTime * 4.0 + vActivation * 3.14) * 0.2 + 0.8;
-            finalColor *= pulse;
-
-            float alpha = (core * 0.9 + glow * 0.5) * (0.2 + vActivation * 0.8);
-            float depthFade = 1.0 / (1.0 + vDepth * 0.02);
-
-            gl_FragColor = vec4(finalColor * (0.5 + vActivation), alpha * depthFade);
-        }
-    </script>
-
-    <!-- Vertex Shader for Synapses -->
-    <script id="synapse-vs" type="x-shader/x-vertex">
-        attribute vec3 aPosition;
-        attribute float aWeight;
-        attribute float aPhase;
-
-        uniform mat4 uProjection;
-        uniform mat4 uView;
-        uniform float uTime;
-
-        varying float vWeight;
-        varying float vPhase;
-        varying float vDepth;
-
-        void main() {
-            vec4 viewPos = uView * vec4(aPosition, 1.0);
-            gl_Position = uProjection * viewPos;
-            gl_PointSize = 1.5 + abs(aWeight) * 2.0;
-
-            vWeight = aWeight;
-            vPhase = aPhase;
-            vDepth = -viewPos.z;
-        }
-    </script>
-
-    <!-- Fragment Shader for Synapses -->
-    <script id="synapse-fs" type="x-shader/x-fragment">
-        precision highp float;
-
-        varying float vWeight;
-        varying float vPhase;
-        varying float vDepth;
-
-        uniform float uTime;
-
-        void main() {
-            vec2 coord = gl_PointCoord - vec2(0.5);
-            float dist = length(coord);
-
-            if (dist > 0.5) discard;
-
-            // Traveling pulse
-            float pulse = sin(vPhase * 6.28 + uTime * 4.0) * 0.5 + 0.5;
-
-            // Color based on weight sign
-            vec3 color = vWeight > 0.0
-                ? vec3(0.0, 0.6, 1.0)
-                : vec3(1.0, 0.3, 0.4);
-
-            color = mix(color, vec3(1.0), pulse * abs(vWeight) * 0.5);
-
-            float intensity = (1.0 - dist * 2.0) * (0.1 + abs(vWeight) * 0.3 + pulse * 0.2);
-            float depthFade = 1.0 / (1.0 + vDepth * 0.03);
-
-            gl_FragColor = vec4(color * intensity, intensity * depthFade * 0.6);
-        }
-    </script>
-
-    <!-- Background Shader -->
-    <script id="bg-vs" type="x-shader/x-vertex">
-        attribute vec2 aPosition;
-        varying vec2 vUv;
-        void main() {
-            vUv = aPosition * 0.5 + 0.5;
-            gl_Position = vec4(aPosition, 0.0, 1.0);
-        }
-    </script>
-
-    <script id="bg-fs" type="x-shader/x-fragment">
-        precision highp float;
-
-        varying vec2 vUv;
-        uniform float uTime;
-        uniform vec2 uMouse;
-        uniform float uConvergence;
-
-        // Noise functions
-        vec3 mod289(vec3 x) { return x - floor(x / 289.0) * 289.0; }
-        vec2 mod289(vec2 x) { return x - floor(x / 289.0) * 289.0; }
-        vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
-
-        float snoise(vec2 v) {
-            const vec4 C = vec4(0.211324865405187, 0.366025403784439,
-                               -0.577350269189626, 0.024390243902439);
-            vec2 i  = floor(v + dot(v, C.yy));
-            vec2 x0 = v - i + dot(i, C.xx);
-            vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-            vec4 x12 = x0.xyxy + C.xxzz;
-            x12.xy -= i1;
-            i = mod289(i);
-            vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
-            vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
-            m = m*m; m = m*m;
-            vec3 x = 2.0 * fract(p * C.www) - 1.0;
-            vec3 h = abs(x) - 0.5;
-            vec3 ox = floor(x + 0.5);
-            vec3 a0 = x - ox;
-            m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
-            vec3 g;
-            g.x = a0.x * x0.x + h.x * x0.y;
-            g.yz = a0.yz * x12.xz + h.yz * x12.yw;
-            return 130.0 * dot(m, g);
-        }
-
-        void main() {
-            vec2 uv = vUv;
-
-            // Neural field effect
-            float n1 = snoise(uv * 3.0 + uTime * 0.03) * 0.5 + 0.5;
-            float n2 = snoise(uv * 6.0 - uTime * 0.05) * 0.5 + 0.5;
-            float n3 = snoise(uv * 12.0 + uTime * 0.07) * 0.5 + 0.5;
-
-            float field = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
-
-            // Mouse glow
-            float mouseDist = length(uv - uMouse);
-            float mouseGlow = exp(-mouseDist * mouseDist * 6.0) * 0.2;
-
-            // Base color
-            vec3 color = vec3(0.01, 0.02, 0.04);
-            color += vec3(0.02, 0.04, 0.08) * field;
-            color += vec3(0.0, 0.2, 0.4) * mouseGlow;
-
-            // Convergence effect
-            color += vec3(0.02, 0.05, 0.08) * uConvergence;
-
-            // Vignette
-            float vignette = 1.0 - length(uv - 0.5) * 0.7;
-            color *= vignette;
-
-            gl_FragColor = vec4(color, 1.0);
-        }
-    </script>
-
-    <script>
-    (function() {
-        'use strict';
-
-        // ================================================
-        // WEBGL INITIALIZATION
-        // ================================================
-        const canvas = document.getElementById('canvas');
-        const gl = canvas.getContext('webgl', {
-            antialias: true,
-            alpha: false,
-            premultipliedAlpha: false
-        });
-
-        if (!gl) {
-            alert('WebGL not supported');
-            return;
-        }
-
-        let width, height, aspect;
-        let mouseX = 0, mouseY = 0, mouseNormX = 0.5, mouseNormY = 0.5;
-        let mouseInfluence = 0;
-        let time = 0;
-        let epoch = 0;
-        let convergence = 0;
-        let titleShown = false;
-
-        // ================================================
-        // SHADER COMPILATION
-        // ================================================
-        function createShader(id) {
-            const script = document.getElementById(id);
-            const type = script.type.includes('vertex') ? gl.VERTEX_SHADER : gl.FRAGMENT_SHADER;
-            const shader = gl.createShader(type);
-            gl.shaderSource(shader, script.textContent);
-            gl.compileShader(shader);
-            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-                console.error('Shader error:', gl.getShaderInfoLog(shader));
-                return null;
-            }
-            return shader;
-        }
-
-        function createProgram(vsId, fsId) {
-            const vs = createShader(vsId);
-            const fs = createShader(fsId);
-            const program = gl.createProgram();
-            gl.attachShader(program, vs);
-            gl.attachShader(program, fs);
-            gl.linkProgram(program);
-            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-                console.error('Program error:', gl.getProgramInfoLog(program));
-                return null;
-            }
-            return program;
-        }
-
-        const neuronProgram = createProgram('neuron-vs', 'neuron-fs');
-        const synapseProgram = createProgram('synapse-vs', 'synapse-fs');
-        const bgProgram = createProgram('bg-vs', 'bg-fs');
-
-        // ================================================
-        // MATRIX UTILITIES
-        // ================================================
-        function mat4Perspective(fov, aspect, near, far) {
-            const f = 1.0 / Math.tan(fov / 2);
-            const nf = 1 / (near - far);
-            return new Float32Array([
-                f / aspect, 0, 0, 0,
-                0, f, 0, 0,
-                0, 0, (far + near) * nf, -1,
-                0, 0, 2 * far * near * nf, 0
-            ]);
-        }
-
-        function mat4LookAt(eye, target, up) {
-            const zAxis = normalize(subtract(eye, target));
-            const xAxis = normalize(cross(up, zAxis));
-            const yAxis = cross(zAxis, xAxis);
-            return new Float32Array([
-                xAxis[0], yAxis[0], zAxis[0], 0,
-                xAxis[1], yAxis[1], zAxis[1], 0,
-                xAxis[2], yAxis[2], zAxis[2], 0,
-                -dot(xAxis, eye), -dot(yAxis, eye), -dot(zAxis, eye), 1
-            ]);
-        }
-
-        function normalize(v) {
-            const len = Math.sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]) || 1;
-            return [v[0]/len, v[1]/len, v[2]/len];
-        }
-
-        function subtract(a, b) {
-            return [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
-        }
-
-        function cross(a, b) {
-            return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
-        }
-
-        function dot(a, b) {
-            return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
-        }
-
-        // ================================================
-        // TEXT TO 3D POINTS
-        // ================================================
-        function generateTextPoints(text, density = 4) {
-            const tempCanvas = document.createElement('canvas');
-            const ctx = tempCanvas.getContext('2d');
-            tempCanvas.width = 512;
-            tempCanvas.height = 128;
-
-            ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, 512, 128);
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 72px Courier New, monospace';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(text, 256, 64);
-
-            const imageData = ctx.getImageData(0, 0, 512, 128);
-            const points = [];
-
-            for (let y = 0; y < 128; y += density) {
-                for (let x = 0; x < 512; x += density) {
-                    const idx = (y * 512 + x) * 4;
-                    if (imageData.data[idx] > 128) {
-                        points.push({
-                            x: (x - 256) / 40,
-                            y: (64 - y) / 40,
-                            z: (Math.random() - 0.5) * 0.5
-                        });
-                    }
-                }
-            }
-
-            return points;
-        }
-
-        // ================================================
-        // NEURAL NETWORK SIMULATION
-        // ================================================
-        const textTargets = generateTextPoints('ALBA STUDIO', 3);
-        const neuronCount = Math.max(textTargets.length, 800);
-
-        class Neuron {
-            constructor(index) {
-                // Random initial position (scattered)
-                const spread = 15;
-                this.x = (Math.random() - 0.5) * spread;
-                this.y = (Math.random() - 0.5) * spread * 0.6;
-                this.z = (Math.random() - 0.5) * spread;
-
-                this.vx = 0;
-                this.vy = 0;
-                this.vz = 0;
-
-                // Target position (text shape)
-                if (index < textTargets.length) {
-                    this.targetX = textTargets[index].x;
-                    this.targetY = textTargets[index].y;
-                    this.targetZ = textTargets[index].z;
-                    this.hasTarget = true;
-                } else {
-                    // Extra neurons orbit around
-                    const angle = Math.random() * Math.PI * 2;
-                    const radius = 8 + Math.random() * 4;
-                    this.targetX = Math.cos(angle) * radius;
-                    this.targetY = (Math.random() - 0.5) * 4;
-                    this.targetZ = Math.sin(angle) * radius;
-                    this.hasTarget = false;
-                }
-
-                this.activation = Math.random() * 0.3;
-                this.targetActivation = this.hasTarget ? 0.8 + Math.random() * 0.2 : 0.2 + Math.random() * 0.3;
-                this.bias = (Math.random() - 0.5) * 0.5;
-                this.phase = Math.random() * Math.PI * 2;
-                this.size = 0.8 + Math.random() * 0.4;
-                this.connections = [];
-            }
-
-            update(dt, time, convergence, mouseX, mouseY, mouseInfluence) {
-                // Interpolate towards target based on convergence
-                const targetLerp = 0.02 + convergence * 0.03;
-
-                // Add some organic movement
-                const noiseX = Math.sin(time * 0.5 + this.phase) * (1 - convergence) * 0.3;
-                const noiseY = Math.cos(time * 0.4 + this.phase * 1.3) * (1 - convergence) * 0.2;
-                const noiseZ = Math.sin(time * 0.6 + this.phase * 0.7) * (1 - convergence) * 0.3;
-
-                const finalTargetX = this.targetX + noiseX;
-                const finalTargetY = this.targetY + noiseY;
-                const finalTargetZ = this.targetZ + noiseZ;
-
-                // Mouse repulsion/attraction
-                if (mouseInfluence > 0.1) {
-                    const dx = mouseX * 8 - this.x;
-                    const dy = mouseY * 5 - this.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < 5) {
-                        const force = (1 - dist / 5) * mouseInfluence * 2;
-                        this.vx -= dx * force * 0.1;
-                        this.vy -= dy * force * 0.1;
-                        this.activation = Math.min(1, this.activation + force * 0.3);
-                    }
-                }
-
-                // Spring force towards target
-                this.vx += (finalTargetX - this.x) * targetLerp;
-                this.vy += (finalTargetY - this.y) * targetLerp;
-                this.vz += (finalTargetZ - this.z) * targetLerp;
-
-                // Damping
-                this.vx *= 0.92;
-                this.vy *= 0.92;
-                this.vz *= 0.92;
-
-                // Apply velocity
-                this.x += this.vx * dt * 60;
-                this.y += this.vy * dt * 60;
-                this.z += this.vz * dt * 60;
-
-                // Update activation (converge to target activation)
-                const activationLerp = 0.02 + convergence * 0.05;
-                this.activation += (this.targetActivation - this.activation) * activationLerp;
-
-                // Pulse effect
-                const pulse = Math.sin(time * 2 + this.phase) * 0.1;
-                this.activation = Math.max(0, Math.min(1, this.activation + pulse * (1 - convergence)));
-            }
-        }
-
-        class Synapse {
-            constructor(from, to) {
-                this.from = from;
-                this.to = to;
-                this.weight = (Math.random() - 0.5) * 2;
-                this.phase = Math.random();
-            }
-        }
-
-        // Create neurons
-        const neurons = [];
-        for (let i = 0; i < neuronCount; i++) {
-            neurons.push(new Neuron(i));
-        }
-
-        // Create synapses (connections between nearby neurons)
-        const synapses = [];
-        const maxConnections = 4;
-        const maxDistance = 3;
-
-        for (const neuron of neurons) {
-            // Find nearby neurons
-            const nearby = neurons
-                .filter(n => n !== neuron)
-                .map(n => ({
-                    neuron: n,
-                    dist: Math.sqrt(
-                        Math.pow(n.targetX - neuron.targetX, 2) +
-                        Math.pow(n.targetY - neuron.targetY, 2) +
-                        Math.pow(n.targetZ - neuron.targetZ, 2)
-                    )
-                }))
-                .filter(n => n.dist < maxDistance)
-                .sort((a, b) => a.dist - b.dist)
-                .slice(0, maxConnections);
-
-            for (const { neuron: target } of nearby) {
-                // Avoid duplicate connections
-                const exists = synapses.some(s =>
-                    (s.from === neuron && s.to === target) ||
-                    (s.from === target && s.to === neuron)
-                );
-                if (!exists) {
-                    const synapse = new Synapse(neuron, target);
-                    synapses.push(synapse);
-                    neuron.connections.push(synapse);
-                }
-            }
-        }
-
-        // Update UI
-        document.getElementById('neurons').textContent = neurons.length;
-        document.getElementById('synapses').textContent = synapses.length;
-
-        // ================================================
-        // BUFFERS
-        // ================================================
-        // Neuron buffers
-        const neuronPositions = new Float32Array(neurons.length * 3);
-        const neuronActivations = new Float32Array(neurons.length);
-        const neuronSizes = new Float32Array(neurons.length);
-
-        const neuronPosBuffer = gl.createBuffer();
-        const neuronActBuffer = gl.createBuffer();
-        const neuronSizeBuffer = gl.createBuffer();
-
-        // Synapse buffers - render as point chain
-        const pointsPerSynapse = 15;
-        const synapsePositions = new Float32Array(synapses.length * pointsPerSynapse * 3);
-        const synapseWeights = new Float32Array(synapses.length * pointsPerSynapse);
-        const synapsePhases = new Float32Array(synapses.length * pointsPerSynapse);
-
-        const synapsePosBuffer = gl.createBuffer();
-        const synapseWeightBuffer = gl.createBuffer();
-        const synapsePhaseBuffer = gl.createBuffer();
-
-        // Initialize synapse phases
-        let idx = 0;
-        for (const synapse of synapses) {
-            for (let p = 0; p < pointsPerSynapse; p++) {
-                synapsePhases[idx] = p / (pointsPerSynapse - 1) + synapse.phase;
-                idx++;
-            }
-        }
-
-        // Background quad
-        const bgBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, bgBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-            -1, -1, 1, -1, -1, 1,
-            -1, 1, 1, -1, 1, 1
-        ]), gl.STATIC_DRAW);
-
-        // ================================================
-        // UPDATE BUFFERS
-        // ================================================
-        function updateBuffers() {
-            // Update neuron data
-            for (let i = 0; i < neurons.length; i++) {
-                const n = neurons[i];
-                neuronPositions[i * 3] = n.x;
-                neuronPositions[i * 3 + 1] = n.y;
-                neuronPositions[i * 3 + 2] = n.z;
-                neuronActivations[i] = n.activation;
-                neuronSizes[i] = n.size;
-            }
-
-            gl.bindBuffer(gl.ARRAY_BUFFER, neuronPosBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, neuronPositions, gl.DYNAMIC_DRAW);
-
-            gl.bindBuffer(gl.ARRAY_BUFFER, neuronActBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, neuronActivations, gl.DYNAMIC_DRAW);
-
-            gl.bindBuffer(gl.ARRAY_BUFFER, neuronSizeBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, neuronSizes, gl.DYNAMIC_DRAW);
-
-            // Update synapse positions
-            let idx = 0;
-            for (const synapse of synapses) {
-                const from = synapse.from;
-                const to = synapse.to;
-
-                for (let p = 0; p < pointsPerSynapse; p++) {
-                    const t = p / (pointsPerSynapse - 1);
-
-                    // Interpolate with slight curve
-                    const midY = (from.y + to.y) / 2 + Math.sin(t * Math.PI) * 0.3;
-
-                    synapsePositions[idx * 3] = from.x + (to.x - from.x) * t;
-                    synapsePositions[idx * 3 + 1] = from.y + (to.y - from.y) * t + Math.sin(t * Math.PI) * 0.15;
-                    synapsePositions[idx * 3 + 2] = from.z + (to.z - from.z) * t;
-
-                    // Weight based on activation of both neurons
-                    synapseWeights[idx] = synapse.weight * (from.activation + to.activation) / 2;
-                    idx++;
-                }
-            }
-
-            gl.bindBuffer(gl.ARRAY_BUFFER, synapsePosBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, synapsePositions, gl.DYNAMIC_DRAW);
-
-            gl.bindBuffer(gl.ARRAY_BUFFER, synapseWeightBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, synapseWeights, gl.DYNAMIC_DRAW);
-
-            gl.bindBuffer(gl.ARRAY_BUFFER, synapsePhaseBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, synapsePhases, gl.DYNAMIC_DRAW);
-        }
-
-        // ================================================
-        // RESIZE
-        // ================================================
-        function resize() {
-            width = window.innerWidth;
-            height = window.innerHeight;
-            aspect = width / height;
-            canvas.width = width;
-            canvas.height = height;
-            gl.viewport(0, 0, width, height);
-        }
-
-        // ================================================
-        // RENDER LOOP
-        // ================================================
-        let lastTime = 0;
-
-        function render(timestamp) {
-            const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
-            lastTime = timestamp;
-            time += dt;
-
-            // Update epoch
-            const newEpoch = Math.floor(time * 3);
-            if (newEpoch > epoch) {
-                epoch = newEpoch;
-                document.getElementById('epoch').textContent = epoch;
-            }
-
-            // Convergence progression
-            convergence = Math.min(1, convergence + dt * 0.015);
-
-            // Update UI
-            const loss = Math.max(0.001, 1 - convergence + Math.sin(time * 2) * 0.02 * (1 - convergence));
-            document.getElementById('loss').textContent = loss.toFixed(4);
-            document.getElementById('conv').textContent = (convergence * 100).toFixed(1) + '%';
-            document.getElementById('progress-fill').style.width = (convergence * 100) + '%';
-
-            // Update status text
-            const statusEl = document.getElementById('status');
-            if (convergence < 0.3) {
-                statusEl.innerHTML = 'INITIALIZING NEURAL NETWORK<span class="cursor">_</span>';
-            } else if (convergence < 0.6) {
-                statusEl.innerHTML = 'TRAINING IN PROGRESS<span class="cursor">_</span>';
-            } else if (convergence < 0.9) {
-                statusEl.innerHTML = 'OPTIMIZING TOPOLOGY<span class="cursor">_</span>';
-            } else {
-                statusEl.innerHTML = 'NETWORK CONVERGED<span class="cursor">_</span>';
-            }
-
-            // Show title when converged enough
-            if (convergence > 0.5 && !titleShown) {
-                titleShown = true;
-                document.getElementById('main-title').classList.add('visible');
-                document.getElementById('subtitle').classList.add('visible');
-            }
-            document.getElementById('progress-container').classList.add('visible');
-
-            // Mouse influence decay
-            mouseInfluence *= 0.95;
-
-            // Update neurons
-            for (const neuron of neurons) {
-                neuron.update(dt, time, convergence, mouseX, mouseY, mouseInfluence);
-            }
-
-            // Forward propagation simulation
-            for (const synapse of synapses) {
-                synapse.to.activation += synapse.from.activation * synapse.weight * 0.001;
-                synapse.to.activation = Math.max(0, Math.min(1, synapse.to.activation));
-            }
-
-            updateBuffers();
-
-            // Camera
-            const camRadius = 18 - convergence * 5;
-            const camHeight = 3 + Math.sin(time * 0.15) * 2;
-            const camAngle = time * 0.1 + mouseX * 0.3;
-            const camX = Math.sin(camAngle) * camRadius;
-            const camZ = Math.cos(camAngle) * camRadius;
-
-            const projection = mat4Perspective(Math.PI / 5, aspect, 0.1, 100);
-            const view = mat4LookAt([camX, camHeight, camZ], [0, 0, 0], [0, 1, 0]);
-
-            // Clear
-            gl.clearColor(0, 0, 0, 1);
-            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-            gl.enable(gl.BLEND);
-            gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-
-            // Render background
-            gl.useProgram(bgProgram);
-            gl.uniform1f(gl.getUniformLocation(bgProgram, 'uTime'), time);
-            gl.uniform2f(gl.getUniformLocation(bgProgram, 'uMouse'), mouseNormX, mouseNormY);
-            gl.uniform1f(gl.getUniformLocation(bgProgram, 'uConvergence'), convergence);
-
-            const bgPosLoc = gl.getAttribLocation(bgProgram, 'aPosition');
-            gl.bindBuffer(gl.ARRAY_BUFFER, bgBuffer);
-            gl.enableVertexAttribArray(bgPosLoc);
-            gl.vertexAttribPointer(bgPosLoc, 2, gl.FLOAT, false, 0, 0);
-            gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-            gl.enable(gl.DEPTH_TEST);
-            gl.depthFunc(gl.LEQUAL);
-
-            // Render synapses
-            gl.useProgram(synapseProgram);
-            gl.uniformMatrix4fv(gl.getUniformLocation(synapseProgram, 'uProjection'), false, projection);
-            gl.uniformMatrix4fv(gl.getUniformLocation(synapseProgram, 'uView'), false, view);
-            gl.uniform1f(gl.getUniformLocation(synapseProgram, 'uTime'), time);
-
-            const synPosLoc = gl.getAttribLocation(synapseProgram, 'aPosition');
-            gl.bindBuffer(gl.ARRAY_BUFFER, synapsePosBuffer);
-            gl.enableVertexAttribArray(synPosLoc);
-            gl.vertexAttribPointer(synPosLoc, 3, gl.FLOAT, false, 0, 0);
-
-            const synWeightLoc = gl.getAttribLocation(synapseProgram, 'aWeight');
-            gl.bindBuffer(gl.ARRAY_BUFFER, synapseWeightBuffer);
-            gl.enableVertexAttribArray(synWeightLoc);
-            gl.vertexAttribPointer(synWeightLoc, 1, gl.FLOAT, false, 0, 0);
-
-            const synPhaseLoc = gl.getAttribLocation(synapseProgram, 'aPhase');
-            gl.bindBuffer(gl.ARRAY_BUFFER, synapsePhaseBuffer);
-            gl.enableVertexAttribArray(synPhaseLoc);
-            gl.vertexAttribPointer(synPhaseLoc, 1, gl.FLOAT, false, 0, 0);
-
-            gl.drawArrays(gl.POINTS, 0, synapses.length * pointsPerSynapse);
-
-            // Render neurons
-            gl.useProgram(neuronProgram);
-            gl.uniformMatrix4fv(gl.getUniformLocation(neuronProgram, 'uProjection'), false, projection);
-            gl.uniformMatrix4fv(gl.getUniformLocation(neuronProgram, 'uView'), false, view);
-            gl.uniform1f(gl.getUniformLocation(neuronProgram, 'uTime'), time);
-
-            const neuPosLoc = gl.getAttribLocation(neuronProgram, 'aPosition');
-            gl.bindBuffer(gl.ARRAY_BUFFER, neuronPosBuffer);
-            gl.enableVertexAttribArray(neuPosLoc);
-            gl.vertexAttribPointer(neuPosLoc, 3, gl.FLOAT, false, 0, 0);
-
-            const neuActLoc = gl.getAttribLocation(neuronProgram, 'aActivation');
-            gl.bindBuffer(gl.ARRAY_BUFFER, neuronActBuffer);
-            gl.enableVertexAttribArray(neuActLoc);
-            gl.vertexAttribPointer(neuActLoc, 1, gl.FLOAT, false, 0, 0);
-
-            const neuSizeLoc = gl.getAttribLocation(neuronProgram, 'aSize');
-            gl.bindBuffer(gl.ARRAY_BUFFER, neuronSizeBuffer);
-            gl.enableVertexAttribArray(neuSizeLoc);
-            gl.vertexAttribPointer(neuSizeLoc, 1, gl.FLOAT, false, 0, 0);
-
-            gl.drawArrays(gl.POINTS, 0, neurons.length);
-
-            requestAnimationFrame(render);
-        }
-
-        // ================================================
-        // EVENT HANDLERS
-        // ================================================
-        function onMouseMove(e) {
-            mouseX = (e.clientX / width) * 2 - 1;
-            mouseY = -((e.clientY / height) * 2 - 1);
-            mouseNormX = e.clientX / width;
-            mouseNormY = 1 - e.clientY / height;
-            mouseInfluence = 1;
-        }
-
-        function onTouchMove(e) {
-            if (e.touches.length > 0) {
-                mouseX = (e.touches[0].clientX / width) * 2 - 1;
-                mouseY = -((e.touches[0].clientY / height) * 2 - 1);
-                mouseNormX = e.touches[0].clientX / width;
-                mouseNormY = 1 - e.touches[0].clientY / height;
-                mouseInfluence = 1;
-            }
-        }
-
-        function onClick() {
-            // Burst of activity - disturb the network
-            for (const neuron of neurons) {
-                neuron.activation = Math.random();
-                neuron.vx += (Math.random() - 0.5) * 2;
-                neuron.vy += (Math.random() - 0.5) * 2;
-                neuron.vz += (Math.random() - 0.5) * 2;
-            }
-            mouseInfluence = 3;
-
-            // Small convergence penalty (network retrains)
-            convergence = Math.max(0.3, convergence - 0.1);
-        }
-
-        // ================================================
-        // INITIALIZATION
-        // ================================================
-        window.addEventListener('resize', resize);
-        window.addEventListener('mousemove', onMouseMove);
-        window.addEventListener('touchmove', onTouchMove, { passive: true });
-        window.addEventListener('click', onClick);
-        window.addEventListener('touchstart', onClick, { passive: true });
-
-        resize();
-        requestAnimationFrame(render);
-
-    })();
-    </script>
+        <div class="field">
+          <label for="fecha">Fecha</label>
+          <input id="fecha" name="fecha" type="date" required />
+        </div>
+
+        <div class="field">
+          <label for="kilos">Kilos</label>
+          <input id="kilos" name="kilos" type="number" min="1" placeholder="Ej: 230" required />
+        </div>
+
+        <div class="field">
+          <label for="nota">Nota</label>
+          <textarea id="nota" name="nota" rows="3" placeholder="Detalle adicional"></textarea>
+        </div>
+
+        <button type="submit">Guardar registro</button>
+      </form>
+
+      <h2 style="margin-top:18px">Trabajos cargados</h2>
+      <ul class="job-list" id="job-list"></ul>
+    </section>
+
+    <section class="card">
+      <div class="calendar-header">
+        <h2>Calendario de cosecha</h2>
+        <span class="muted" id="month-label"></span>
+      </div>
+      <div class="calendar" id="calendar"></div>
+    </section>
+  </main>
+
+  <script>
+    const defaultTrabajos = [
+      { id: 'uva', nombre: 'Cosecha de uva' },
+      { id: 'manzana', nombre: 'Recolección de manzana' },
+      { id: 'pera', nombre: 'Clasificación de pera' }
+    ];
+
+    const trabajos = JSON.parse(localStorage.getItem('trabajos-disponibles') || 'null') || defaultTrabajos;
+
+    const selectTrabajo = document.getElementById('trabajo');
+    const jobList = document.getElementById('job-list');
+
+    function renderTrabajos() {
+      selectTrabajo.innerHTML = '';
+
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = 'Selecciona un trabajo';
+      placeholder.disabled = true;
+      placeholder.selected = true;
+      selectTrabajo.appendChild(placeholder);
+
+      trabajos.forEach((trabajo) => {
+        const option = document.createElement('option');
+        option.value = trabajo.id;
+        option.textContent = trabajo.nombre;
+        selectTrabajo.appendChild(option);
+
+        const li = document.createElement('li');
+        li.textContent = trabajo.nombre;
+        jobList.appendChild(li);
+      });
+    }
+
+    function renderCalendar() {
+      const calendar = document.getElementById('calendar');
+      const monthLabel = document.getElementById('month-label');
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      const firstDay = new Date(year, month, 1);
+      const totalDays = new Date(year, month + 1, 0).getDate();
+      const startWeekday = firstDay.getDay();
+
+      monthLabel.textContent = firstDay.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+
+      calendar.innerHTML = '';
+      ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].forEach((d) => {
+        const head = document.createElement('div');
+        head.className = 'day-name';
+        head.textContent = d;
+        calendar.appendChild(head);
+      });
+
+      for (let i = 0; i < startWeekday; i++) {
+        const empty = document.createElement('div');
+        empty.className = 'day-cell empty';
+        calendar.appendChild(empty);
+      }
+
+      for (let day = 1; day <= totalDays; day++) {
+        const date = new Date(year, month, day);
+        const weekday = date.getDay();
+        const cell = document.createElement('div');
+        cell.className = 'day-cell';
+
+        if (weekday === 6) cell.classList.add('saturday');
+        if (weekday === 0) cell.classList.add('sunday');
+
+        cell.innerHTML = `<span>${day}</span>${Math.random() > 0.72 ? '<span class="badge">Cosecha</span>' : ''}`;
+        calendar.appendChild(cell);
+      }
+    }
+
+    document.getElementById('registro-form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      const data = new FormData(event.target);
+      const trabajoElegido = trabajos.find((item) => item.id === data.get('trabajo'));
+      alert(`Registro guardado para: ${trabajoElegido?.nombre || 'Sin trabajo'}`);
+      event.target.reset();
+      selectTrabajo.selectedIndex = 0;
+    });
+
+    renderTrabajos();
+    renderCalendar();
+  </script>
 </body>
 </html>
