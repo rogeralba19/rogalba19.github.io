@@ -324,6 +324,9 @@ async function deleteJob() {
 // ENTRY MODAL
 // ============================================
 function openEntryModal(entryId = null, preselectedJobId = null) {
+    // Update job select options first
+    updateJobSelect();
+
     document.getElementById('entryId').value = '';
     document.getElementById('entryJob').value = preselectedJobId || '';
     document.getElementById('entryDate').value = selectedDayDate || new Date().toISOString().split('T')[0];
@@ -503,25 +506,37 @@ function renderCalendar() {
     grid.innerHTML = '';
 
     const dayNames = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
-    dayNames.forEach(day => {
+    dayNames.forEach((day, idx) => {
         const header = document.createElement('div');
         header.className = 'calendar-day-header';
+        if (idx === 0) header.classList.add('sunday');
+        if (idx === 6) header.classList.add('saturday');
         header.textContent = day;
         grid.appendChild(header);
     });
 
     const prevMonth = new Date(year, month, 0);
     for (let i = startDay - 1; i >= 0; i--) {
+        const dayOfWeek = startDay - 1 - i;
         const day = document.createElement('div');
         day.className = 'calendar-day other-month';
+        if (dayOfWeek === 0) day.classList.add('sunday');
+        if (dayOfWeek === 6) day.classList.add('saturday');
         day.innerHTML = `<span class="day-number">${prevMonth.getDate() - i}</span>`;
         grid.appendChild(day);
     }
 
     const today = new Date();
     for (let i = 1; i <= daysInMonth; i++) {
+        const dayDate = new Date(year, month, i);
+        const dayOfWeek = dayDate.getDay();
+
         const day = document.createElement('div');
         day.className = 'calendar-day';
+
+        // Weekend classes
+        if (dayOfWeek === 0) day.classList.add('sunday');
+        if (dayOfWeek === 6) day.classList.add('saturday');
 
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
         const dayEntries = entries.filter(e => e.date === dateStr);
@@ -546,8 +561,13 @@ function renderCalendar() {
 
     const remainingDays = 42 - (startDay + daysInMonth);
     for (let i = 1; i <= remainingDays; i++) {
+        const dayDate = new Date(year, month + 1, i);
+        const dayOfWeek = dayDate.getDay();
+
         const day = document.createElement('div');
         day.className = 'calendar-day other-month';
+        if (dayOfWeek === 0) day.classList.add('sunday');
+        if (dayOfWeek === 6) day.classList.add('saturday');
         day.innerHTML = `<span class="day-number">${i}</span>`;
         grid.appendChild(day);
     }

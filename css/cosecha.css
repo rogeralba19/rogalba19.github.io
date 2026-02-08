@@ -348,6 +348,52 @@ body {
     border-color: rgba(255, 170, 0, 0.3);
 }
 
+/* Weekend Styling */
+.calendar-day-header.sunday {
+    color: rgba(255, 120, 120, 0.8);
+}
+
+.calendar-day-header.saturday {
+    color: rgba(150, 180, 255, 0.7);
+}
+
+.calendar-day.sunday {
+    background: rgba(255, 100, 100, 0.08);
+    border-color: rgba(255, 100, 100, 0.15);
+}
+
+.calendar-day.sunday .day-number {
+    color: rgba(255, 150, 150, 0.9);
+}
+
+.calendar-day.saturday {
+    background: rgba(100, 150, 255, 0.06);
+    border-color: rgba(100, 150, 255, 0.12);
+}
+
+.calendar-day.saturday .day-number {
+    color: rgba(150, 180, 255, 0.85);
+}
+
+.calendar-day.sunday:hover,
+.calendar-day.saturday:hover {
+    background: rgba(0, 170, 255, 0.15);
+    border-color: rgba(0, 170, 255, 0.4);
+}
+
+/* Weekend with entries */
+.calendar-day.sunday.has-entries,
+.calendar-day.saturday.has-entries {
+    background: rgba(0, 255, 136, 0.12);
+    border-color: rgba(0, 255, 136, 0.35);
+}
+
+.calendar-day.sunday.has-pending,
+.calendar-day.saturday.has-pending {
+    background: rgba(255, 170, 0, 0.12);
+    border-color: rgba(255, 170, 0, 0.35);
+}
+
 .day-number {
     font-size: 14px;
     font-weight: 600;
