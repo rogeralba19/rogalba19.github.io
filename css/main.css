@@ -1,0 +1,101 @@
+/**
+ * Main Styles
+ * Estilos principales para index.html
+ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #000;
+    overflow: hidden;
+    font-family: 'Courier New', monospace;
+}
+
+/* Canvas */
+#webgl-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+#overlay-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none;
+}
+
+/* UI Layer */
+.ui-layer {
+    position: fixed;
+    z-index: 10;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 11px;
+    letter-spacing: 2px;
+    pointer-events: none;
+}
+
+/* Metrics */
+.metrics {
+    top: 20px;
+    left: 20px;
+}
+
+.metrics p {
+    margin: 4px 0;
+    font-size: 10px;
+}
+
+.metrics .value {
+    color: #00ff88;
+}
+
+.metrics .label {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+/* Architecture Info */
+.architecture {
+    top: 20px;
+    right: 20px;
+    text-align: right;
+}
+
+.architecture p {
+    margin: 3px 0;
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+/* Footer */
+.footer {
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+}
+
+.footer p {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+/* Animations */
+@keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0.3; }
+}
+
+.cursor-blink {
+    animation: blink 1s infinite;
+}
