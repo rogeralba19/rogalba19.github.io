@@ -13,7 +13,6 @@ let selectedDayDate = null;
 
 // Job modal state
 let jobType = 'trato';
-let jobActive = true;
 
 // Entry modal state
 let entryPaid = false;
@@ -27,6 +26,19 @@ const unitNames = {
     'bandeja': 'Bandejas',
     'bins': 'Bins'
 };
+
+// Lista de frutas disponibles
+const availableFruits = [
+    'Fresa',
+    'Frambuesa',
+    'Arandano',
+    'Mora',
+    'Cereza',
+    'Ciruela',
+    'Manzana',
+    'Pera',
+    'Uva'
+];
 
 // Auth listener
 auth.onAuthStateChanged((user) => {
@@ -48,8 +60,14 @@ function loadData() {
         snapshot.forEach((child) => {
             jobs.push({ id: child.key, ...child.val() });
         });
-        renderJobs();
-        updateJobSelect();
+
+        // Si no hay trabajos, crear los predeterminados para cada fruta
+        if (jobs.length === 0) {
+            initializeDefaultJobs();
+        } else {
+            renderJobs();
+            updateJobSelect();
+        }
     });
 
     // Load entries
@@ -98,6 +116,32 @@ function switchTab(tab) {
 // ============================================
 // JOBS
 // ============================================
+
+// Crear trabajos predeterminados para cada fruta
+async function initializeDefaultJobs() {
+    if (!currentUser) return;
+
+    const batch = {};
+    availableFruits.forEach((fruit, idx) => {
+        const key = db.ref(`jobs/${currentUser.uid}`).push().key;
+        batch[key] = {
+            product: fruit,
+            type: 'trato',
+            unit: 'totens',
+            price: 0,
+            employer: '',
+            active: true,
+            createdAt: Date.now() + idx
+        };
+    });
+
+    try {
+        await db.ref(`jobs/${currentUser.uid}`).update(batch);
+    } catch (error) {
+        console.error('Error creando trabajos predeterminados:', error);
+    }
+}
+
 function renderJobs() {
     const grid = document.getElementById('jobsGrid');
 
@@ -117,17 +161,19 @@ function renderJobs() {
         const totalEarned = jobEntries.reduce((sum, e) => sum + (e.total || 0), 0);
         const totalUnits = jobEntries.reduce((sum, e) => sum + (e.quantity || 0), 0);
         const daysWorked = new Set(jobEntries.map(e => e.date)).size;
+        const displayName = getJobDisplayName(job);
+        const isConfigured = job.price > 0 || job.employer;
 
         return `
-            <div class="job-card ${job.active !== false ? 'active' : ''}" onclick="selectJobForQuickAdd('${job.id}')">
+            <div class="job-card ${isConfigured ? 'active' : ''}" onclick="selectJobForQuickAdd('${job.id}')">
                 <div class="job-header">
-                    <span class="job-title">${job.name || job.product}</span>
-                    <span class="job-status ${job.active === false ? 'inactive' : ''}">${job.active === false ? 'Inactivo' : 'Activo'}</span>
+                    <span class="job-title">${displayName}</span>
+                    <span class="job-status ${!isConfigured ? 'inactive' : ''}">${isConfigured ? 'Configurado' : 'Sin configurar'}</span>
                 </div>
                 <div class="job-details">
-                    <span>🍎 ${job.product}</span>
-                    <span>📍 ${job.employer || 'Sin especificar'}</span>
-                    <span>${job.type === 'dia' ? '📅 Al Dia - $' + job.dailyRate : '📦 ' + (unitNames[job.unit] || job.unit) + ' - $' + job.price}</span>
+                    <span>${job.type === 'dia' ? '📅 Al Dia' : '📦 Al Trato'}</span>
+                    ${job.employer ? `<span>📍 ${job.employer}</span>` : ''}
+                    <span>${job.type === 'dia' ? '$' + (job.dailyRate || 0) + '/dia' : '$' + (job.price || 0) + '/' + (unitNames[job.unit] || 'unidad')}</span>
                 </div>
                 <div class="job-stats">
                     <div class="job-stat">
@@ -157,7 +203,7 @@ function selectJobForQuickAdd(jobId) {
     }
 
     selectedJob = job;
-    document.getElementById('quickAddTitle').textContent = `Agregar a: ${job.name || job.product}`;
+    document.getElementById('quickAddTitle').textContent = `Agregar a: ${getJobDisplayName(job)}`;
     document.getElementById('quickDate').value = new Date().toISOString().split('T')[0];
     document.getElementById('quickQuantity').value = '';
     document.getElementById('quickAddBar').classList.add('visible');
@@ -202,16 +248,13 @@ async function quickAddEntry() {
 // ============================================
 function openJobModal(jobId = null) {
     document.getElementById('jobId').value = '';
-    document.getElementById('jobName').value = '';
     document.getElementById('jobProduct').value = '';
     document.getElementById('jobUnit').value = 'totens';
     document.getElementById('jobPrice').value = '';
     document.getElementById('jobDailyRate').value = '';
     document.getElementById('jobEmployer').value = '';
     jobType = 'trato';
-    jobActive = true;
     updateJobTypeUI();
-    updateJobActiveUI();
     document.getElementById('deleteJobBtn').style.display = 'none';
     document.getElementById('jobModalTitle').textContent = 'Nuevo Trabajo';
 
@@ -219,16 +262,13 @@ function openJobModal(jobId = null) {
         const job = jobs.find(j => j.id === jobId);
         if (job) {
             document.getElementById('jobId').value = job.id;
-            document.getElementById('jobName').value = job.name || '';
             document.getElementById('jobProduct').value = job.product || '';
             document.getElementById('jobUnit').value = job.unit || 'totens';
             document.getElementById('jobPrice').value = job.price || '';
             document.getElementById('jobDailyRate').value = job.dailyRate || '';
             document.getElementById('jobEmployer').value = job.employer || '';
             jobType = job.type || 'trato';
-            jobActive = job.active !== false;
             updateJobTypeUI();
-            updateJobActiveUI();
             document.getElementById('deleteJobBtn').style.display = 'block';
             document.getElementById('jobModalTitle').textContent = 'Editar Trabajo';
         }
@@ -257,25 +297,15 @@ function updateJobTypeUI() {
     document.getElementById('jobDiaFields').classList.toggle('visible', jobType === 'dia');
 }
 
-function toggleJobActive() {
-    jobActive = !jobActive;
-    updateJobActiveUI();
-}
-
-function updateJobActiveUI() {
-    document.getElementById('jobActiveToggle').classList.toggle('active', jobActive);
-}
-
 async function saveJob() {
     if (!currentUser) return;
 
     const id = document.getElementById('jobId').value;
     const data = {
-        name: document.getElementById('jobName').value,
         product: document.getElementById('jobProduct').value,
         type: jobType,
         employer: document.getElementById('jobEmployer').value,
-        active: jobActive,
+        active: true,
         updatedAt: Date.now()
     };
 
@@ -371,16 +401,23 @@ function updateJobSelect() {
     const currentVal = select.value;
     let options = '<option value="">Seleccionar trabajo</option>';
 
-    // Show all jobs - indicate inactive ones in label
     jobs.forEach(j => {
-        const name = j.name || j.product || 'Sin nombre';
-        const employer = j.employer ? ` - ${j.employer}` : '';
-        const inactive = j.active === false ? ' (Inactivo)' : '';
-        options += `<option value="${j.id}">${name}${employer}${inactive}</option>`;
+        const jobName = getJobDisplayName(j);
+        options += `<option value="${j.id}">${jobName}</option>`;
     });
 
     select.innerHTML = options;
     if (currentVal) select.value = currentVal;
+}
+
+// Generate job display name: fruta + recipiente + precio + ubicacion
+function getJobDisplayName(job) {
+    const parts = [];
+    if (job.product) parts.push(job.product);
+    if (job.unit && unitNames[job.unit]) parts.push(unitNames[job.unit]);
+    if (job.price) parts.push('$' + job.price);
+    if (job.employer) parts.push(job.employer);
+    return parts.length > 0 ? parts.join(' - ') : 'Sin configurar';
 }
 
 function onJobSelect() {
@@ -605,7 +642,7 @@ function openDayModal(dateStr, dayEntries) {
             return `
                 <div class="entry-card" onclick="closeDayModal(); openEntryModal('${e.id}')">
                     <div class="entry-info">
-                        <div class="entry-date">${job ? (job.name || job.product) : 'Trabajo eliminado'}</div>
+                        <div class="entry-date">${job ? getJobDisplayName(job) : 'Trabajo eliminado'}</div>
                         <div class="entry-details">${e.quantity ? e.quantity + ' unidades' : 'Jornada'} ${e.paid ? '• Pagado' : '• Pendiente'}</div>
                     </div>
                     <div class="entry-total">$${(e.total || 0).toFixed(2)}</div>
@@ -651,7 +688,7 @@ function renderEntries() {
         return `
             <div class="entry-card" onclick="openEntryModal('${e.id}')">
                 <div class="entry-info">
-                    <div class="entry-date">${date.getDate()} ${monthNames[date.getMonth()]} - ${job ? (job.name || job.product) : 'Trabajo eliminado'}</div>
+                    <div class="entry-date">${date.getDate()} ${monthNames[date.getMonth()]} - ${job ? job.product : 'Trabajo eliminado'}</div>
                     <div class="entry-details">${e.quantity ? e.quantity + ' unidades' : 'Jornada'} ${job?.employer ? '• ' + job.employer : ''}</div>
                 </div>
                 <div class="entry-amount">
