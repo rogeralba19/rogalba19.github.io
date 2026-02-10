@@ -312,16 +312,16 @@ body {
 }
 
 .calendar-day {
-    aspect-ratio: 1;
-    min-height: 55px;
+    min-height: 80px;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 8px;
-    padding: 5px;
+    padding: 8px;
     cursor: pointer;
     transition: all 0.3s;
     display: flex;
     flex-direction: column;
+    gap: 3px;
 }
 
 .calendar-day:hover {
@@ -397,13 +397,28 @@ body {
 }
 
 .day-number {
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.day-entries-count {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
 }
 
 .day-amount {
-    font-size: 10px;
+    font-size: 13px;
+    font-weight: 600;
     color: #00ff88;
+}
+
+.day-notes {
+    font-size: 10px;
+    color: #ffcc00;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     margin-top: auto;
 }
 
@@ -857,14 +872,22 @@ body {
     }
 
     .calendar-day {
-        min-height: 45px;
+        min-height: 65px;
     }
 
     .day-number {
-        font-size: 12px;
+        font-size: 14px;
     }
 
     .day-amount {
+        font-size: 11px;
+    }
+
+    .day-notes {
+        font-size: 9px;
+    }
+
+    .day-entries-count {
         font-size: 9px;
     }
 
@@ -901,14 +924,18 @@ body {
     }
 
     .calendar-day {
-        min-height: 38px;
+        min-height: 55px;
         border-radius: 4px;
-        padding: 3px;
+        padding: 4px;
     }
 
     .calendar-day-header {
         font-size: 9px;
         padding: 5px 2px;
+    }
+
+    .day-notes {
+        display: none;
     }
 
     .jobs-grid {

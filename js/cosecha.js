@@ -61,13 +61,10 @@ function loadData() {
             jobs.push({ id: child.key, ...child.val() });
         });
 
-        // Si no hay trabajos, crear los predeterminados para cada fruta
-        if (jobs.length === 0) {
-            initializeDefaultJobs();
-        } else {
-            renderJobs();
-            updateJobSelect();
-        }
+        // Verificar que todas las frutas existan, agregar las faltantes
+        checkAndAddMissingFruits();
+        renderJobs();
+        updateJobSelect();
     });
 
     // Load entries
@@ -117,12 +114,17 @@ function switchTab(tab) {
 // JOBS
 // ============================================
 
-// Crear trabajos predeterminados para cada fruta
-async function initializeDefaultJobs() {
+// Verificar y agregar frutas faltantes
+async function checkAndAddMissingFruits() {
     if (!currentUser) return;
 
+    const existingProducts = jobs.map(j => j.product);
+    const missingFruits = availableFruits.filter(f => !existingProducts.includes(f));
+
+    if (missingFruits.length === 0) return;
+
     const batch = {};
-    availableFruits.forEach((fruit, idx) => {
+    missingFruits.forEach((fruit, idx) => {
         const key = db.ref(`jobs/${currentUser.uid}`).push().key;
         batch[key] = {
             product: fruit,
@@ -138,7 +140,33 @@ async function initializeDefaultJobs() {
     try {
         await db.ref(`jobs/${currentUser.uid}`).update(batch);
     } catch (error) {
-        console.error('Error creando trabajos predeterminados:', error);
+        console.error('Error agregando frutas faltantes:', error);
+    }
+}
+
+// Agregar nueva fruta personalizada
+async function addCustomFruit(fruitName) {
+    if (!currentUser || !fruitName) return;
+
+    // Verificar que no exista
+    if (jobs.some(j => j.product.toLowerCase() === fruitName.toLowerCase())) {
+        showToast('Esta fruta ya existe', 'error');
+        return;
+    }
+
+    try {
+        await db.ref(`jobs/${currentUser.uid}`).push({
+            product: fruitName,
+            type: 'trato',
+            unit: 'totens',
+            price: 0,
+            employer: '',
+            active: true,
+            createdAt: Date.now()
+        });
+        showToast('Fruta agregada');
+    } catch (error) {
+        showToast('Error al agregar', 'error');
     }
 }
 
@@ -596,9 +624,15 @@ function renderCalendar() {
             day.classList.add(hasPending ? 'has-pending' : 'has-entries');
         }
 
+        // Obtener notas del dia
+        const dayNotes = dayEntries.filter(e => e.notes).map(e => e.notes).join(' | ');
+        const truncatedNotes = dayNotes.length > 30 ? dayNotes.substring(0, 30) + '...' : dayNotes;
+
         day.innerHTML = `
             <span class="day-number">${i}</span>
+            ${dayEntries.length > 0 ? `<span class="day-entries-count">${dayEntries.length} reg</span>` : ''}
             ${dayTotal > 0 ? `<span class="day-amount">$${dayTotal.toFixed(0)}</span>` : ''}
+            ${truncatedNotes ? `<span class="day-notes">${truncatedNotes}</span>` : ''}
         `;
 
         day.onclick = () => openDayModal(dateStr, dayEntries);
@@ -708,6 +742,28 @@ function showToast(message, type = 'success') {
     toast.textContent = message;
     toast.className = 'toast visible' + (type === 'error' ? ' error' : '');
     setTimeout(() => toast.classList.remove('visible'), 3000);
+}
+
+// ============================================
+// ADD FRUIT MODAL
+// ============================================
+function openAddFruitModal() {
+    document.getElementById('newFruitName').value = '';
+    document.getElementById('addFruitModal').classList.add('visible');
+}
+
+function closeAddFruitModal() {
+    document.getElementById('addFruitModal').classList.remove('visible');
+}
+
+async function saveNewFruit() {
+    const fruitName = document.getElementById('newFruitName').value.trim();
+    if (!fruitName) {
+        showToast('Ingresa un nombre', 'error');
+        return;
+    }
+    await addCustomFruit(fruitName);
+    closeAddFruitModal();
 }
 
 // ============================================
