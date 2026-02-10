@@ -11,7 +11,7 @@
         <h1><span>🍎</span> Registro de Cosecha</h1>
         <div class="header-actions">
             <a href="index.html" class="back-btn">← Volver</a>
-            <button class="action-btn" onclick="openJobModal()">+ Trabajo</button>
+            <button class="action-btn" onclick="openAddFruitModal()">+ Fruta</button>
             <button class="action-btn primary" onclick="openEntryModal()">+ Registro</button>
         </div>
     </header>
@@ -245,6 +245,26 @@
 
     <!-- Toast -->
     <div class="toast" id="toast"></div>
+
+    <!-- Add Fruit Modal -->
+    <div class="modal-overlay" id="addFruitModal">
+        <div class="modal" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2>Agregar Nueva Fruta</h2>
+                <button class="modal-close" onclick="closeAddFruitModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Nombre de la Fruta</label>
+                    <input type="text" id="newFruitName" placeholder="Ej: Durazno, Kiwi, etc.">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeAddFruitModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveNewFruit()">Agregar</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
