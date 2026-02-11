@@ -669,6 +669,49 @@ body {
     display: block;
 }
 
+/* Input with button */
+.input-with-btn {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.input-with-btn select {
+    flex: 1;
+}
+
+.btn-edit {
+    padding: 10px 15px;
+    background: rgba(255, 170, 0, 0.2);
+    border: 1px solid rgba(255, 170, 0, 0.4);
+    border-radius: 8px;
+    color: #ffaa00;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.btn-edit:hover {
+    background: rgba(255, 170, 0, 0.3);
+}
+
+/* Config Section */
+.config-section {
+    background: rgba(0, 170, 255, 0.1);
+    border: 1px solid rgba(0, 170, 255, 0.3);
+    border-radius: 12px;
+    padding: 15px;
+    margin: 15px 0;
+}
+
+.config-header {
+    font-size: 14px;
+    font-weight: 600;
+    color: #00aaff;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
 /* Toggle */
 .toggle-row {
     display: flex;

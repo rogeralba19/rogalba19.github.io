@@ -178,9 +178,52 @@
 
                 <div class="form-group">
                     <label>Trabajo</label>
-                    <select id="entryJob" onchange="onJobSelect()">
-                        <option value="">Seleccionar trabajo</option>
-                    </select>
+                    <div class="input-with-btn">
+                        <select id="entryJob" onchange="onJobSelect()">
+                            <option value="">Seleccionar trabajo</option>
+                        </select>
+                        <button type="button" class="btn-edit" id="editJobBtn" style="display: none;" onclick="toggleEntryEdit()">✏️ Editar</button>
+                    </div>
+                </div>
+
+                <!-- Campos de configuracion (si no esta configurado) -->
+                <div id="entryConfigFields" class="conditional-fields config-section">
+                    <div class="config-header">Configurar trabajo</div>
+                    <div class="form-group">
+                        <label>Tipo</label>
+                        <select id="entryConfigType" onchange="updateEntryConfigType()">
+                            <option value="trato">Al Trato</option>
+                            <option value="dia">Al Dia</option>
+                        </select>
+                    </div>
+                    <div id="entryConfigTratoFields">
+                        <div class="form-group">
+                            <label>Recipiente</label>
+                            <select id="entryConfigUnit">
+                                <option value="totens">Totens</option>
+                                <option value="capacho_grande">Capacho Grande</option>
+                                <option value="capacho_pequeno">Capacho Pequeño</option>
+                                <option value="kilo">Kilo</option>
+                                <option value="bandeja">Bandeja</option>
+                                <option value="bins">Bins</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Precio por unidad ($)</label>
+                            <input type="number" id="entryConfigPrice" placeholder="0.00" step="0.01">
+                        </div>
+                    </div>
+                    <div id="entryConfigDiaFields" style="display: none;">
+                        <div class="form-group">
+                            <label>Pago por dia ($)</label>
+                            <input type="number" id="entryConfigDailyRate" placeholder="0.00" step="0.01">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Ubicacion / Empleador</label>
+                        <input type="text" id="entryConfigEmployer" placeholder="Ej: Rancho Norte">
+                    </div>
+                    <button type="button" class="btn btn-primary" style="width: 100%;" onclick="saveEntryConfig()">Guardar Configuracion</button>
                 </div>
 
                 <div class="form-group">
@@ -188,10 +231,29 @@
                     <input type="date" id="entryDate">
                 </div>
 
-                <div id="entryTratoFields" class="conditional-fields visible">
+                <div id="entryTratoFields" class="conditional-fields">
                     <div class="form-group">
                         <label>Cantidad <span id="entryUnitLabel">(unidades)</span></label>
                         <input type="number" id="entryQuantity" placeholder="0" step="0.5" oninput="calculateEntryTotal()">
+                    </div>
+                </div>
+
+                <!-- Campo de personas para bins -->
+                <div id="entryBinsFields" class="conditional-fields">
+                    <div class="form-group">
+                        <label>Personas que trabajaron</label>
+                        <select id="entryPeople" onchange="calculateEntryTotal()">
+                            <option value="1">1 persona (solo yo)</option>
+                            <option value="2">2 personas</option>
+                            <option value="3">3 personas</option>
+                            <option value="4">4 personas</option>
+                            <option value="5">5 personas</option>
+                            <option value="6">6 personas</option>
+                            <option value="7">7 personas</option>
+                            <option value="8">8 personas</option>
+                            <option value="9">9 personas</option>
+                            <option value="10">10 personas</option>
+                        </select>
                     </div>
                 </div>
 
@@ -203,7 +265,7 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Total</label>
+                    <label>Total (tu ganancia)</label>
                     <div class="calculated-total" id="entryTotal">$0.00</div>
                 </div>
 

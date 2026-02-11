@@ -185,39 +185,20 @@ function renderJobs() {
     }
 
     grid.innerHTML = jobs.map(job => {
-        const jobEntries = entries.filter(e => e.jobId === job.id);
-        const totalEarned = jobEntries.reduce((sum, e) => sum + (e.total || 0), 0);
-        const totalUnits = jobEntries.reduce((sum, e) => sum + (e.quantity || 0), 0);
-        const daysWorked = new Set(jobEntries.map(e => e.date)).size;
         const displayName = getJobDisplayName(job);
-        const isConfigured = job.price > 0 || job.employer;
+        const isConfigured = job.price > 0 || job.dailyRate > 0;
 
         return `
-            <div class="job-card ${isConfigured ? 'active' : ''}" onclick="selectJobForQuickAdd('${job.id}')">
+            <div class="job-card ${isConfigured ? 'active' : ''}" onclick="editJob('${job.id}')">
                 <div class="job-header">
-                    <span class="job-title">${displayName}</span>
+                    <span class="job-title">${job.product}</span>
                     <span class="job-status ${!isConfigured ? 'inactive' : ''}">${isConfigured ? 'Configurado' : 'Sin configurar'}</span>
                 </div>
                 <div class="job-details">
                     <span>${job.type === 'dia' ? '📅 Al Dia' : '📦 Al Trato'}</span>
-                    ${job.employer ? `<span>📍 ${job.employer}</span>` : ''}
+                    ${job.employer ? `<span>📍 ${job.employer}</span>` : '<span>📍 Sin ubicacion</span>'}
                     <span>${job.type === 'dia' ? '$' + (job.dailyRate || 0) + '/dia' : '$' + (job.price || 0) + '/' + (unitNames[job.unit] || 'unidad')}</span>
                 </div>
-                <div class="job-stats">
-                    <div class="job-stat">
-                        <div class="job-stat-value">${daysWorked}</div>
-                        <div class="job-stat-label">Dias</div>
-                    </div>
-                    <div class="job-stat">
-                        <div class="job-stat-value">${Math.round(totalUnits)}</div>
-                        <div class="job-stat-label">Unidades</div>
-                    </div>
-                    <div class="job-stat">
-                        <div class="job-stat-value" style="color: #00ff88;">$${totalEarned.toFixed(0)}</div>
-                        <div class="job-stat-label">Total</div>
-                    </div>
-                </div>
-                <button class="icon-btn" style="position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; font-size: 12px;" onclick="event.stopPropagation(); editJob('${job.id}')">✏️</button>
             </div>
         `;
     }).join('');
@@ -391,6 +372,7 @@ function openEntryModal(entryId = null, preselectedJobId = null) {
     document.getElementById('entryQuantity').value = '';
     document.getElementById('entryHours').value = '';
     document.getElementById('entryNotes').value = '';
+    document.getElementById('entryPeople').value = '1';
     entryPaid = false;
     updateEntryPaidUI();
     document.getElementById('deleteEntryBtn').style.display = 'none';
@@ -406,6 +388,7 @@ function openEntryModal(entryId = null, preselectedJobId = null) {
             document.getElementById('entryQuantity').value = entry.quantity || '';
             document.getElementById('entryHours').value = entry.hours || '';
             document.getElementById('entryNotes').value = entry.notes || '';
+            document.getElementById('entryPeople').value = entry.people || '1';
             entryPaid = entry.paid || false;
             updateEntryPaidUI();
             document.getElementById('deleteEntryBtn').style.display = 'block';
@@ -452,7 +435,34 @@ function onJobSelect() {
     const jobId = document.getElementById('entryJob').value;
     const job = jobs.find(j => j.id === jobId);
 
-    if (job) {
+    const configFields = document.getElementById('entryConfigFields');
+    const editBtn = document.getElementById('editJobBtn');
+    const binsFields = document.getElementById('entryBinsFields');
+
+    // Ocultar todo primero
+    configFields.classList.remove('visible');
+    editBtn.style.display = 'none';
+    binsFields.classList.remove('visible');
+    document.getElementById('entryTratoFields').classList.remove('visible');
+    document.getElementById('entryDiaFields').classList.remove('visible');
+
+    if (!job) return;
+
+    const isConfigured = (job.type === 'dia' && job.dailyRate > 0) || (job.type === 'trato' && job.price > 0);
+
+    if (!isConfigured) {
+        // Mostrar campos de configuracion
+        configFields.classList.add('visible');
+        document.getElementById('entryConfigUnit').value = job.unit || 'totens';
+        document.getElementById('entryConfigPrice').value = job.price || '';
+        document.getElementById('entryConfigDailyRate').value = job.dailyRate || '';
+        document.getElementById('entryConfigEmployer').value = job.employer || '';
+        document.getElementById('entryConfigType').value = job.type || 'trato';
+        updateEntryConfigType();
+    } else {
+        // Mostrar boton de editar
+        editBtn.style.display = 'inline-block';
+
         const unitLabels = {
             'totens': 'totens',
             'capacho_grande': 'capachos grandes',
@@ -463,15 +473,70 @@ function onJobSelect() {
         };
 
         if (job.type === 'dia') {
-            document.getElementById('entryTratoFields').classList.remove('visible');
             document.getElementById('entryDiaFields').classList.add('visible');
             document.getElementById('entryTotal').textContent = '$' + (job.dailyRate || 0).toFixed(2);
         } else {
             document.getElementById('entryTratoFields').classList.add('visible');
-            document.getElementById('entryDiaFields').classList.remove('visible');
             document.getElementById('entryUnitLabel').textContent = `(${unitLabels[job.unit] || 'unidades'})`;
+
+            // Si es bins, mostrar selector de personas
+            if (job.unit === 'bins') {
+                binsFields.classList.add('visible');
+            }
+
             calculateEntryTotal();
         }
+    }
+}
+
+function updateEntryConfigType() {
+    const type = document.getElementById('entryConfigType').value;
+    document.getElementById('entryConfigTratoFields').style.display = type === 'trato' ? 'block' : 'none';
+    document.getElementById('entryConfigDiaFields').style.display = type === 'dia' ? 'block' : 'none';
+}
+
+function toggleEntryEdit() {
+    const configFields = document.getElementById('entryConfigFields');
+    const jobId = document.getElementById('entryJob').value;
+    const job = jobs.find(j => j.id === jobId);
+
+    if (!job) return;
+
+    configFields.classList.toggle('visible');
+    if (configFields.classList.contains('visible')) {
+        document.getElementById('entryConfigUnit').value = job.unit || 'totens';
+        document.getElementById('entryConfigPrice').value = job.price || '';
+        document.getElementById('entryConfigDailyRate').value = job.dailyRate || '';
+        document.getElementById('entryConfigEmployer').value = job.employer || '';
+        document.getElementById('entryConfigType').value = job.type || 'trato';
+        updateEntryConfigType();
+    }
+}
+
+async function saveEntryConfig() {
+    const jobId = document.getElementById('entryJob').value;
+    if (!jobId || !currentUser) return;
+
+    const type = document.getElementById('entryConfigType').value;
+    const data = {
+        type: type,
+        employer: document.getElementById('entryConfigEmployer').value,
+        updatedAt: Date.now()
+    };
+
+    if (type === 'trato') {
+        data.unit = document.getElementById('entryConfigUnit').value;
+        data.price = parseFloat(document.getElementById('entryConfigPrice').value) || 0;
+    } else {
+        data.dailyRate = parseFloat(document.getElementById('entryConfigDailyRate').value) || 0;
+    }
+
+    try {
+        await db.ref(`jobs/${currentUser.uid}/${jobId}`).update(data);
+        showToast('Configuracion guardada');
+        document.getElementById('entryConfigFields').classList.remove('visible');
+    } catch (error) {
+        showToast('Error al guardar', 'error');
     }
 }
 
@@ -486,6 +551,12 @@ function calculateEntryTotal() {
             total = job.dailyRate || 0;
         } else {
             total = quantity * (job.price || 0);
+
+            // Si es bins, dividir entre personas
+            if (job.unit === 'bins') {
+                const people = parseInt(document.getElementById('entryPeople').value) || 1;
+                total = total / people;
+            }
         }
     }
     document.getElementById('entryTotal').textContent = '$' + total.toFixed(2);
@@ -529,6 +600,13 @@ async function saveEntry() {
     } else {
         data.quantity = parseFloat(document.getElementById('entryQuantity').value) || 0;
         data.total = data.quantity * (job.price || 0);
+
+        // Si es bins, dividir entre personas
+        if (job.unit === 'bins') {
+            const people = parseInt(document.getElementById('entryPeople').value) || 1;
+            data.people = people;
+            data.total = data.total / people;
+        }
     }
 
     try {
