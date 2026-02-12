@@ -80,11 +80,13 @@ function loadData() {
     });
 }
 
-// Update statistics
+// Update statistics - usar el mes del calendario
 function updateStats() {
-    const now = new Date();
-    const month = now.getMonth();
-    const year = now.getFullYear();
+    const month = currentDate.getMonth();
+    const year = currentDate.getFullYear();
+
+    const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
     const monthEntries = entries.filter(e => {
         const d = new Date(e.date);
@@ -94,12 +96,37 @@ function updateStats() {
     const total = monthEntries.reduce((sum, e) => sum + (e.total || 0), 0);
     const pending = monthEntries.filter(e => !e.paid).reduce((sum, e) => sum + (e.total || 0), 0);
     const days = new Set(monthEntries.map(e => e.date)).size;
-    const units = monthEntries.reduce((sum, e) => sum + (e.quantity || 0), 0);
 
     document.getElementById('totalEarnings').textContent = '$' + total.toFixed(2);
     document.getElementById('pendingAmount').textContent = '$' + pending.toFixed(2);
     document.getElementById('totalDays').textContent = days;
-    document.getElementById('totalUnits').textContent = Math.round(units);
+    document.getElementById('totalLabel').textContent = monthNames[month];
+}
+
+// Mostrar total general por 10 segundos
+let totalGeneralTimeout = null;
+function toggleTotalGeneral() {
+    const totalEl = document.getElementById('totalEarnings');
+    const labelEl = document.getElementById('totalLabel');
+
+    // Calcular total general de todos los meses
+    const totalGeneral = entries.reduce((sum, e) => sum + (e.total || 0), 0);
+
+    // Mostrar total general
+    totalEl.textContent = '$' + totalGeneral.toFixed(2);
+    labelEl.textContent = 'TOTAL GENERAL';
+    totalEl.parentElement.classList.add('showing-general');
+
+    // Limpiar timeout anterior si existe
+    if (totalGeneralTimeout) {
+        clearTimeout(totalGeneralTimeout);
+    }
+
+    // Volver al mes actual despues de 10 segundos
+    totalGeneralTimeout = setTimeout(() => {
+        updateStats();
+        totalEl.parentElement.classList.remove('showing-general');
+    }, 10000);
 }
 
 // Tab switching
@@ -734,6 +761,7 @@ function renderCalendar() {
 function changeMonth(delta) {
     currentDate.setMonth(currentDate.getMonth() + delta);
     renderCalendar();
+    updateStats();
 }
 
 // ============================================
@@ -793,19 +821,21 @@ function renderEntries() {
     }
 
     const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const dayNames = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
 
     list.innerHTML = entries.slice(0, 50).map(e => {
         const job = jobs.find(j => j.id === e.jobId);
         const date = new Date(e.date + 'T12:00:00');
+        const dayName = dayNames[date.getDay()];
+        const dateStr = `${date.getDate()} ${monthNames[date.getMonth()]}`;
+        const fruta = job ? job.product : 'Sin trabajo';
+        const precio = '$' + (e.total || 0).toFixed(2);
+
         return `
             <div class="entry-card" onclick="openEntryModal('${e.id}')">
                 <div class="entry-info">
-                    <div class="entry-date">${date.getDate()} ${monthNames[date.getMonth()]} - ${job ? job.product : 'Trabajo eliminado'}</div>
-                    <div class="entry-details">${e.quantity ? e.quantity + ' unidades' : 'Jornada'} ${job?.employer ? '• ' + job.employer : ''}</div>
-                </div>
-                <div class="entry-amount">
-                    <div class="entry-total">$${(e.total || 0).toFixed(2)}</div>
-                    <span class="entry-status ${e.paid ? 'paid' : 'pending'}">${e.paid ? 'Pagado' : 'Pendiente'}</span>
+                    <div class="entry-date">${dayName} - ${dateStr} - ${fruta} - ${precio}</div>
+                    <div class="entry-details">${e.quantity ? e.quantity + ' unidades' : 'Jornada'} ${job?.employer ? '• ' + job.employer : ''} ${e.paid ? '• Pagado' : '• Pendiente'}</div>
                 </div>
             </div>
         `;
