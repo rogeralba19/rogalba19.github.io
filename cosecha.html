@@ -18,18 +18,18 @@
 
     <div class="container">
         <!-- Stats -->
-        <div class="stats-grid">
+        <div class="stats-grid" id="statsGrid">
             <div class="stat-card highlight clickable" onclick="toggleTotalGeneral()">
                 <div class="stat-value" id="totalEarnings">$0</div>
                 <div class="stat-label" id="totalLabel">Total Mes</div>
             </div>
-            <div class="stat-card pending">
+            <div class="stat-card pending clickable" onclick="toggleTotalGeneral()">
                 <div class="stat-value" id="pendingAmount">$0</div>
-                <div class="stat-label">Pendiente</div>
+                <div class="stat-label" id="pendingLabel">Pendiente</div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card clickable" onclick="toggleTotalGeneral()">
                 <div class="stat-value" id="totalDays">0</div>
-                <div class="stat-label">Dias</div>
+                <div class="stat-label" id="daysLabel">Dias</div>
             </div>
         </div>
 

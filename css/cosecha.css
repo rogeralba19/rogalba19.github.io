@@ -96,6 +96,8 @@ body {
     border-radius: 12px;
     padding: 15px;
     text-align: center;
+    position: relative;
+    overflow: hidden;
 }
 
 .stat-card.highlight {
@@ -113,19 +115,57 @@ body {
     border-color: rgba(0, 255, 136, 0.5);
 }
 
+/* Animacion de transicion a total general */
+.stat-card .stat-value,
+.stat-card .stat-label {
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.stat-card.animating .stat-value,
+.stat-card.animating .stat-label {
+    transform: scale(0) rotateX(90deg);
+    opacity: 0;
+}
+
 .stat-card.showing-general {
-    background: rgba(0, 170, 255, 0.15);
-    border-color: rgba(0, 170, 255, 0.5);
-    animation: pulse 1s infinite;
+    background: linear-gradient(135deg, rgba(0, 170, 255, 0.2), rgba(138, 43, 226, 0.15));
+    border-color: rgba(0, 170, 255, 0.6);
+    box-shadow: 0 0 20px rgba(0, 170, 255, 0.3), inset 0 0 30px rgba(0, 170, 255, 0.1);
+    animation: glowPulse 2s ease-in-out infinite;
+}
+
+.stat-card.showing-general::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    animation: shimmer 3s infinite;
 }
 
 .stat-card.showing-general .stat-value {
     color: #00aaff;
+    text-shadow: 0 0 10px rgba(0, 170, 255, 0.5);
 }
 
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
+.stat-card.showing-general .stat-label {
+    color: rgba(0, 170, 255, 0.8);
+}
+
+@keyframes glowPulse {
+    0%, 100% {
+        box-shadow: 0 0 20px rgba(0, 170, 255, 0.3), inset 0 0 30px rgba(0, 170, 255, 0.1);
+    }
+    50% {
+        box-shadow: 0 0 35px rgba(0, 170, 255, 0.5), inset 0 0 40px rgba(0, 170, 255, 0.15);
+    }
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%) rotate(45deg); }
+    100% { transform: translateX(100%) rotate(45deg); }
 }
 
 .stat-card.pending {
