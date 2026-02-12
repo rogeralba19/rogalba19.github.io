@@ -17,6 +17,9 @@ let jobType = 'trato';
 // Entry modal state
 let entryPaid = false;
 
+// Entries filter state
+let paymentFilter = 'all'; // 'all', 'pending', 'paid'
+
 // Unit names mapping
 const unitNames = {
     'totens': 'Totens',
@@ -809,37 +812,128 @@ function addEntryForDay() {
 function renderEntries() {
     const list = document.getElementById('entriesList');
 
-    if (entries.length === 0) {
+    // Actualizar filtro de frutas
+    updateFruitFilter();
+
+    // Aplicar filtros
+    const fruitFilter = document.getElementById('filterFruit')?.value || '';
+    let filteredEntries = entries.filter(e => {
+        const job = jobs.find(j => j.id === e.jobId);
+
+        // Filtro por fruta
+        if (fruitFilter && job?.product !== fruitFilter) return false;
+
+        // Filtro por pago
+        if (paymentFilter === 'pending' && e.paid) return false;
+        if (paymentFilter === 'paid' && !e.paid) return false;
+
+        return true;
+    });
+
+    if (filteredEntries.length === 0) {
         list.innerHTML = `
             <div class="empty-state">
                 <div class="icon">📋</div>
                 <h3>No hay registros</h3>
-                <p>Agrega tu primer registro de cosecha</p>
+                <p>${entries.length > 0 ? 'No hay registros con estos filtros' : 'Agrega tu primer registro de cosecha'}</p>
             </div>
         `;
         return;
     }
 
-    const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     const dayNames = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
 
-    list.innerHTML = entries.slice(0, 50).map(e => {
-        const job = jobs.find(j => j.id === e.jobId);
+    // Agrupar por mes
+    const groupedByMonth = {};
+    filteredEntries.forEach(e => {
         const date = new Date(e.date + 'T12:00:00');
-        const dayName = dayNames[date.getDay()];
-        const dateStr = `${date.getDate()} ${monthNames[date.getMonth()]}`;
-        const fruta = job ? job.product : 'Sin trabajo';
-        const precio = '$' + (e.total || 0).toFixed(2);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth()).padStart(2, '0')}`;
+        if (!groupedByMonth[monthKey]) {
+            groupedByMonth[monthKey] = {
+                year: date.getFullYear(),
+                month: date.getMonth(),
+                entries: [],
+                total: 0
+            };
+        }
+        groupedByMonth[monthKey].entries.push(e);
+        groupedByMonth[monthKey].total += (e.total || 0);
+    });
 
-        return `
-            <div class="entry-card" onclick="openEntryModal('${e.id}')">
-                <div class="entry-info">
-                    <div class="entry-date">${dayName} - ${dateStr} - ${fruta} - ${precio}</div>
-                    <div class="entry-details">${e.quantity ? e.quantity + ' unidades' : 'Jornada'} ${job?.employer ? '• ' + job.employer : ''} ${e.paid ? '• Pagado' : '• Pendiente'}</div>
-                </div>
+    // Ordenar meses de mas reciente a mas antiguo
+    const sortedMonths = Object.keys(groupedByMonth).sort().reverse();
+
+    let html = '';
+    sortedMonths.forEach(monthKey => {
+        const group = groupedByMonth[monthKey];
+        const monthLabel = `${monthNames[group.month]} ${group.year}`;
+
+        // Separador de mes
+        html += `
+            <div class="month-separator">
+                <span class="month-separator-title">${monthLabel}</span>
+                <span class="month-separator-line"></span>
+                <span class="month-separator-stats">${group.entries.length} registros - <span class="total">$${group.total.toFixed(2)}</span></span>
             </div>
         `;
-    }).join('');
+
+        // Entradas del mes
+        group.entries.forEach(e => {
+            const job = jobs.find(j => j.id === e.jobId);
+            const date = new Date(e.date + 'T12:00:00');
+            const dayName = dayNames[date.getDay()];
+            const dateStr = `${date.getDate()} ${monthNames[date.getMonth()].substring(0, 3)}`;
+            const fruta = job ? job.product : 'Sin trabajo';
+            const precio = '$' + (e.total || 0).toFixed(2);
+
+            html += `
+                <div class="entry-card" onclick="openEntryModal('${e.id}')">
+                    <div class="entry-info">
+                        <div class="entry-date">${dayName} - ${dateStr} - ${fruta} - ${precio}</div>
+                        <div class="entry-details">${e.quantity ? e.quantity + ' unidades' : 'Jornada'} ${job?.employer ? '• ' + job.employer : ''} ${e.paid ? '• Pagado' : '• Pendiente'}</div>
+                    </div>
+                </div>
+            `;
+        });
+    });
+
+    list.innerHTML = html;
+}
+
+// Actualizar filtro de frutas
+function updateFruitFilter() {
+    const select = document.getElementById('filterFruit');
+    if (!select) return;
+
+    const currentVal = select.value;
+
+    // Obtener frutas unicas de los registros
+    const fruitsInEntries = new Set();
+    entries.forEach(e => {
+        const job = jobs.find(j => j.id === e.jobId);
+        if (job?.product) fruitsInEntries.add(job.product);
+    });
+
+    let options = '<option value="">Todas las frutas</option>';
+    Array.from(fruitsInEntries).sort().forEach(fruit => {
+        options += `<option value="${fruit}">${fruit}</option>`;
+    });
+
+    select.innerHTML = options;
+    if (currentVal) select.value = currentVal;
+}
+
+// Cambiar filtro de pago
+function setPaymentFilter(filter) {
+    paymentFilter = filter;
+
+    // Actualizar UI de botones
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === filter);
+    });
+
+    renderEntries();
 }
 
 // ============================================
