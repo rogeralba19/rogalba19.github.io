@@ -108,28 +108,82 @@ function updateStats() {
 
 // Mostrar total general por 10 segundos
 let totalGeneralTimeout = null;
+let isShowingGeneral = false;
+
 function toggleTotalGeneral() {
+    const cards = document.querySelectorAll('.stat-card');
     const totalEl = document.getElementById('totalEarnings');
-    const labelEl = document.getElementById('totalLabel');
+    const pendingEl = document.getElementById('pendingAmount');
+    const daysEl = document.getElementById('totalDays');
+    const totalLabel = document.getElementById('totalLabel');
+    const pendingLabel = document.getElementById('pendingLabel');
+    const daysLabel = document.getElementById('daysLabel');
 
-    // Calcular total general de todos los meses
-    const totalGeneral = entries.reduce((sum, e) => sum + (e.total || 0), 0);
-
-    // Mostrar total general
-    totalEl.textContent = '$' + totalGeneral.toFixed(2);
-    labelEl.textContent = 'TOTAL GENERAL';
-    totalEl.parentElement.classList.add('showing-general');
-
-    // Limpiar timeout anterior si existe
+    // Limpiar timeout anterior
     if (totalGeneralTimeout) {
         clearTimeout(totalGeneralTimeout);
     }
 
+    // Calcular totales generales
+    const totalGeneral = entries.reduce((sum, e) => sum + (e.total || 0), 0);
+    const pendingGeneral = entries.filter(e => !e.paid).reduce((sum, e) => sum + (e.total || 0), 0);
+    const daysGeneral = new Set(entries.map(e => e.date)).size;
+
+    // Paso 1: Animar salida
+    cards.forEach(card => card.classList.add('animating'));
+
+    // Paso 2: Cambiar datos mientras estan ocultos
+    setTimeout(() => {
+        totalEl.textContent = '$' + totalGeneral.toFixed(2);
+        pendingEl.textContent = '$' + pendingGeneral.toFixed(2);
+        daysEl.textContent = daysGeneral;
+        totalLabel.textContent = 'TOTAL GENERAL';
+        pendingLabel.textContent = 'PEND. GENERAL';
+        daysLabel.textContent = 'DIAS TOTALES';
+
+        // Agregar clase showing-general
+        cards.forEach(card => card.classList.add('showing-general'));
+
+        // Paso 3: Animar entrada
+        setTimeout(() => {
+            cards.forEach(card => card.classList.remove('animating'));
+        }, 50);
+    }, 400);
+
+    isShowingGeneral = true;
+
     // Volver al mes actual despues de 10 segundos
     totalGeneralTimeout = setTimeout(() => {
-        updateStats();
-        totalEl.parentElement.classList.remove('showing-general');
+        restoreMonthStats();
     }, 10000);
+}
+
+function restoreMonthStats() {
+    if (!isShowingGeneral) return;
+
+    const cards = document.querySelectorAll('.stat-card');
+
+    // Animar salida
+    cards.forEach(card => card.classList.add('animating'));
+
+    setTimeout(() => {
+        // Restaurar datos del mes
+        updateStats();
+
+        // Restaurar labels
+        document.getElementById('pendingLabel').textContent = 'Pendiente';
+        document.getElementById('daysLabel').textContent = 'Dias';
+
+        // Quitar clase showing-general
+        cards.forEach(card => card.classList.remove('showing-general'));
+
+        // Animar entrada
+        setTimeout(() => {
+            cards.forEach(card => card.classList.remove('animating'));
+        }, 50);
+    }, 400);
+
+    isShowingGeneral = false;
 }
 
 // Tab switching
