@@ -19,9 +19,9 @@
     <div class="container">
         <!-- Stats -->
         <div class="stats-grid">
-            <div class="stat-card highlight">
+            <div class="stat-card highlight clickable" onclick="toggleTotalGeneral()">
                 <div class="stat-value" id="totalEarnings">$0</div>
-                <div class="stat-label">Total Mes</div>
+                <div class="stat-label" id="totalLabel">Total Mes</div>
             </div>
             <div class="stat-card pending">
                 <div class="stat-value" id="pendingAmount">$0</div>
@@ -30,10 +30,6 @@
             <div class="stat-card">
                 <div class="stat-value" id="totalDays">0</div>
                 <div class="stat-label">Dias</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="totalUnits">0</div>
-                <div class="stat-label">Unidades</div>
             </div>
         </div>
 
@@ -58,18 +54,13 @@
 
         <!-- Tabs -->
         <div class="tabs">
-            <button class="tab active" onclick="switchTab('trabajos')">Trabajos</button>
-            <button class="tab" onclick="switchTab('calendario')">Calendario</button>
+            <button class="tab active" onclick="switchTab('calendario')">Calendario</button>
             <button class="tab" onclick="switchTab('registros')">Registros</button>
-        </div>
-
-        <!-- Trabajos Section -->
-        <div class="section active" id="trabajosSection">
-            <div class="jobs-grid" id="jobsGrid"></div>
+            <button class="tab" onclick="switchTab('trabajos')">Trabajos</button>
         </div>
 
         <!-- Calendario Section -->
-        <div class="section" id="calendarioSection">
+        <div class="section active" id="calendarioSection">
             <div class="calendar-container">
                 <div class="calendar-header">
                     <div class="calendar-nav">
@@ -85,6 +76,11 @@
         <!-- Registros Section -->
         <div class="section" id="registrosSection">
             <div class="entries-list" id="entriesList"></div>
+        </div>
+
+        <!-- Trabajos Section -->
+        <div class="section" id="trabajosSection">
+            <div class="jobs-grid" id="jobsGrid"></div>
         </div>
     </div>
 
