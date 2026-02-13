@@ -193,6 +193,20 @@ function restoreMonthStats() {
 
 // Tab switching
 function switchTab(tab) {
+    // Limpiar selecciones al cambiar de pestaña
+    if (selectedDays.size > 0) {
+        selectedDays.clear();
+        selectionMode = false;
+        renderCalendar();
+    }
+    if (selectedEntries.size > 0) {
+        selectedEntries.clear();
+        selectionMode = false;
+        renderEntries();
+    }
+    updateStats();
+    updateSelectionUI();
+
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
@@ -1083,10 +1097,7 @@ function renderEntries() {
             const isSelected = selectedEntries.has(e.id);
 
             html += `
-                <div class="entry-card ${isSelected ? 'selected' : ''}" onclick="handleEntryClick(event, '${e.id}')">
-                    <div class="entry-checkbox ${isSelected ? 'checked' : ''}" onclick="event.stopPropagation(); toggleEntrySelection('${e.id}')">
-                        ${isSelected ? '✓' : ''}
-                    </div>
+                <div class="entry-card ${isSelected ? 'selected' : ''}" data-entry-id="${e.id}">
                     <div class="entry-info">
                         <div class="entry-date">${dayName} - ${dateStr} - ${fruta} - ${precio}</div>
                         <div class="entry-details">${e.quantity ? e.quantity + ' unidades' : 'Jornada'} ${job?.employer ? '• ' + job.employer : ''} ${e.paid ? '• Pagado' : '• Pendiente'}</div>
@@ -1097,14 +1108,34 @@ function renderEntries() {
     });
 
     list.innerHTML = html;
-}
 
-function handleEntryClick(event, entryId) {
-    if (event.ctrlKey || event.metaKey || selectionMode) {
-        toggleEntrySelection(entryId);
-    } else {
-        openEntryModal(entryId);
-    }
+    // Agregar eventos de long press a cada entry-card
+    list.querySelectorAll('.entry-card').forEach(card => {
+        const entryId = card.dataset.entryId;
+        let pressTimer;
+
+        // Click normal o con Ctrl/Cmd
+        card.onclick = (e) => {
+            if (e.ctrlKey || e.metaKey || selectionMode) {
+                toggleEntrySelection(entryId);
+            } else {
+                openEntryModal(entryId);
+            }
+        };
+
+        // Long press para activar modo seleccion
+        card.onmousedown = card.ontouchstart = (e) => {
+            pressTimer = setTimeout(() => {
+                selectionMode = true;
+                toggleEntrySelection(entryId);
+                showToast('Modo seleccion activado');
+            }, 500);
+        };
+
+        card.onmouseup = card.ontouchend = card.onmouseleave = () => {
+            clearTimeout(pressTimer);
+        };
+    });
 }
 
 function toggleEntrySelection(entryId) {
