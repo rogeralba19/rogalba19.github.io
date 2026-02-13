@@ -20,6 +20,11 @@ let entryPaid = false;
 // Entries filter state
 let paymentFilter = 'all'; // 'all', 'pending', 'paid'
 
+// Selection state
+let selectedDays = new Set(); // Dias seleccionados en calendario
+let selectedEntries = new Set(); // Registros seleccionados
+let selectionMode = false; // Modo seleccion activo
+
 // Unit names mapping
 const unitNames = {
     'totens': 'Totens',
@@ -268,7 +273,42 @@ function renderJobs() {
         return;
     }
 
-    grid.innerHTML = jobs.map(job => {
+    // Obtener ultimo uso de cada trabajo
+    const lastUsed = {};
+    entries.forEach(e => {
+        if (!lastUsed[e.jobId] || new Date(e.date) > new Date(lastUsed[e.jobId])) {
+            lastUsed[e.jobId] = e.date;
+        }
+    });
+
+    // Separar trabajos configurados y no configurados
+    const configured = [];
+    const unconfigured = [];
+
+    jobs.forEach(job => {
+        const isConfigured = job.price > 0 || job.dailyRate > 0;
+        if (isConfigured) {
+            configured.push({ ...job, lastUsed: lastUsed[job.id] || null });
+        } else {
+            unconfigured.push(job);
+        }
+    });
+
+    // Ordenar no configurados alfabeticamente
+    unconfigured.sort((a, b) => (a.product || '').localeCompare(b.product || ''));
+
+    // Ordenar configurados por ultimo uso (mas reciente primero)
+    configured.sort((a, b) => {
+        if (!a.lastUsed && !b.lastUsed) return 0;
+        if (!a.lastUsed) return 1;
+        if (!b.lastUsed) return -1;
+        return new Date(b.lastUsed) - new Date(a.lastUsed);
+    });
+
+    // Combinar: primero usados, luego no configurados
+    const sortedJobs = [...configured, ...unconfigured];
+
+    grid.innerHTML = sortedJobs.map(job => {
         const displayName = getJobDisplayName(job);
         const isConfigured = job.price > 0 || job.dailyRate > 0;
 
@@ -786,6 +826,11 @@ function renderCalendar() {
             day.classList.add(hasPending ? 'has-pending' : 'has-entries');
         }
 
+        // Marcar si esta seleccionado
+        if (selectedDays.has(dateStr)) {
+            day.classList.add('selected');
+        }
+
         // Obtener notas del dia
         const dayNotes = dayEntries.filter(e => e.notes).map(e => e.notes).join(' | ');
         const truncatedNotes = dayNotes.length > 30 ? dayNotes.substring(0, 30) + '...' : dayNotes;
@@ -797,7 +842,28 @@ function renderCalendar() {
             ${truncatedNotes ? `<span class="day-notes">${truncatedNotes}</span>` : ''}
         `;
 
-        day.onclick = () => openDayModal(dateStr, dayEntries);
+        // Click normal abre modal, con Ctrl/Cmd selecciona
+        day.onclick = (e) => {
+            if (e.ctrlKey || e.metaKey || selectionMode) {
+                toggleDaySelection(dateStr);
+            } else {
+                openDayModal(dateStr, dayEntries);
+            }
+        };
+
+        // Long press para activar modo seleccion
+        let pressTimer;
+        day.onmousedown = day.ontouchstart = () => {
+            pressTimer = setTimeout(() => {
+                selectionMode = true;
+                toggleDaySelection(dateStr);
+                showToast('Modo seleccion activado');
+            }, 500);
+        };
+        day.onmouseup = day.ontouchend = day.onmouseleave = () => {
+            clearTimeout(pressTimer);
+        };
+
         grid.appendChild(day);
     }
 
@@ -813,12 +879,86 @@ function renderCalendar() {
         day.innerHTML = `<span class="day-number">${i}</span>`;
         grid.appendChild(day);
     }
+
+    // Mostrar boton para limpiar seleccion si hay dias seleccionados
+    updateSelectionUI();
+}
+
+function toggleDaySelection(dateStr) {
+    if (selectedDays.has(dateStr)) {
+        selectedDays.delete(dateStr);
+    } else {
+        selectedDays.add(dateStr);
+    }
+    renderCalendar();
+    updateSelectionStats();
+}
+
+function clearDaySelection() {
+    selectedDays.clear();
+    selectionMode = false;
+    renderCalendar();
+    updateStats();
+    updateSelectionUI();
+}
+
+function updateSelectionStats() {
+    if (selectedDays.size === 0) {
+        updateStats();
+        return;
+    }
+
+    // Calcular stats de dias seleccionados
+    const selectedEntries = entries.filter(e => selectedDays.has(e.date));
+    const total = selectedEntries.reduce((sum, e) => sum + (e.total || 0), 0);
+    const pending = selectedEntries.filter(e => !e.paid).reduce((sum, e) => sum + (e.total || 0), 0);
+    const days = selectedDays.size;
+
+    document.getElementById('totalEarnings').textContent = '$' + total.toFixed(2);
+    document.getElementById('pendingAmount').textContent = '$' + pending.toFixed(2);
+    document.getElementById('totalDays').textContent = days;
+    document.getElementById('totalLabel').textContent = 'Seleccion';
+    document.getElementById('pendingLabel').textContent = 'Pendiente';
+    document.getElementById('daysLabel').textContent = 'Dias';
+
+    // Agregar clase visual
+    document.querySelectorAll('.stat-card').forEach(card => {
+        card.classList.add('showing-selection');
+    });
+}
+
+function updateSelectionUI() {
+    let clearBtn = document.getElementById('clearSelectionBtn');
+
+    if (selectedDays.size > 0 || selectedEntries.size > 0) {
+        if (!clearBtn) {
+            clearBtn = document.createElement('button');
+            clearBtn.id = 'clearSelectionBtn';
+            clearBtn.className = 'clear-selection-btn';
+            clearBtn.innerHTML = '✕ Limpiar seleccion';
+            clearBtn.onclick = () => {
+                clearDaySelection();
+                clearEntrySelection();
+            };
+            document.querySelector('.stats-grid').after(clearBtn);
+        }
+        clearBtn.style.display = 'block';
+    } else {
+        if (clearBtn) clearBtn.style.display = 'none';
+        document.querySelectorAll('.stat-card').forEach(card => {
+            card.classList.remove('showing-selection');
+        });
+    }
 }
 
 function changeMonth(delta) {
     currentDate.setMonth(currentDate.getMonth() + delta);
     renderCalendar();
-    updateStats();
+    if (selectedDays.size > 0) {
+        updateSelectionStats();
+    } else {
+        updateStats();
+    }
 }
 
 // ============================================
@@ -940,9 +1080,13 @@ function renderEntries() {
             const dateStr = `${date.getDate()} ${monthNames[date.getMonth()].substring(0, 3)}`;
             const fruta = job ? job.product : 'Sin trabajo';
             const precio = '$' + (e.total || 0).toFixed(2);
+            const isSelected = selectedEntries.has(e.id);
 
             html += `
-                <div class="entry-card" onclick="openEntryModal('${e.id}')">
+                <div class="entry-card ${isSelected ? 'selected' : ''}" onclick="handleEntryClick(event, '${e.id}')">
+                    <div class="entry-checkbox ${isSelected ? 'checked' : ''}" onclick="event.stopPropagation(); toggleEntrySelection('${e.id}')">
+                        ${isSelected ? '✓' : ''}
+                    </div>
                     <div class="entry-info">
                         <div class="entry-date">${dayName} - ${dateStr} - ${fruta} - ${precio}</div>
                         <div class="entry-details">${e.quantity ? e.quantity + ' unidades' : 'Jornada'} ${job?.employer ? '• ' + job.employer : ''} ${e.paid ? '• Pagado' : '• Pendiente'}</div>
@@ -953,6 +1097,60 @@ function renderEntries() {
     });
 
     list.innerHTML = html;
+}
+
+function handleEntryClick(event, entryId) {
+    if (event.ctrlKey || event.metaKey || selectionMode) {
+        toggleEntrySelection(entryId);
+    } else {
+        openEntryModal(entryId);
+    }
+}
+
+function toggleEntrySelection(entryId) {
+    if (selectedEntries.has(entryId)) {
+        selectedEntries.delete(entryId);
+    } else {
+        selectedEntries.add(entryId);
+    }
+    renderEntries();
+    updateEntrySelectionStats();
+}
+
+function clearEntrySelection() {
+    selectedEntries.clear();
+    selectionMode = false;
+    renderEntries();
+    updateStats();
+    updateSelectionUI();
+}
+
+function updateEntrySelectionStats() {
+    if (selectedEntries.size === 0) {
+        updateStats();
+        updateSelectionUI();
+        return;
+    }
+
+    // Calcular stats de registros seleccionados
+    const selected = entries.filter(e => selectedEntries.has(e.id));
+    const total = selected.reduce((sum, e) => sum + (e.total || 0), 0);
+    const pending = selected.filter(e => !e.paid).reduce((sum, e) => sum + (e.total || 0), 0);
+    const days = new Set(selected.map(e => e.date)).size;
+
+    document.getElementById('totalEarnings').textContent = '$' + total.toFixed(2);
+    document.getElementById('pendingAmount').textContent = '$' + pending.toFixed(2);
+    document.getElementById('totalDays').textContent = days;
+    document.getElementById('totalLabel').textContent = 'Seleccion';
+    document.getElementById('pendingLabel').textContent = 'Pendiente';
+    document.getElementById('daysLabel').textContent = 'Dias';
+
+    // Agregar clase visual
+    document.querySelectorAll('.stat-card').forEach(card => {
+        card.classList.add('showing-selection');
+    });
+
+    updateSelectionUI();
 }
 
 // Actualizar filtro de frutas
