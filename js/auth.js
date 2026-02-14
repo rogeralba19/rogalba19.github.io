@@ -89,50 +89,41 @@ function showAuthSuccess(message) {
     if (errorEl) errorEl.classList.remove('visible');
 }
 
-// Google Sign-In
-async function loginWithGoogle() {
-    try {
-        const provider = new firebase.auth.GoogleAuthProvider();
-        provider.setCustomParameters({ prompt: 'select_account' });
-
-        const result = await auth.signInWithPopup(provider);
-        const user = result.user;
-
-        // Save/update user in database
-        const userRef = db.ref('users/' + user.uid);
-        const snapshot = await userRef.once('value');
-
-        if (!snapshot.exists()) {
-            await userRef.set({
-                email: user.email,
-                displayName: user.displayName || '',
-                photoURL: user.photoURL || '',
-                createdAt: Date.now(),
-                role: 'user',
-                provider: 'google'
-            });
-        } else {
-            await userRef.update({
-                lastLogin: Date.now(),
-                displayName: user.displayName || '',
-                photoURL: user.photoURL || ''
-            });
-        }
-
-        showAuthSuccess('Sesion iniciada con Google');
-        setTimeout(() => closeAuthModal(), 1000);
-    } catch (error) {
-        if (error.code === 'auth/cancelled-popup-request') return;
-
-        let message = 'Error al iniciar sesion con Google';
-        if (error.code === 'auth/popup-closed-by-user') {
-            message = 'Inicio de sesion cancelado';
-        } else if (error.code === 'auth/popup-blocked') {
-            message = 'Popup bloqueado. Permite popups para este sitio';
-        }
-        showAuthError(message);
-    }
+// Google Sign-In (usando redirect en lugar de popup)
+function loginWithGoogle() {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    auth.signInWithRedirect(provider);
 }
+
+// Manejar resultado del redirect de Google
+auth.getRedirectResult().then((result) => {
+    if (result.user) {
+        const user = result.user;
+        const userRef = db.ref('users/' + user.uid);
+
+        userRef.once('value').then((snapshot) => {
+            if (!snapshot.exists()) {
+                userRef.set({
+                    email: user.email,
+                    displayName: user.displayName || '',
+                    photoURL: user.photoURL || '',
+                    createdAt: Date.now(),
+                    role: 'user',
+                    provider: 'google'
+                });
+            } else {
+                userRef.update({
+                    lastLogin: Date.now(),
+                    displayName: user.displayName || '',
+                    photoURL: user.photoURL || ''
+                });
+            }
+        });
+    }
+}).catch((error) => {
+    console.error('Error en redirect:', error);
+});
 
 // Email/Password Login
 async function handleLogin(event) {
