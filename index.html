@@ -1780,54 +1780,43 @@
         auth.signOut();
     }
 
-    // Google Sign-In Handler
-    async function loginWithGoogle() {
-        try {
-            const provider = new firebase.auth.GoogleAuthProvider();
-            provider.setCustomParameters({
-                prompt: 'select_account'
-            });
-
-            const result = await auth.signInWithPopup(provider);
-            const user = result.user;
-
-            // Save/update user in database
-            const userRef = db.ref('users/' + user.uid);
-            const snapshot = await userRef.once('value');
-
-            if (!snapshot.exists()) {
-                // New user
-                await userRef.set({
-                    email: user.email,
-                    displayName: user.displayName || '',
-                    photoURL: user.photoURL || '',
-                    createdAt: Date.now(),
-                    role: 'user',
-                    provider: 'google'
-                });
-            } else {
-                // Existing user - update last login
-                await userRef.update({
-                    lastLogin: Date.now(),
-                    displayName: user.displayName || '',
-                    photoURL: user.photoURL || ''
-                });
-            }
-
-            showAuthSuccess('Sesion iniciada con Google');
-            setTimeout(() => closeAuthModal(), 1000);
-        } catch (error) {
-            let message = 'Error al iniciar sesion con Google';
-            if (error.code === 'auth/popup-closed-by-user') {
-                message = 'Inicio de sesion cancelado';
-            } else if (error.code === 'auth/popup-blocked') {
-                message = 'Popup bloqueado. Permite popups para este sitio';
-            } else if (error.code === 'auth/cancelled-popup-request') {
-                return; // Ignore this error
-            }
-            showAuthError(message);
-        }
+    // Google Sign-In Handler (usando redirect)
+    function loginWithGoogle() {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        provider.setCustomParameters({
+            prompt: 'select_account'
+        });
+        auth.signInWithRedirect(provider);
     }
+
+    // Manejar resultado del redirect de Google
+    auth.getRedirectResult().then((result) => {
+        if (result.user) {
+            const user = result.user;
+            const userRef = db.ref('users/' + user.uid);
+
+            userRef.once('value').then((snapshot) => {
+                if (!snapshot.exists()) {
+                    userRef.set({
+                        email: user.email,
+                        displayName: user.displayName || '',
+                        photoURL: user.photoURL || '',
+                        createdAt: Date.now(),
+                        role: 'user',
+                        provider: 'google'
+                    });
+                } else {
+                    userRef.update({
+                        lastLogin: Date.now(),
+                        displayName: user.displayName || '',
+                        photoURL: user.photoURL || ''
+                    });
+                }
+            });
+        }
+    }).catch((error) => {
+        console.error('Error en redirect:', error);
+    });
     </script>
 
     <script>
