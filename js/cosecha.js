@@ -52,9 +52,19 @@ const availableFruits = [
 auth.onAuthStateChanged((user) => {
     if (user) {
         currentUser = user;
+        // Cerrar modal de auth si estaba abierto
+        const authOverlay = document.getElementById('authModalOverlay');
+        if (authOverlay) authOverlay.classList.remove('visible');
+        // Mostrar contenido de la app
+        document.querySelector('.header').style.display = '';
+        document.querySelector('.container').style.display = '';
         loadData();
     } else {
-        window.location.href = 'index.html';
+        // Ocultar contenido y mostrar formulario de registro/login
+        document.querySelector('.header').style.display = 'none';
+        document.querySelector('.container').style.display = 'none';
+        const authOverlay = document.getElementById('authModalOverlay');
+        if (authOverlay) authOverlay.classList.add('visible');
     }
 });
 
@@ -982,7 +992,6 @@ function updateSelectionUI() {
             actionsContainer.className = 'selection-actions';
             actionsContainer.innerHTML = `
                 <button class="selection-btn clear" onclick="clearDaySelection()">✕ Limpiar</button>
-                <button class="selection-btn pending" onclick="markSelectionAs(false)">Marcar Pendiente</button>
                 <button class="selection-btn paid" onclick="confirmMarkAsPaid()">Marcar Pagado</button>
             `;
             document.querySelector('.stats-grid').after(actionsContainer);
@@ -1286,11 +1295,25 @@ function toggleEntrySelection(entryId) {
         selectedDays.clear();
         selectionMode = false;
         renderCalendar();
+    } else {
+        // Sincronizar registros seleccionados hacia el calendario
+        syncSelectionToDays();
     }
 
     renderEntries();
     updateSelectionStats();
     updateSelectionUI();
+}
+
+// Sincronizar seleccion de registros a dias del calendario
+function syncSelectionToDays() {
+    selectedDays.clear();
+    entries.forEach(e => {
+        if (selectedEntries.has(e.id)) {
+            selectedDays.add(e.date);
+        }
+    });
+    renderCalendar();
 }
 
 function clearEntrySelection() {
