@@ -477,7 +477,7 @@ async function deleteJob() {
     const id = document.getElementById('jobId').value;
     if (!id || !currentUser) return;
 
-    if (confirm('¿Eliminar este trabajo? Los registros asociados no se eliminaran.')) {
+    showConfirmModal('Eliminar trabajo', '¿Eliminar este trabajo? Los registros asociados no se eliminaran.', 'Eliminar', async () => {
         try {
             await db.ref(`jobs/${currentUser.uid}/${id}`).remove();
             showToast('Trabajo eliminado');
@@ -485,7 +485,7 @@ async function deleteJob() {
         } catch (error) {
             showToast('Error al eliminar', 'error');
         }
-    }
+    });
 }
 
 // ============================================
@@ -588,6 +588,14 @@ function onJobSelect() {
         document.getElementById('entryConfigEmployer').value = job.employer || '';
         document.getElementById('entryConfigType').value = job.type || 'trato';
         updateEntryConfigType();
+
+        // Mostrar campo de cantidad tambien para que pueda llenar todo junto
+        const configType = document.getElementById('entryConfigType').value;
+        if (configType === 'trato') {
+            document.getElementById('entryTratoFields').classList.add('visible');
+        } else {
+            document.getElementById('entryDiaFields').classList.add('visible');
+        }
     } else {
         // Mostrar boton de editar
         editBtn.style.display = 'inline-block';
@@ -622,6 +630,13 @@ function updateEntryConfigType() {
     const type = document.getElementById('entryConfigType').value;
     document.getElementById('entryConfigTratoFields').style.display = type === 'trato' ? 'block' : 'none';
     document.getElementById('entryConfigDiaFields').style.display = type === 'dia' ? 'block' : 'none';
+
+    // Tambien actualizar campos de cantidad/horas si config esta visible
+    const configFields = document.getElementById('entryConfigFields');
+    if (configFields.classList.contains('visible')) {
+        document.getElementById('entryTratoFields').classList.toggle('visible', type === 'trato');
+        document.getElementById('entryDiaFields').classList.toggle('visible', type === 'dia');
+    }
 }
 
 function toggleEntryEdit() {
@@ -756,7 +771,7 @@ async function deleteEntry() {
     const id = document.getElementById('entryId').value;
     if (!id || !currentUser) return;
 
-    if (confirm('¿Eliminar este registro?')) {
+    showConfirmModal('Eliminar registro', '¿Eliminar este registro?', 'Eliminar', async () => {
         try {
             await db.ref(`harvest/${currentUser.uid}/${id}`).remove();
             showToast('Registro eliminado');
@@ -764,7 +779,7 @@ async function deleteEntry() {
         } catch (error) {
             showToast('Error al eliminar', 'error');
         }
-    }
+    });
 }
 
 // ============================================
@@ -981,6 +996,27 @@ function updateSelectionUI() {
     }
 }
 
+// ============================================
+// CONFIRM MODAL (in-page)
+// ============================================
+let confirmCallback = null;
+
+function showConfirmModal(title, messageHtml, confirmLabel, callback) {
+    document.getElementById('confirmModalTitle').textContent = title;
+    document.getElementById('confirmModalMessage').innerHTML = messageHtml;
+    document.getElementById('confirmModalBtn').textContent = confirmLabel || 'Confirmar';
+    confirmCallback = callback;
+    document.getElementById('confirmModal').classList.add('visible');
+}
+
+function closeConfirmModal(accepted) {
+    document.getElementById('confirmModal').classList.remove('visible');
+    if (accepted && confirmCallback) {
+        confirmCallback();
+    }
+    confirmCallback = null;
+}
+
 // Mostrar confirmacion antes de marcar como pagado
 function confirmMarkAsPaid() {
     // Obtener registros seleccionados
@@ -1010,16 +1046,23 @@ function confirmMarkAsPaid() {
         byFruit[fruit].total += (e.total || 0);
     });
 
-    let summary = '';
+    let fruitLines = '';
     Object.keys(byFruit).forEach(fruit => {
-        summary += `${fruit}: ${byFruit[fruit].count} reg - $${byFruit[fruit].total.toFixed(2)}\n`;
+        fruitLines += `<div class="confirm-fruit-line"><span>${fruit}: ${byFruit[fruit].count} reg</span><span>$${byFruit[fruit].total.toFixed(2)}</span></div>`;
     });
 
-    const message = `¿Marcar como PAGADO?\n\n${summary}\nTotal: $${total.toFixed(2)}\nDias: ${days}\nRegistros: ${pendingOnly.length}`;
+    const messageHtml = `
+        <div class="confirm-summary">${fruitLines}</div>
+        <div class="confirm-totals">Total: $${total.toFixed(2)}</div>
+        <div class="confirm-stats">
+            <span>Dias: ${days}</span>
+            <span>Registros: ${pendingOnly.length}</span>
+        </div>
+    `;
 
-    if (confirm(message)) {
+    showConfirmModal('Marcar como PAGADO', messageHtml, 'Marcar Pagado', () => {
         markSelectionAs(true);
-    }
+    });
 }
 
 // Marcar registros seleccionados como pagado o pendiente
@@ -1121,6 +1164,15 @@ function renderEntries() {
 
         return true;
     });
+
+    // Si hay seleccion activa, mover seleccionados arriba ordenados cronologicamente
+    if (selectionMode && selectedEntries.size > 0) {
+        const selectedList = filteredEntries.filter(e => selectedEntries.has(e.id));
+        const unselectedList = filteredEntries.filter(e => !selectedEntries.has(e.id));
+        // Ordenar seleccionados cronologicamente (mas reciente primero)
+        selectedList.sort((a, b) => new Date(b.date) - new Date(a.date));
+        filteredEntries = [...selectedList, ...unselectedList];
+    }
 
     if (filteredEntries.length === 0) {
         list.innerHTML = `
@@ -1229,9 +1281,11 @@ function toggleEntrySelection(entryId) {
         selectedEntries.add(entryId);
     }
 
-    // Si no queda ninguna seleccion, desactivar modo seleccion
-    if (selectedEntries.size === 0 && selectedDays.size === 0) {
+    // Si no queda ninguna seleccion, desactivar modo seleccion y limpiar dias
+    if (selectedEntries.size === 0) {
+        selectedDays.clear();
         selectionMode = false;
+        renderCalendar();
     }
 
     renderEntries();
