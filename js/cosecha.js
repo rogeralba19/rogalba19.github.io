@@ -191,26 +191,17 @@ function restoreMonthStats() {
     isShowingGeneral = false;
 }
 
-// Tab switching
+// Tab switching - mantener seleccion al cambiar de pestaña
 function switchTab(tab) {
-    // Limpiar selecciones al cambiar de pestaña
-    if (selectedDays.size > 0) {
-        selectedDays.clear();
-        selectionMode = false;
-        renderCalendar();
-    }
-    if (selectedEntries.size > 0) {
-        selectedEntries.clear();
-        selectionMode = false;
-        renderEntries();
-    }
-    updateStats();
-    updateSelectionUI();
-
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
     document.getElementById(tab + 'Section').classList.add('active');
+
+    // Si hay dias seleccionados y vamos a registros, sincronizar
+    if (tab === 'registros' && selectedDays.size > 0) {
+        syncSelectionToEntries();
+    }
 }
 
 // ============================================
@@ -904,29 +895,54 @@ function toggleDaySelection(dateStr) {
     } else {
         selectedDays.add(dateStr);
     }
+
+    // Si no queda ninguna seleccion, desactivar modo seleccion
+    if (selectedDays.size === 0) {
+        selectionMode = false;
+    }
+
     renderCalendar();
     updateSelectionStats();
+    updateSelectionUI();
 }
 
 function clearDaySelection() {
     selectedDays.clear();
+    selectedEntries.clear();
     selectionMode = false;
     renderCalendar();
     updateStats();
     updateSelectionUI();
 }
 
+// Sincronizar seleccion de dias a registros
+function syncSelectionToEntries() {
+    selectedEntries.clear();
+    entries.forEach(e => {
+        if (selectedDays.has(e.date)) {
+            selectedEntries.add(e.id);
+        }
+    });
+    renderEntries();
+}
+
 function updateSelectionStats() {
-    if (selectedDays.size === 0) {
+    if (selectedDays.size === 0 && selectedEntries.size === 0) {
         updateStats();
         return;
     }
 
-    // Calcular stats de dias seleccionados
-    const selectedEntries = entries.filter(e => selectedDays.has(e.date));
-    const total = selectedEntries.reduce((sum, e) => sum + (e.total || 0), 0);
-    const pending = selectedEntries.filter(e => !e.paid).reduce((sum, e) => sum + (e.total || 0), 0);
-    const days = selectedDays.size;
+    // Obtener registros seleccionados (por dias o directamente)
+    let selected;
+    if (selectedDays.size > 0) {
+        selected = entries.filter(e => selectedDays.has(e.date));
+    } else {
+        selected = entries.filter(e => selectedEntries.has(e.id));
+    }
+
+    const total = selected.reduce((sum, e) => sum + (e.total || 0), 0);
+    const pending = selected.filter(e => !e.paid).reduce((sum, e) => sum + (e.total || 0), 0);
+    const days = new Set(selected.map(e => e.date)).size;
 
     document.getElementById('totalEarnings').textContent = '$' + total.toFixed(2);
     document.getElementById('pendingAmount').textContent = '$' + pending.toFixed(2);
@@ -942,26 +958,94 @@ function updateSelectionStats() {
 }
 
 function updateSelectionUI() {
-    let clearBtn = document.getElementById('clearSelectionBtn');
+    let actionsContainer = document.getElementById('selectionActions');
 
     if (selectedDays.size > 0 || selectedEntries.size > 0) {
-        if (!clearBtn) {
-            clearBtn = document.createElement('button');
-            clearBtn.id = 'clearSelectionBtn';
-            clearBtn.className = 'clear-selection-btn';
-            clearBtn.innerHTML = '✕ Limpiar seleccion';
-            clearBtn.onclick = () => {
-                clearDaySelection();
-                clearEntrySelection();
-            };
-            document.querySelector('.stats-grid').after(clearBtn);
+        if (!actionsContainer) {
+            actionsContainer = document.createElement('div');
+            actionsContainer.id = 'selectionActions';
+            actionsContainer.className = 'selection-actions';
+            actionsContainer.innerHTML = `
+                <button class="selection-btn clear" onclick="clearDaySelection()">✕ Limpiar</button>
+                <button class="selection-btn pending" onclick="markSelectionAs(false)">Marcar Pendiente</button>
+                <button class="selection-btn paid" onclick="confirmMarkAsPaid()">Marcar Pagado</button>
+            `;
+            document.querySelector('.stats-grid').after(actionsContainer);
         }
-        clearBtn.style.display = 'block';
+        actionsContainer.style.display = 'flex';
     } else {
-        if (clearBtn) clearBtn.style.display = 'none';
+        if (actionsContainer) actionsContainer.style.display = 'none';
         document.querySelectorAll('.stat-card').forEach(card => {
             card.classList.remove('showing-selection');
         });
+    }
+}
+
+// Mostrar confirmacion antes de marcar como pagado
+function confirmMarkAsPaid() {
+    // Obtener registros seleccionados
+    let selected;
+    if (selectedDays.size > 0) {
+        selected = entries.filter(e => selectedDays.has(e.date));
+    } else {
+        selected = entries.filter(e => selectedEntries.has(e.id));
+    }
+
+    const pendingOnly = selected.filter(e => !e.paid);
+    if (pendingOnly.length === 0) {
+        showToast('No hay registros pendientes en la seleccion', 'error');
+        return;
+    }
+
+    const total = pendingOnly.reduce((sum, e) => sum + (e.total || 0), 0);
+    const days = new Set(pendingOnly.map(e => e.date)).size;
+
+    // Agrupar por fruta
+    const byFruit = {};
+    pendingOnly.forEach(e => {
+        const job = jobs.find(j => j.id === e.jobId);
+        const fruit = job?.product || 'Sin trabajo';
+        if (!byFruit[fruit]) byFruit[fruit] = { count: 0, total: 0 };
+        byFruit[fruit].count++;
+        byFruit[fruit].total += (e.total || 0);
+    });
+
+    let summary = '';
+    Object.keys(byFruit).forEach(fruit => {
+        summary += `${fruit}: ${byFruit[fruit].count} reg - $${byFruit[fruit].total.toFixed(2)}\n`;
+    });
+
+    const message = `¿Marcar como PAGADO?\n\n${summary}\nTotal: $${total.toFixed(2)}\nDias: ${days}\nRegistros: ${pendingOnly.length}`;
+
+    if (confirm(message)) {
+        markSelectionAs(true);
+    }
+}
+
+// Marcar registros seleccionados como pagado o pendiente
+async function markSelectionAs(paid) {
+    if (!currentUser) return;
+
+    let selected;
+    if (selectedDays.size > 0) {
+        selected = entries.filter(e => selectedDays.has(e.date));
+    } else {
+        selected = entries.filter(e => selectedEntries.has(e.id));
+    }
+
+    if (selected.length === 0) return;
+
+    try {
+        const updates = {};
+        selected.forEach(e => {
+            updates[`harvest/${currentUser.uid}/${e.id}/paid`] = paid;
+        });
+
+        await db.ref().update(updates);
+        showToast(paid ? 'Marcados como pagado' : 'Marcados como pendiente');
+        clearDaySelection();
+    } catch (error) {
+        showToast('Error al actualizar', 'error');
     }
 }
 
@@ -1144,43 +1228,24 @@ function toggleEntrySelection(entryId) {
     } else {
         selectedEntries.add(entryId);
     }
+
+    // Si no queda ninguna seleccion, desactivar modo seleccion
+    if (selectedEntries.size === 0 && selectedDays.size === 0) {
+        selectionMode = false;
+    }
+
     renderEntries();
-    updateEntrySelectionStats();
+    updateSelectionStats();
+    updateSelectionUI();
 }
 
 function clearEntrySelection() {
     selectedEntries.clear();
+    selectedDays.clear();
     selectionMode = false;
     renderEntries();
+    renderCalendar();
     updateStats();
-    updateSelectionUI();
-}
-
-function updateEntrySelectionStats() {
-    if (selectedEntries.size === 0) {
-        updateStats();
-        updateSelectionUI();
-        return;
-    }
-
-    // Calcular stats de registros seleccionados
-    const selected = entries.filter(e => selectedEntries.has(e.id));
-    const total = selected.reduce((sum, e) => sum + (e.total || 0), 0);
-    const pending = selected.filter(e => !e.paid).reduce((sum, e) => sum + (e.total || 0), 0);
-    const days = new Set(selected.map(e => e.date)).size;
-
-    document.getElementById('totalEarnings').textContent = '$' + total.toFixed(2);
-    document.getElementById('pendingAmount').textContent = '$' + pending.toFixed(2);
-    document.getElementById('totalDays').textContent = days;
-    document.getElementById('totalLabel').textContent = 'Seleccion';
-    document.getElementById('pendingLabel').textContent = 'Pendiente';
-    document.getElementById('daysLabel').textContent = 'Dias';
-
-    // Agregar clase visual
-    document.querySelectorAll('.stat-card').forEach(card => {
-        card.classList.add('showing-selection');
-    });
-
     updateSelectionUI();
 }
 
