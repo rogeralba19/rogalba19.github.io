@@ -29,6 +29,10 @@ function openAuthModal() {
 }
 
 function closeAuthModal(event) {
+    // No permitir cerrar si estamos en cosecha.html y no hay usuario logueado
+    if (window.location.pathname.includes('cosecha') && !auth.currentUser) {
+        return;
+    }
     const overlay = document.getElementById('authModalOverlay');
     if (!event || event.target === overlay) {
         overlay.classList.remove('visible');
