@@ -90,6 +90,13 @@ body {
     color: rgba(255, 255, 255, 0.3);
 }
 
+.footer-hidden-access {
+    cursor: default;
+    color: inherit;
+    user-select: text;
+    -webkit-user-select: text;
+}
+
 /* Animations */
 @keyframes blink {
     0%, 50% { opacity: 1; }

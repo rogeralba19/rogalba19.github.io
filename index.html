@@ -437,10 +437,9 @@
         <p><span class="label">SYNAPSES:</span> <span class="value" id="synapses">0</span></p>
     </div>
 
-    <!-- Auth UI -->
-    <div class="auth-container" id="authContainer">
-        <!-- Login Button (shown when not logged in) -->
-        <button class="auth-btn" id="loginBtn" onclick="openAuthModal()">Iniciar Sesion</button>
+    <!-- Auth UI (hidden, triggered from footer) -->
+    <div class="auth-container" id="authContainer" style="display:none;">
+        <button class="auth-btn" id="loginBtn" onclick="openAuthModal()" style="display:none;">Iniciar Sesion</button>
 
         <!-- User Menu (shown when logged in) -->
         <div class="user-menu" id="userMenu">
@@ -523,7 +522,7 @@
 
     <div class="ui-layer footer">
         <p>PURE WEBGL + CANVAS 2D HYBRID</p>
-        <p>NO FRAMEWORKS</p>
+        <p><span class="footer-hidden-access" onclick="openAuthModal()" title="">NO</span> FRAMEWORKS</p>
     </div>
 
     <script>
@@ -1334,8 +1333,9 @@
                 ctx.shadowBlur = 30 * convergence;
                 ctx.shadowColor = 'rgba(0, 200, 255, 0.8)';
 
-                // Scale logo to fit nicely on screen
-                const maxLogoWidth = Math.min(width * 0.45, 500);
+                // Scale logo to fit nicely on screen (bigger on mobile)
+                const isMobile = width < 768;
+                const maxLogoWidth = isMobile ? Math.min(width * 0.85, 500) : Math.min(width * 0.45, 500);
                 const scale = maxLogoWidth / logoImg.width;
                 const logoW = logoImg.width * scale;
                 const logoH = logoImg.height * scale;
@@ -1661,15 +1661,16 @@
     // Auth state listener
     auth.onAuthStateChanged((user) => {
         if (user) {
-            // User is signed in
+            // User is signed in - show menu
+            document.getElementById('authContainer').style.display = 'flex';
             document.getElementById('loginBtn').style.display = 'none';
             document.getElementById('userMenu').classList.add('visible');
-            // Show display name for Google users, email otherwise
             const displayText = user.displayName || user.email;
             document.getElementById('userEmail').textContent = displayText;
         } else {
-            // User is signed out
-            document.getElementById('loginBtn').style.display = 'block';
+            // User is signed out - hide container completely
+            document.getElementById('authContainer').style.display = 'none';
+            document.getElementById('loginBtn').style.display = 'none';
             document.getElementById('userMenu').classList.remove('visible');
         }
     });
