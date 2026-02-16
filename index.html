@@ -1314,6 +1314,10 @@
         let logoLoaded = false;
         logoImg.onload = function() { logoLoaded = true; };
 
+        // Offscreen canvas for logo outline effect
+        const outlineCanvas = document.createElement('canvas');
+        const outlineCtx = outlineCanvas.getContext('2d');
+
         // ============================================
         // CANVAS 2D OVERLAY
         // ============================================
@@ -1358,7 +1362,28 @@
                     ctx.globalCompositeOperation = 'source-over';
                 }
 
-                // Main logo
+                // Dark blue outline around logo letters using offscreen canvas
+                const outlineSize = 2;
+                const outlineSteps = 16;
+                outlineCanvas.width = width;
+                outlineCanvas.height = height;
+
+                // Draw offset copies in a circle to form outline shape
+                for (let i = 0; i < outlineSteps; i++) {
+                    const angle = (i / outlineSteps) * Math.PI * 2;
+                    const ox = Math.cos(angle) * outlineSize;
+                    const oy = Math.sin(angle) * outlineSize;
+                    outlineCtx.drawImage(logoImg, logoX + ox, logoY + oy, logoW, logoH);
+                }
+                // Tint outline dark blue using source-in
+                outlineCtx.globalCompositeOperation = 'source-in';
+                outlineCtx.fillStyle = 'rgba(0, 30, 80, 0.9)';
+                outlineCtx.fillRect(0, 0, width, height);
+
+                // Draw outline onto main canvas
+                ctx.drawImage(outlineCanvas, 0, 0);
+
+                // Main logo on top
                 ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
 
                 ctx.restore();
