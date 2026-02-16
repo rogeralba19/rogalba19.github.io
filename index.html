@@ -1137,36 +1137,46 @@
         }
 
         // ============================================
-        // TEXT GENERATION FOR "ALBA STUDIO"
+        // LOGO POINTS GENERATION FOR PARTICLES
         // ============================================
         const textPoints = [];
 
         function generateTextPoints() {
-            // Create temporary canvas to render text
+            // Create temporary canvas to sample logo shape
             const tempCanvas = document.createElement('canvas');
             const tempCtx = tempCanvas.getContext('2d');
             tempCanvas.width = 400;
-            tempCanvas.height = 100;
+            tempCanvas.height = 200;
 
             tempCtx.fillStyle = '#000';
-            tempCtx.fillRect(0, 0, 400, 100);
-            tempCtx.fillStyle = '#fff';
-            tempCtx.font = 'bold 48px Courier New';
-            tempCtx.textAlign = 'center';
-            tempCtx.textBaseline = 'middle';
-            tempCtx.fillText('ALBA STUDIO', 200, 50);
+            tempCtx.fillRect(0, 0, 400, 200);
 
-            // Sample points from the text
-            const imageData = tempCtx.getImageData(0, 0, 400, 100);
+            if (logoLoaded) {
+                const scale = Math.min(380 / logoImg.width, 180 / logoImg.height);
+                const w = logoImg.width * scale;
+                const h = logoImg.height * scale;
+                tempCtx.drawImage(logoImg, (400 - w) / 2, (200 - h) / 2, w, h);
+            } else {
+                // Fallback to text if logo hasn't loaded yet
+                tempCtx.fillStyle = '#fff';
+                tempCtx.font = 'bold 48px Courier New';
+                tempCtx.textAlign = 'center';
+                tempCtx.textBaseline = 'middle';
+                tempCtx.fillText('ALBA STUDIO', 200, 100);
+            }
+
+            // Sample points from the rendered shape
+            const imageData = tempCtx.getImageData(0, 0, 400, 200);
             const data = imageData.data;
 
-            for (let y = 0; y < 100; y += 3) {
+            for (let y = 0; y < 200; y += 3) {
                 for (let x = 0; x < 400; x += 3) {
                     const idx = (y * 400 + x) * 4;
-                    if (data[idx] > 128) {
+                    // Check if pixel is not black (any channel > threshold)
+                    if (data[idx] > 50 || data[idx + 1] > 50 || data[idx + 2] > 50) {
                         textPoints.push({
                             x: (x - 200) / 50,
-                            y: (50 - y) / 50,
+                            y: (100 - y) / 50,
                             z: 0
                         });
                     }
@@ -1297,81 +1307,59 @@
         }
 
         // ============================================
+        // LOGO IMAGE LOADING
+        // ============================================
+        const logoImg = new Image();
+        logoImg.src = 'logo.png';
+        let logoLoaded = false;
+        logoImg.onload = function() { logoLoaded = true; };
+
+        // ============================================
         // CANVAS 2D OVERLAY
         // ============================================
         function renderOverlay() {
             ctx.clearRect(0, 0, width, height);
 
-            // Main title - appears gradually with convergence
+            // Main logo - appears gradually with convergence
             const titleAlpha = Math.min(1, convergence * 2);
-            if (titleAlpha > 0.01) {
+            if (titleAlpha > 0.01 && logoLoaded) {
                 ctx.save();
                 ctx.globalAlpha = titleAlpha;
 
-                // Glowing text effect
+                // Glowing effect
                 ctx.shadowBlur = 30 * convergence;
                 ctx.shadowColor = 'rgba(0, 200, 255, 0.8)';
 
-                const albaFontSize = Math.min(width / 5, 180);
-                ctx.font = `bold ${albaFontSize}px 'Arial Narrow', Arial, sans-serif`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
+                // Scale logo to fit nicely on screen
+                const maxLogoWidth = Math.min(width * 0.45, 500);
+                const scale = maxLogoWidth / logoImg.width;
+                const logoW = logoImg.width * scale;
+                const logoH = logoImg.height * scale;
+                const logoX = (width - logoW) / 2;
+                const logoY = (height - logoH) / 2 - 30;
 
-                // Measure ALBA width for STUDIO spacing
-                const albaWidth = ctx.measureText('ALBA').width;
-
-                // Gradient fill
-                const gradient = ctx.createLinearGradient(
-                    width / 2 - 200, height / 2,
-                    width / 2 + 200, height / 2
-                );
-                gradient.addColorStop(0, '#00aaff');
-                gradient.addColorStop(0.5, '#ffffff');
-                gradient.addColorStop(1, '#00ffaa');
-
-                ctx.fillStyle = gradient;
-
-                // Glitch effect - permanent during and after training
+                // Glitch effect
                 const glitchIntensity = convergence < 0.9 ? (1 - convergence) * 12 : 3;
                 const glitchOffset = glitchIntensity * (Math.random() - 0.5);
 
-                // Multiple glitch layers for ALBA
+                // Glitch layers (colored offset copies)
                 if (Math.random() > 0.92) {
-                    ctx.fillStyle = '#ff0066';
-                    ctx.fillText('ALBA', width / 2 + glitchOffset * 2, height / 2 - 60);
+                    ctx.globalCompositeOperation = 'lighter';
+                    ctx.filter = 'hue-rotate(280deg) saturate(3)';
+                    ctx.drawImage(logoImg, logoX + glitchOffset * 2, logoY, logoW, logoH);
+                    ctx.filter = 'none';
+                    ctx.globalCompositeOperation = 'source-over';
                 }
                 if (Math.random() > 0.94) {
-                    ctx.fillStyle = '#00ffaa';
-                    ctx.fillText('ALBA', width / 2 - glitchOffset * 1.5, height / 2 - 60);
-                }
-                ctx.fillStyle = gradient;
-                ctx.fillText('ALBA', width / 2, height / 2 - 60);
-
-                // STUDIO below with letter-spacing to match ALBA width
-                const studioFontSize = Math.min(width / 12, 80);
-                ctx.font = `bold ${studioFontSize}px 'Arial Narrow', Arial, sans-serif`;
-
-                // Function to draw text with custom letter spacing
-                function drawSpacedText(text, x, y, targetWidth) {
-                    const baseWidth = ctx.measureText(text).width;
-                    const extraSpace = (targetWidth - baseWidth) / (text.length - 1);
-                    let currentX = x - targetWidth / 2;
-
-                    for (let i = 0; i < text.length; i++) {
-                        const char = text[i];
-                        const charWidth = ctx.measureText(char).width;
-                        ctx.fillText(char, currentX + charWidth / 2, y);
-                        currentX += charWidth + extraSpace;
-                    }
+                    ctx.globalCompositeOperation = 'lighter';
+                    ctx.filter = 'hue-rotate(120deg) saturate(3)';
+                    ctx.drawImage(logoImg, logoX - glitchOffset * 1.5, logoY, logoW, logoH);
+                    ctx.filter = 'none';
+                    ctx.globalCompositeOperation = 'source-over';
                 }
 
-                // Glitch for STUDIO
-                if (Math.random() > 0.93) {
-                    ctx.fillStyle = '#ff0066';
-                    drawSpacedText('STUDIO', width / 2 + glitchOffset * 1.5, height / 2 + 40, albaWidth);
-                }
-                ctx.fillStyle = gradient;
-                drawSpacedText('STUDIO', width / 2, height / 2 + 40, albaWidth);
+                // Main logo
+                ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
 
                 ctx.restore();
             }
