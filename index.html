@@ -446,7 +446,6 @@
         <div class="user-menu" id="userMenu">
             <span class="user-email" id="userEmail"></span>
             <div class="menu-links">
-                <a href="analytics.html" class="menu-link">Panel</a>
                 <a href="cosecha.html" class="menu-link">Cosecha</a>
             </div>
             <button class="logout-btn" onclick="logoutUser()">Salir</button>
@@ -523,7 +522,7 @@
 
     <div class="ui-layer footer">
         <p>PURE WEBGL + CANVAS 2D HYBRID</p>
-        <p>NO FRAMEWORKS</p>
+        <p><a href="analytics.html" class="footer-hidden-access">NO</a> FRAMEWORKS</p>
     </div>
 
     <script>
@@ -1334,8 +1333,9 @@
                 ctx.shadowBlur = 30 * convergence;
                 ctx.shadowColor = 'rgba(0, 200, 255, 0.8)';
 
-                // Scale logo to fit nicely on screen
-                const maxLogoWidth = Math.min(width * 0.45, 500);
+                // Scale logo to fit nicely on screen (bigger on mobile)
+                const isMobile = width < 768;
+                const maxLogoWidth = isMobile ? Math.min(width * 0.85, 500) : Math.min(width * 0.45, 500);
                 const scale = maxLogoWidth / logoImg.width;
                 const logoW = logoImg.width * scale;
                 const logoH = logoImg.height * scale;
@@ -1664,7 +1664,6 @@
             // User is signed in
             document.getElementById('loginBtn').style.display = 'none';
             document.getElementById('userMenu').classList.add('visible');
-            // Show display name for Google users, email otherwise
             const displayText = user.displayName || user.email;
             document.getElementById('userEmail').textContent = displayText;
         } else {

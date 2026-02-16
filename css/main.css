@@ -90,6 +90,21 @@ body {
     color: rgba(255, 255, 255, 0.3);
 }
 
+.footer-hidden-access {
+    cursor: default;
+    color: inherit;
+    text-decoration: none;
+    user-select: text;
+    -webkit-user-select: text;
+}
+
+.footer-hidden-access:hover,
+.footer-hidden-access:visited,
+.footer-hidden-access:active {
+    color: inherit;
+    text-decoration: none;
+}
+
 /* Animations */
 @keyframes blink {
     0%, 50% { opacity: 1; }
