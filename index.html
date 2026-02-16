@@ -437,15 +437,15 @@
         <p><span class="label">SYNAPSES:</span> <span class="value" id="synapses">0</span></p>
     </div>
 
-    <!-- Auth UI (hidden, triggered from footer) -->
-    <div class="auth-container" id="authContainer" style="display:none;">
-        <button class="auth-btn" id="loginBtn" onclick="openAuthModal()" style="display:none;">Iniciar Sesion</button>
+    <!-- Auth UI -->
+    <div class="auth-container" id="authContainer">
+        <!-- Login Button (shown when not logged in) -->
+        <button class="auth-btn" id="loginBtn" onclick="openAuthModal()">Iniciar Sesion</button>
 
         <!-- User Menu (shown when logged in) -->
         <div class="user-menu" id="userMenu">
             <span class="user-email" id="userEmail"></span>
             <div class="menu-links">
-                <a href="analytics.html" class="menu-link">Panel</a>
                 <a href="cosecha.html" class="menu-link">Cosecha</a>
             </div>
             <button class="logout-btn" onclick="logoutUser()">Salir</button>
@@ -522,7 +522,7 @@
 
     <div class="ui-layer footer">
         <p>PURE WEBGL + CANVAS 2D HYBRID</p>
-        <p><span class="footer-hidden-access" onclick="openAuthModal()" title="">NO</span> FRAMEWORKS</p>
+        <p><a href="analytics.html" class="footer-hidden-access">NO</a> FRAMEWORKS</p>
     </div>
 
     <script>
@@ -1661,16 +1661,14 @@
     // Auth state listener
     auth.onAuthStateChanged((user) => {
         if (user) {
-            // User is signed in - show menu
-            document.getElementById('authContainer').style.display = 'flex';
+            // User is signed in
             document.getElementById('loginBtn').style.display = 'none';
             document.getElementById('userMenu').classList.add('visible');
             const displayText = user.displayName || user.email;
             document.getElementById('userEmail').textContent = displayText;
         } else {
-            // User is signed out - hide container completely
-            document.getElementById('authContainer').style.display = 'none';
-            document.getElementById('loginBtn').style.display = 'none';
+            // User is signed out
+            document.getElementById('loginBtn').style.display = 'block';
             document.getElementById('userMenu').classList.remove('visible');
         }
     });
