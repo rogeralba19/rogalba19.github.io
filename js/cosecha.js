@@ -48,6 +48,19 @@ const availableFruits = [
     'Uva'
 ];
 
+// Colores por fruta (60% opacidad)
+const fruitColors = {
+    'Fresa': 'rgba(220, 38, 38, 0.6)',
+    'Frambuesa': 'rgba(190, 24, 93, 0.6)',
+    'Arandano': 'rgba(49, 46, 129, 0.6)',
+    'Mora': 'rgba(88, 28, 135, 0.6)',
+    'Cereza': 'rgba(159, 18, 57, 0.6)',
+    'Ciruela': 'rgba(126, 34, 206, 0.6)',
+    'Manzana': 'rgba(127, 29, 29, 0.6)',
+    'Pera': 'rgba(101, 163, 13, 0.6)',
+    'Uva': 'rgba(76, 29, 149, 0.6)'
+};
+
 // Auth listener
 auth.onAuthStateChanged((user) => {
     if (user) {
@@ -296,39 +309,22 @@ function renderJobs() {
         }
     });
 
-    // Separar trabajos configurados y no configurados
-    const configured = [];
-    const unconfigured = [];
-
-    jobs.forEach(job => {
-        const isConfigured = job.price > 0 || job.dailyRate > 0;
-        if (isConfigured) {
-            configured.push({ ...job, lastUsed: lastUsed[job.id] || null });
-        } else {
-            unconfigured.push(job);
-        }
-    });
-
-    // Ordenar no configurados alfabeticamente
-    unconfigured.sort((a, b) => (a.product || '').localeCompare(b.product || ''));
-
-    // Ordenar configurados por ultimo uso (mas reciente primero)
-    configured.sort((a, b) => {
-        if (!a.lastUsed && !b.lastUsed) return 0;
+    // Ordenar todos por ultimo uso (mas reciente primero), sin uso al final
+    const sortedJobs = jobs.map(job => ({ ...job, lastUsed: lastUsed[job.id] || null }));
+    sortedJobs.sort((a, b) => {
+        if (!a.lastUsed && !b.lastUsed) return (a.product || '').localeCompare(b.product || '');
         if (!a.lastUsed) return 1;
         if (!b.lastUsed) return -1;
         return new Date(b.lastUsed) - new Date(a.lastUsed);
     });
 
-    // Combinar: primero usados, luego no configurados
-    const sortedJobs = [...configured, ...unconfigured];
-
     grid.innerHTML = sortedJobs.map(job => {
         const displayName = getJobDisplayName(job);
         const isConfigured = job.price > 0 || job.dailyRate > 0;
+        const bgColor = fruitColors[job.product] || 'rgba(255, 255, 255, 0.1)';
 
         return `
-            <div class="job-card ${isConfigured ? 'active' : ''}" onclick="editJob('${job.id}')">
+            <div class="job-card ${isConfigured ? 'active' : ''}" onclick="editJob('${job.id}')" style="background: ${bgColor}">
                 <div class="job-header">
                     <span class="job-title">${job.product}</span>
                     <span class="job-status ${!isConfigured ? 'inactive' : ''}">${isConfigured ? 'Configurado' : 'Sin configurar'}</span>
@@ -378,6 +374,7 @@ async function quickAddEntry() {
     try {
         await db.ref(`harvest/${currentUser.uid}`).push({
             jobId: selectedJob.id,
+            jobSnapshot: createJobSnapshot(selectedJob),
             date,
             quantity,
             total,
@@ -570,6 +567,24 @@ function getJobDisplayName(job) {
     return parts.length > 0 ? parts.join(' - ') : 'Sin configurar';
 }
 
+// Get job info for an entry: use snapshot if available, fallback to current job
+function getEntryJobInfo(entry) {
+    if (entry.jobSnapshot) return entry.jobSnapshot;
+    return jobs.find(j => j.id === entry.jobId) || null;
+}
+
+// Create snapshot of job data for storing with entry
+function createJobSnapshot(job) {
+    return {
+        product: job.product || '',
+        unit: job.unit || '',
+        price: job.price || 0,
+        dailyRate: job.dailyRate || 0,
+        employer: job.employer || '',
+        type: job.type || 'trato'
+    };
+}
+
 function onJobSelect() {
     const jobId = document.getElementById('entryJob').value;
     const job = jobs.find(j => j.id === jobId);
@@ -689,6 +704,9 @@ async function saveEntryConfig() {
         await db.ref(`jobs/${currentUser.uid}/${jobId}`).update(data);
         showToast('Configuracion guardada');
         document.getElementById('entryConfigFields').classList.remove('visible');
+
+        // Esperar a que Firebase actualice el job local y refrescar campos
+        setTimeout(() => onJobSelect(), 300);
     } catch (error) {
         showToast('Error al guardar', 'error');
     }
@@ -765,8 +783,15 @@ async function saveEntry() {
 
     try {
         if (id) {
+            // Edicion: NO sobrescribir el snapshot original
+            const existingEntry = entries.find(e => e.id === id);
+            if (!existingEntry?.jobSnapshot) {
+                data.jobSnapshot = createJobSnapshot(job);
+            }
             await db.ref(`harvest/${currentUser.uid}/${id}`).update(data);
         } else {
+            // Nuevo: siempre guardar snapshot
+            data.jobSnapshot = createJobSnapshot(job);
             data.createdAt = Date.now();
             await db.ref(`harvest/${currentUser.uid}`).push(data);
         }
@@ -1048,8 +1073,8 @@ function confirmMarkAsPaid() {
     // Agrupar por fruta
     const byFruit = {};
     pendingOnly.forEach(e => {
-        const job = jobs.find(j => j.id === e.jobId);
-        const fruit = job?.product || 'Sin trabajo';
+        const jobInfo = getEntryJobInfo(e);
+        const fruit = jobInfo?.product || 'Sin trabajo';
         if (!byFruit[fruit]) byFruit[fruit] = { count: 0, total: 0 };
         byFruit[fruit].count++;
         byFruit[fruit].total += (e.total || 0);
@@ -1125,11 +1150,11 @@ function openDayModal(dateStr, dayEntries) {
         list.innerHTML = '<p style="text-align: center; color: rgba(255,255,255,0.5); padding: 20px;">No hay registros para este dia</p>';
     } else {
         list.innerHTML = dayEntries.map(e => {
-            const job = jobs.find(j => j.id === e.jobId);
+            const jobInfo = getEntryJobInfo(e);
             return `
                 <div class="entry-card" onclick="closeDayModal(); openEntryModal('${e.id}')">
                     <div class="entry-info">
-                        <div class="entry-date">${job ? getJobDisplayName(job) : 'Trabajo eliminado'}</div>
+                        <div class="entry-date">${jobInfo ? getJobDisplayName(jobInfo) : 'Trabajo eliminado'}</div>
                         <div class="entry-details">${e.quantity ? e.quantity + ' unidades' : 'Jornada'} ${e.paid ? '• Pagado' : '• Pendiente'}</div>
                     </div>
                     <div class="entry-total">$${(e.total || 0).toFixed(2)}</div>
@@ -1162,10 +1187,10 @@ function renderEntries() {
     // Aplicar filtros
     const fruitFilter = document.getElementById('filterFruit')?.value || '';
     let filteredEntries = entries.filter(e => {
-        const job = jobs.find(j => j.id === e.jobId);
+        const jobInfo = getEntryJobInfo(e);
 
         // Filtro por fruta
-        if (fruitFilter && job?.product !== fruitFilter) return false;
+        if (fruitFilter && jobInfo?.product !== fruitFilter) return false;
 
         // Filtro por pago
         if (paymentFilter === 'pending' && e.paid) return false;
@@ -1233,11 +1258,11 @@ function renderEntries() {
 
         // Entradas del mes
         group.entries.forEach(e => {
-            const job = jobs.find(j => j.id === e.jobId);
+            const jobInfo = getEntryJobInfo(e);
             const date = new Date(e.date + 'T12:00:00');
             const dayName = dayNames[date.getDay()];
             const dateStr = `${date.getDate()} ${monthNames[date.getMonth()].substring(0, 3)}`;
-            const fruta = job ? job.product : 'Sin trabajo';
+            const fruta = jobInfo ? jobInfo.product : 'Sin trabajo';
             const precio = '$' + (e.total || 0).toFixed(2);
             const isSelected = selectedEntries.has(e.id);
 
@@ -1245,7 +1270,7 @@ function renderEntries() {
                 <div class="entry-card ${isSelected ? 'selected' : ''}" data-entry-id="${e.id}">
                     <div class="entry-info">
                         <div class="entry-date">${dayName} - ${dateStr} - ${fruta} - ${precio}</div>
-                        <div class="entry-details">${e.quantity ? e.quantity + ' unidades' : 'Jornada'} ${job?.employer ? '• ' + job.employer : ''} ${e.paid ? '• Pagado' : '• Pendiente'}</div>
+                        <div class="entry-details">${e.quantity ? e.quantity + ' unidades' : 'Jornada'} ${jobInfo?.employer ? '• ' + jobInfo.employer : ''} ${e.paid ? '• Pagado' : '• Pendiente'}</div>
                     </div>
                 </div>
             `;
@@ -1336,8 +1361,8 @@ function updateFruitFilter() {
     // Obtener frutas unicas de los registros
     const fruitsInEntries = new Set();
     entries.forEach(e => {
-        const job = jobs.find(j => j.id === e.jobId);
-        if (job?.product) fruitsInEntries.add(job.product);
+        const jobInfo = getEntryJobInfo(e);
+        if (jobInfo?.product) fruitsInEntries.add(jobInfo.product);
     });
 
     let options = '<option value="">Todas las frutas</option>';
