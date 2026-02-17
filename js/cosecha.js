@@ -48,6 +48,19 @@ const availableFruits = [
     'Uva'
 ];
 
+// Colores por fruta (60% opacidad)
+const fruitColors = {
+    'Fresa': 'rgba(220, 38, 38, 0.6)',
+    'Frambuesa': 'rgba(190, 24, 93, 0.6)',
+    'Arandano': 'rgba(49, 46, 129, 0.6)',
+    'Mora': 'rgba(88, 28, 135, 0.6)',
+    'Cereza': 'rgba(159, 18, 57, 0.6)',
+    'Ciruela': 'rgba(126, 34, 206, 0.6)',
+    'Manzana': 'rgba(127, 29, 29, 0.6)',
+    'Pera': 'rgba(101, 163, 13, 0.6)',
+    'Uva': 'rgba(76, 29, 149, 0.6)'
+};
+
 // Auth listener
 auth.onAuthStateChanged((user) => {
     if (user) {
@@ -296,39 +309,22 @@ function renderJobs() {
         }
     });
 
-    // Separar trabajos configurados y no configurados
-    const configured = [];
-    const unconfigured = [];
-
-    jobs.forEach(job => {
-        const isConfigured = job.price > 0 || job.dailyRate > 0;
-        if (isConfigured) {
-            configured.push({ ...job, lastUsed: lastUsed[job.id] || null });
-        } else {
-            unconfigured.push(job);
-        }
-    });
-
-    // Ordenar no configurados alfabeticamente
-    unconfigured.sort((a, b) => (a.product || '').localeCompare(b.product || ''));
-
-    // Ordenar configurados por ultimo uso (mas reciente primero)
-    configured.sort((a, b) => {
-        if (!a.lastUsed && !b.lastUsed) return 0;
+    // Ordenar todos por ultimo uso (mas reciente primero), sin uso al final
+    const sortedJobs = jobs.map(job => ({ ...job, lastUsed: lastUsed[job.id] || null }));
+    sortedJobs.sort((a, b) => {
+        if (!a.lastUsed && !b.lastUsed) return (a.product || '').localeCompare(b.product || '');
         if (!a.lastUsed) return 1;
         if (!b.lastUsed) return -1;
         return new Date(b.lastUsed) - new Date(a.lastUsed);
     });
 
-    // Combinar: primero usados, luego no configurados
-    const sortedJobs = [...configured, ...unconfigured];
-
     grid.innerHTML = sortedJobs.map(job => {
         const displayName = getJobDisplayName(job);
         const isConfigured = job.price > 0 || job.dailyRate > 0;
+        const bgColor = fruitColors[job.product] || 'rgba(255, 255, 255, 0.1)';
 
         return `
-            <div class="job-card ${isConfigured ? 'active' : ''}" onclick="editJob('${job.id}')">
+            <div class="job-card ${isConfigured ? 'active' : ''}" onclick="editJob('${job.id}')" style="background: ${bgColor}">
                 <div class="job-header">
                     <span class="job-title">${job.product}</span>
                     <span class="job-status ${!isConfigured ? 'inactive' : ''}">${isConfigured ? 'Configurado' : 'Sin configurar'}</span>
@@ -708,6 +704,9 @@ async function saveEntryConfig() {
         await db.ref(`jobs/${currentUser.uid}/${jobId}`).update(data);
         showToast('Configuracion guardada');
         document.getElementById('entryConfigFields').classList.remove('visible');
+
+        // Esperar a que Firebase actualice el job local y refrescar campos
+        setTimeout(() => onJobSelect(), 300);
     } catch (error) {
         showToast('Error al guardar', 'error');
     }
@@ -761,7 +760,6 @@ async function saveEntry() {
 
     const data = {
         jobId,
-        jobSnapshot: createJobSnapshot(job),
         date,
         paid: entryPaid,
         notes: document.getElementById('entryNotes').value,
@@ -785,8 +783,15 @@ async function saveEntry() {
 
     try {
         if (id) {
+            // Edicion: NO sobrescribir el snapshot original
+            const existingEntry = entries.find(e => e.id === id);
+            if (!existingEntry?.jobSnapshot) {
+                data.jobSnapshot = createJobSnapshot(job);
+            }
             await db.ref(`harvest/${currentUser.uid}/${id}`).update(data);
         } else {
+            // Nuevo: siempre guardar snapshot
+            data.jobSnapshot = createJobSnapshot(job);
             data.createdAt = Date.now();
             await db.ref(`harvest/${currentUser.uid}`).push(data);
         }
