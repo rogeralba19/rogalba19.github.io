@@ -378,6 +378,7 @@ async function quickAddEntry() {
     try {
         await db.ref(`harvest/${currentUser.uid}`).push({
             jobId: selectedJob.id,
+            jobSnapshot: createJobSnapshot(selectedJob),
             date,
             quantity,
             total,
@@ -570,6 +571,24 @@ function getJobDisplayName(job) {
     return parts.length > 0 ? parts.join(' - ') : 'Sin configurar';
 }
 
+// Get job info for an entry: use snapshot if available, fallback to current job
+function getEntryJobInfo(entry) {
+    if (entry.jobSnapshot) return entry.jobSnapshot;
+    return jobs.find(j => j.id === entry.jobId) || null;
+}
+
+// Create snapshot of job data for storing with entry
+function createJobSnapshot(job) {
+    return {
+        product: job.product || '',
+        unit: job.unit || '',
+        price: job.price || 0,
+        dailyRate: job.dailyRate || 0,
+        employer: job.employer || '',
+        type: job.type || 'trato'
+    };
+}
+
 function onJobSelect() {
     const jobId = document.getElementById('entryJob').value;
     const job = jobs.find(j => j.id === jobId);
@@ -742,6 +761,7 @@ async function saveEntry() {
 
     const data = {
         jobId,
+        jobSnapshot: createJobSnapshot(job),
         date,
         paid: entryPaid,
         notes: document.getElementById('entryNotes').value,
@@ -1048,8 +1068,8 @@ function confirmMarkAsPaid() {
     // Agrupar por fruta
     const byFruit = {};
     pendingOnly.forEach(e => {
-        const job = jobs.find(j => j.id === e.jobId);
-        const fruit = job?.product || 'Sin trabajo';
+        const jobInfo = getEntryJobInfo(e);
+        const fruit = jobInfo?.product || 'Sin trabajo';
         if (!byFruit[fruit]) byFruit[fruit] = { count: 0, total: 0 };
         byFruit[fruit].count++;
         byFruit[fruit].total += (e.total || 0);
@@ -1125,11 +1145,11 @@ function openDayModal(dateStr, dayEntries) {
         list.innerHTML = '<p style="text-align: center; color: rgba(255,255,255,0.5); padding: 20px;">No hay registros para este dia</p>';
     } else {
         list.innerHTML = dayEntries.map(e => {
-            const job = jobs.find(j => j.id === e.jobId);
+            const jobInfo = getEntryJobInfo(e);
             return `
                 <div class="entry-card" onclick="closeDayModal(); openEntryModal('${e.id}')">
                     <div class="entry-info">
-                        <div class="entry-date">${job ? getJobDisplayName(job) : 'Trabajo eliminado'}</div>
+                        <div class="entry-date">${jobInfo ? getJobDisplayName(jobInfo) : 'Trabajo eliminado'}</div>
                         <div class="entry-details">${e.quantity ? e.quantity + ' unidades' : 'Jornada'} ${e.paid ? '• Pagado' : '• Pendiente'}</div>
                     </div>
                     <div class="entry-total">$${(e.total || 0).toFixed(2)}</div>
@@ -1162,10 +1182,10 @@ function renderEntries() {
     // Aplicar filtros
     const fruitFilter = document.getElementById('filterFruit')?.value || '';
     let filteredEntries = entries.filter(e => {
-        const job = jobs.find(j => j.id === e.jobId);
+        const jobInfo = getEntryJobInfo(e);
 
         // Filtro por fruta
-        if (fruitFilter && job?.product !== fruitFilter) return false;
+        if (fruitFilter && jobInfo?.product !== fruitFilter) return false;
 
         // Filtro por pago
         if (paymentFilter === 'pending' && e.paid) return false;
@@ -1233,11 +1253,11 @@ function renderEntries() {
 
         // Entradas del mes
         group.entries.forEach(e => {
-            const job = jobs.find(j => j.id === e.jobId);
+            const jobInfo = getEntryJobInfo(e);
             const date = new Date(e.date + 'T12:00:00');
             const dayName = dayNames[date.getDay()];
             const dateStr = `${date.getDate()} ${monthNames[date.getMonth()].substring(0, 3)}`;
-            const fruta = job ? job.product : 'Sin trabajo';
+            const fruta = jobInfo ? jobInfo.product : 'Sin trabajo';
             const precio = '$' + (e.total || 0).toFixed(2);
             const isSelected = selectedEntries.has(e.id);
 
@@ -1245,7 +1265,7 @@ function renderEntries() {
                 <div class="entry-card ${isSelected ? 'selected' : ''}" data-entry-id="${e.id}">
                     <div class="entry-info">
                         <div class="entry-date">${dayName} - ${dateStr} - ${fruta} - ${precio}</div>
-                        <div class="entry-details">${e.quantity ? e.quantity + ' unidades' : 'Jornada'} ${job?.employer ? '• ' + job.employer : ''} ${e.paid ? '• Pagado' : '• Pendiente'}</div>
+                        <div class="entry-details">${e.quantity ? e.quantity + ' unidades' : 'Jornada'} ${jobInfo?.employer ? '• ' + jobInfo.employer : ''} ${e.paid ? '• Pagado' : '• Pendiente'}</div>
                     </div>
                 </div>
             `;
@@ -1336,8 +1356,8 @@ function updateFruitFilter() {
     // Obtener frutas unicas de los registros
     const fruitsInEntries = new Set();
     entries.forEach(e => {
-        const job = jobs.find(j => j.id === e.jobId);
-        if (job?.product) fruitsInEntries.add(job.product);
+        const jobInfo = getEntryJobInfo(e);
+        if (jobInfo?.product) fruitsInEntries.add(jobInfo.product);
     });
 
     let options = '<option value="">Todas las frutas</option>';
