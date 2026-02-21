@@ -3,17 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Aplicación de registro de cosecha para trabajadores agrícolas - ALBA STUDIO">
     <title>Registro de Cosecha | ALBA STUDIO</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍎</text></svg>">
     <link rel="stylesheet" href="css/cosecha.css">
     <link rel="stylesheet" href="css/auth.css">
 </head>
 <body>
-    <header class="header">
+    <header class="header" role="banner">
         <h1><span>🍎</span> Registro de Cosecha</h1>
         <div class="header-actions">
-            <a href="index.html" class="back-btn">← Volver</a>
-            <button class="action-btn" onclick="openAddFruitModal()">+ Fruta</button>
-            <button class="action-btn primary" onclick="openEntryModal()">+ Registro</button>
+            <a href="index.html" class="back-btn" aria-label="Volver al inicio">← Volver</a>
+            <button class="action-btn" onclick="openAddFruitModal()" aria-label="Agregar nueva fruta">+ Fruta</button>
+            <button class="action-btn primary" onclick="openEntryModal()" aria-label="Agregar nuevo registro">+ Registro</button>
+            <div class="user-info" id="userInfo" style="display: none;">
+                <span class="user-email-display" id="userEmailDisplay"></span>
+                <button class="action-btn logout-action" onclick="logoutUser()" aria-label="Cerrar sesión">Salir</button>
+            </div>
         </div>
     </header>
 
@@ -30,7 +36,7 @@
             </div>
             <div class="stat-card clickable" onclick="toggleTotalGeneral()">
                 <div class="stat-value" id="totalDays">0</div>
-                <div class="stat-label" id="daysLabel">Dias</div>
+                <div class="stat-label" id="daysLabel">Días</div>
             </div>
         </div>
 
@@ -54,14 +60,14 @@
         </div>
 
         <!-- Tabs -->
-        <div class="tabs">
-            <button class="tab active" onclick="switchTab('calendario')">Calendario</button>
-            <button class="tab" onclick="switchTab('registros')">Registros</button>
-            <button class="tab" onclick="switchTab('trabajos')">Trabajos</button>
+        <div class="tabs" role="tablist">
+            <button class="tab active" data-tab="calendario" onclick="switchTab('calendario')" role="tab" aria-selected="true">Calendario</button>
+            <button class="tab" data-tab="registros" onclick="switchTab('registros')" role="tab" aria-selected="false">Registros</button>
+            <button class="tab" data-tab="trabajos" onclick="switchTab('trabajos')" role="tab" aria-selected="false">Trabajos</button>
         </div>
 
         <!-- Calendario Section -->
-        <div class="section active" id="calendarioSection">
+        <div class="section active" id="calendarioSection" role="tabpanel">
             <div class="calendar-container">
                 <div class="calendar-header">
                     <div class="calendar-nav">
@@ -75,7 +81,7 @@
         </div>
 
         <!-- Registros Section -->
-        <div class="section" id="registrosSection">
+        <div class="section" id="registrosSection" role="tabpanel">
             <div class="filters-bar">
                 <div class="filter-group">
                     <select id="filterFruit" onchange="renderEntries()">
@@ -92,17 +98,17 @@
         </div>
 
         <!-- Trabajos Section -->
-        <div class="section" id="trabajosSection">
+        <div class="section" id="trabajosSection" role="tabpanel">
             <div class="jobs-grid" id="jobsGrid"></div>
         </div>
     </div>
 
     <!-- Job Modal -->
-    <div class="modal-overlay" id="jobModal">
+    <div class="modal-overlay" id="jobModal" role="dialog" aria-modal="true" aria-labelledby="jobModalTitle">
         <div class="modal">
             <div class="modal-header">
                 <h2 id="jobModalTitle">Nuevo Trabajo</h2>
-                <button class="modal-close" onclick="closeJobModal()">&times;</button>
+                <button class="modal-close" onclick="closeJobModal()" aria-label="Cerrar">&times;</button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="jobId">
@@ -132,14 +138,14 @@
                         </div>
                         <div class="work-type-option" onclick="selectJobType('dia')" id="jobTypeDia">
                             <div class="icon">📅</div>
-                            <div class="label">Al Dia</div>
+                            <div class="label">Al Día</div>
                         </div>
                     </div>
                 </div>
 
                 <div class="conditional-fields visible" id="jobTratoFields">
                     <div class="form-group">
-                        <label>Recipiente / Unidad</label>
+                        <label>Recipiente/Unidad</label>
                         <select id="jobUnit">
                             <option value="totens">Totens</option>
                             <option value="capacho_grande">Capacho Grande</option>
@@ -150,21 +156,21 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Precio por Unidad ($)</label>
+                        <label>Precio por unidad ($)</label>
                         <input type="number" id="jobPrice" placeholder="0.00" step="0.01">
                     </div>
                 </div>
 
                 <div class="conditional-fields" id="jobDiaFields">
                     <div class="form-group">
-                        <label>Pago por Dia ($)</label>
+                        <label>Pago por día ($)</label>
                         <input type="number" id="jobDailyRate" placeholder="0.00" step="0.01">
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label>Empleador / Ubicacion</label>
-                    <input type="text" id="jobEmployer" placeholder="Nombre del empleador o ubicacion de la parcela">
+                    <label>Empleador / Ubicación</label>
+                    <input type="text" id="jobEmployer" placeholder="Nombre del empleador o ubicación de la parcela">
                 </div>
             </div>
             <div class="modal-footer">
@@ -176,11 +182,11 @@
     </div>
 
     <!-- Entry Modal -->
-    <div class="modal-overlay" id="entryModal">
+    <div class="modal-overlay" id="entryModal" role="dialog" aria-modal="true" aria-labelledby="entryModalTitle">
         <div class="modal">
             <div class="modal-header">
                 <h2 id="entryModalTitle">Nuevo Registro</h2>
-                <button class="modal-close" onclick="closeEntryModal()">&times;</button>
+                <button class="modal-close" onclick="closeEntryModal()" aria-label="Cerrar">&times;</button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="entryId">
@@ -195,14 +201,14 @@
                     </div>
                 </div>
 
-                <!-- Campos de configuracion (si no esta configurado) -->
+                <!-- Campos de configuración (si no está configurado) -->
                 <div id="entryConfigFields" class="conditional-fields config-section">
                     <div class="config-header">Configurar trabajo</div>
                     <div class="form-group">
                         <label>Tipo</label>
                         <select id="entryConfigType" onchange="updateEntryConfigType()">
                             <option value="trato">Al Trato</option>
-                            <option value="dia">Al Dia</option>
+                            <option value="dia">Al Día</option>
                         </select>
                     </div>
                     <div id="entryConfigTratoFields">
@@ -224,15 +230,15 @@
                     </div>
                     <div id="entryConfigDiaFields" style="display: none;">
                         <div class="form-group">
-                            <label>Pago por dia ($)</label>
+                            <label>Pago por día ($)</label>
                             <input type="number" id="entryConfigDailyRate" placeholder="0.00" step="0.01">
                         </div>
                     </div>
                     <div class="form-group">
-                        <label>Ubicacion / Empleador</label>
+                        <label>Ubicación / Empleador</label>
                         <input type="text" id="entryConfigEmployer" placeholder="Ej: Rancho Norte">
                     </div>
-                    <button type="button" class="btn btn-primary" style="width: 100%;" onclick="saveEntryConfig()">Guardar Configuracion</button>
+                    <button type="button" class="btn btn-primary" style="width: 100%;" onclick="saveEntryConfig()">Guardar Configuración</button>
                 </div>
 
                 <div class="form-group">
@@ -250,19 +256,8 @@
                 <!-- Campo de personas para bins -->
                 <div id="entryBinsFields" class="conditional-fields">
                     <div class="form-group">
-                        <label>Personas que trabajaron</label>
-                        <select id="entryPeople" onchange="calculateEntryTotal()">
-                            <option value="1">1 persona (solo yo)</option>
-                            <option value="2">2 personas</option>
-                            <option value="3">3 personas</option>
-                            <option value="4">4 personas</option>
-                            <option value="5">5 personas</option>
-                            <option value="6">6 personas</option>
-                            <option value="7">7 personas</option>
-                            <option value="8">8 personas</option>
-                            <option value="9">9 personas</option>
-                            <option value="10">10 personas</option>
-                        </select>
+                        <label>Personas que trabajaron (máx. 50)</label>
+                        <input type="number" id="entryPeople" min="1" max="50" value="1" placeholder="1" oninput="calculateEntryTotal()" onchange="calculateEntryTotal()">
                     </div>
                 </div>
 
@@ -299,11 +294,11 @@
     </div>
 
     <!-- Day Modal -->
-    <div class="modal-overlay" id="dayModal">
+    <div class="modal-overlay" id="dayModal" role="dialog" aria-modal="true" aria-labelledby="dayModalTitle">
         <div class="modal">
             <div class="modal-header">
-                <h2 id="dayModalTitle">Registros del dia</h2>
-                <button class="modal-close" onclick="closeDayModal()">&times;</button>
+                <h2 id="dayModalTitle">Registros del día</h2>
+                <button class="modal-close" onclick="closeDayModal()" aria-label="Cerrar">&times;</button>
             </div>
             <div class="modal-body">
                 <div id="dayEntriesList"></div>
@@ -315,11 +310,11 @@
     </div>
 
     <!-- Confirm Modal -->
-    <div class="modal-overlay" id="confirmModal">
+    <div class="modal-overlay" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
         <div class="modal" style="max-width: 420px;">
             <div class="modal-header">
                 <h2 id="confirmModalTitle">Confirmar</h2>
-                <button class="modal-close" onclick="closeConfirmModal(false)">&times;</button>
+                <button class="modal-close" onclick="closeConfirmModal(false)" aria-label="Cerrar">&times;</button>
             </div>
             <div class="modal-body">
                 <div id="confirmModalMessage" class="confirm-message"></div>
@@ -332,10 +327,12 @@
     </div>
 
     <!-- Auth Modal -->
-    <div class="auth-modal-overlay" id="authModalOverlay" onclick="closeAuthModal(event)">
+    <div class="auth-modal-overlay" id="authModalOverlay" onclick="closeAuthModal(event)" role="dialog" aria-modal="true">
         <div class="auth-modal" onclick="event.stopPropagation()">
-            <h2>Registro de Cosecha</h2>
-            <p class="subtitle">Inicia sesion para continuar</p>
+            <div class="auth-modal-header">
+                <h2>Registro de Cosecha</h2>
+                <p>Inicia sesión para continuar</p>
+            </div>
 
             <div class="auth-error" id="authError"></div>
             <div class="auth-success" id="authSuccess"></div>
@@ -355,36 +352,36 @@
             </div>
 
             <div class="auth-tabs">
-                <button class="auth-tab" onclick="switchAuthTab('login')">Iniciar Sesion</button>
-                <button class="auth-tab active" onclick="switchAuthTab('register')">Registrarse</button>
+                <button class="auth-tab active" onclick="switchAuthTab('login')">Iniciar Sesión</button>
+                <button class="auth-tab" onclick="switchAuthTab('register')">Registrarse</button>
             </div>
 
             <!-- Login Form -->
-            <form class="auth-form" id="loginForm" onsubmit="handleLogin(event)">
+            <form class="auth-form active" id="loginForm" onsubmit="handleLogin(event)">
                 <div class="form-group">
-                    <label>Correo Electronico</label>
+                    <label>Correo Electrónico</label>
                     <input type="email" id="loginEmail" placeholder="tu@correo.com" required>
                 </div>
                 <div class="form-group">
-                    <label>Contrasena</label>
+                    <label>Contraseña</label>
                     <input type="password" id="loginPassword" placeholder="********" required>
                 </div>
                 <button type="submit" class="auth-submit" id="loginSubmit">Entrar</button>
             </form>
 
             <!-- Register Form -->
-            <form class="auth-form active" id="registerForm" onsubmit="handleRegister(event)">
+            <form class="auth-form" id="registerForm" onsubmit="handleRegister(event)">
                 <div class="form-group">
-                    <label>Correo Electronico</label>
+                    <label>Correo Electrónico</label>
                     <input type="email" id="registerEmail" placeholder="tu@correo.com" required>
                 </div>
                 <div class="form-group">
-                    <label>Contrasena</label>
-                    <input type="password" id="registerPassword" placeholder="Minimo 6 caracteres" minlength="6" required>
+                    <label>Contraseña</label>
+                    <input type="password" id="registerPassword" placeholder="Mínimo 6 caracteres" minlength="6" required>
                 </div>
                 <div class="form-group">
-                    <label>Confirmar Contrasena</label>
-                    <input type="password" id="registerPasswordConfirm" placeholder="Repetir contrasena" required>
+                    <label>Confirmar Contraseña</label>
+                    <input type="password" id="registerPasswordConfirm" placeholder="Repetir contraseña" required>
                 </div>
                 <button type="submit" class="auth-submit" id="registerSubmit">Crear Cuenta</button>
             </form>
@@ -395,11 +392,11 @@
     <div class="toast" id="toast"></div>
 
     <!-- Add Fruit Modal -->
-    <div class="modal-overlay" id="addFruitModal">
+    <div class="modal-overlay" id="addFruitModal" role="dialog" aria-modal="true">
         <div class="modal" style="max-width: 400px;">
             <div class="modal-header">
                 <h2>Agregar Nueva Fruta</h2>
-                <button class="modal-close" onclick="closeAddFruitModal()">&times;</button>
+                <button class="modal-close" onclick="closeAddFruitModal()" aria-label="Cerrar">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
@@ -412,6 +409,12 @@
                 <button class="btn btn-primary" onclick="saveNewFruit()">Agregar</button>
             </div>
         </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <p>Cargando datos...</p>
     </div>
 
     <!-- Firebase SDK -->

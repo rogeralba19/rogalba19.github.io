@@ -3,11 +3,14 @@
  * Manejo de autenticacion con Firebase Auth
  */
 
-// Auth state listener
+// Auth state listener - solo para elementos de UI que auth.js gestiona (index.html)
 auth.onAuthStateChanged((user) => {
+    // Solo ejecutar si los elementos existen (index.html)
     const loginBtn = document.getElementById('loginBtn');
     const userMenu = document.getElementById('userMenu');
     const userEmail = document.getElementById('userEmail');
+
+    if (!loginBtn && !userMenu) return; // No estamos en index.html
 
     if (user) {
         if (loginBtn) loginBtn.style.display = 'none';
@@ -122,13 +125,13 @@ async function loginWithGoogle() {
             });
         }
 
-        showAuthSuccess('Sesion iniciada con Google');
+        showAuthSuccess('Sesión iniciada con Google');
         setTimeout(() => closeAuthModal(), 1000);
     } catch (error) {
         if (error.code === 'auth/cancelled-popup-request') return;
-        let message = 'Error al iniciar sesion con Google';
+        let message = 'Error al iniciar sesión con Google';
         if (error.code === 'auth/popup-closed-by-user') {
-            message = 'Inicio de sesion cancelado';
+            message = 'Inicio de sesión cancelado';
         } else if (error.code === 'auth/popup-blocked') {
             message = 'Popup bloqueado. Permite popups para este sitio';
         }
@@ -149,16 +152,16 @@ async function handleLogin(event) {
 
     try {
         await auth.signInWithEmailAndPassword(email, password);
-        showAuthSuccess('Sesion iniciada correctamente');
+        showAuthSuccess('Sesión iniciada correctamente');
         setTimeout(() => closeAuthModal(), 1000);
     } catch (error) {
         const messages = {
             'auth/user-not-found': 'Usuario no encontrado',
-            'auth/wrong-password': 'Contrasena incorrecta',
-            'auth/invalid-email': 'Correo invalido',
-            'auth/too-many-requests': 'Demasiados intentos. Intenta mas tarde'
+            'auth/wrong-password': 'Contraseña incorrecta',
+            'auth/invalid-email': 'Correo inválido',
+            'auth/too-many-requests': 'Demasiados intentos. Intenta más tarde'
         };
-        showAuthError(messages[error.code] || 'Error al iniciar sesion');
+        showAuthError(messages[error.code] || 'Error al iniciar sesión');
     } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Entrar';
@@ -175,7 +178,7 @@ async function handleRegister(event) {
     const submitBtn = document.getElementById('registerSubmit');
 
     if (password !== passwordConfirm) {
-        showAuthError('Las contrasenas no coinciden');
+        showAuthError('Las contraseñas no coinciden');
         return;
     }
 
@@ -187,15 +190,16 @@ async function handleRegister(event) {
         await db.ref('users/' + userCredential.user.uid).set({
             email: email,
             createdAt: Date.now(),
-            role: 'user'
+            role: 'user',
+            provider: 'email'
         });
         showAuthSuccess('Cuenta creada exitosamente');
         setTimeout(() => closeAuthModal(), 1000);
     } catch (error) {
         const messages = {
-            'auth/email-already-in-use': 'Este correo ya esta registrado',
-            'auth/invalid-email': 'Correo invalido',
-            'auth/weak-password': 'La contrasena es muy debil'
+            'auth/email-already-in-use': 'Este correo ya está registrado',
+            'auth/invalid-email': 'Correo inválido',
+            'auth/weak-password': 'La contraseña es muy débil'
         };
         showAuthError(messages[error.code] || 'Error al crear cuenta');
     } finally {

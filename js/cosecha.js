@@ -10,6 +10,8 @@ let entries = [];
 let currentDate = new Date();
 let selectedJob = null;
 let selectedDayDate = null;
+let jobsLoaded = false;
+let entriesLoaded = false;
 
 // Job modal state
 let jobType = 'trato';
@@ -21,9 +23,44 @@ let entryPaid = false;
 let paymentFilter = 'all'; // 'all', 'pending', 'paid'
 
 // Selection state
-let selectedDays = new Set(); // Dias seleccionados en calendario
+let selectedDays = new Set(); // Días seleccionados en calendario
 let selectedEntries = new Set(); // Registros seleccionados
-let selectionMode = false; // Modo seleccion activo
+let selectionMode = false; // Modo selección activo
+
+// Long press state
+let longPressTriggered = false;
+
+// Helper: get local date as YYYY-MM-DD
+function getLocalDateString(date) {
+    if (!date) date = new Date();
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+// Helper: escape HTML to prevent XSS
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// Helper: open/close modal with scroll lock
+function openModal(modalId) {
+    document.getElementById(modalId).classList.add('visible');
+    document.body.classList.add('modal-open');
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).classList.remove('visible');
+    // Only remove scroll lock if no other modals are visible
+    const anyVisible = document.querySelector('.modal-overlay.visible, .auth-modal-overlay.visible');
+    if (!anyVisible) {
+        document.body.classList.remove('modal-open');
+    }
+}
 
 // Unit names mapping
 const unitNames = {
@@ -48,29 +85,66 @@ const availableFruits = [
     'Uva'
 ];
 
-// Auth listener
+// Auth listener (single unified listener - auth.js only handles UI elements it owns)
 auth.onAuthStateChanged((user) => {
     if (user) {
         currentUser = user;
         // Cerrar modal de auth si estaba abierto
         const authOverlay = document.getElementById('authModalOverlay');
-        if (authOverlay) authOverlay.classList.remove('visible');
+        if (authOverlay) {
+            authOverlay.classList.remove('visible');
+            document.body.classList.remove('modal-open');
+        }
         // Mostrar contenido de la app
         document.querySelector('.header').style.display = '';
         document.querySelector('.container').style.display = '';
+        // Actualizar info de usuario en header
+        const userInfo = document.getElementById('userInfo');
+        const userEmailDisplay = document.getElementById('userEmailDisplay');
+        if (userInfo) userInfo.style.display = 'flex';
+        if (userEmailDisplay) userEmailDisplay.textContent = user.displayName || user.email;
+        showLoading(true);
         loadData();
     } else {
+        currentUser = null;
+        jobs = [];
+        entries = [];
+        jobsLoaded = false;
+        entriesLoaded = false;
         // Ocultar contenido y mostrar formulario de registro/login
         document.querySelector('.header').style.display = 'none';
         document.querySelector('.container').style.display = 'none';
+        const userInfo = document.getElementById('userInfo');
+        if (userInfo) userInfo.style.display = 'none';
         const authOverlay = document.getElementById('authModalOverlay');
-        if (authOverlay) authOverlay.classList.add('visible');
+        if (authOverlay) {
+            authOverlay.classList.add('visible');
+            document.body.classList.add('modal-open');
+        }
     }
 });
 
+// Loading state
+function showLoading(show) {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+        overlay.classList.toggle('visible', show);
+    }
+}
+
+function checkDataReady() {
+    if (jobsLoaded && entriesLoaded) {
+        showLoading(false);
+    }
+}
+
 // Load data from Firebase
+let fruitsChecked = false;
+
 function loadData() {
     if (!currentUser) return;
+
+    fruitsChecked = false;
 
     // Load jobs
     db.ref(`jobs/${currentUser.uid}`).on('value', (snapshot) => {
@@ -79,10 +153,20 @@ function loadData() {
             jobs.push({ id: child.key, ...child.val() });
         });
 
-        // Verificar que todas las frutas existan, agregar las faltantes
-        checkAndAddMissingFruits();
+        // Solo verificar frutas faltantes una vez por sesión de carga
+        if (!fruitsChecked) {
+            fruitsChecked = true;
+            checkAndAddMissingFruits();
+        }
+        jobsLoaded = true;
         renderJobs();
         updateJobSelect();
+        // Re-render entries si ya están cargadas (para mostrar nombres de trabajo)
+        if (entriesLoaded) {
+            renderEntries();
+            renderCalendar();
+        }
+        checkDataReady();
     });
 
     // Load entries
@@ -92,9 +176,13 @@ function loadData() {
             entries.push({ id: child.key, ...child.val() });
         });
         entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+        entriesLoaded = true;
         updateStats();
         renderCalendar();
-        renderEntries();
+        if (jobsLoaded) {
+            renderEntries();
+        }
+        checkDataReady();
     });
 }
 
@@ -107,7 +195,7 @@ function updateStats() {
                       'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
     const monthEntries = entries.filter(e => {
-        const d = new Date(e.date);
+        const d = new Date(e.date + 'T12:00:00');
         return d.getMonth() === month && d.getFullYear() === year;
     });
 
@@ -118,7 +206,7 @@ function updateStats() {
     document.getElementById('totalEarnings').textContent = '$' + total.toFixed(2);
     document.getElementById('pendingAmount').textContent = '$' + pending.toFixed(2);
     document.getElementById('totalDays').textContent = days;
-    document.getElementById('totalLabel').textContent = monthNames[month];
+    document.getElementById('totalLabel').textContent = 'Total ' + monthNames[month];
 }
 
 // Mostrar total general por 10 segundos
@@ -154,7 +242,7 @@ function toggleTotalGeneral() {
         daysEl.textContent = daysGeneral;
         totalLabel.textContent = 'TOTAL GENERAL';
         pendingLabel.textContent = 'PEND. GENERAL';
-        daysLabel.textContent = 'DIAS TOTALES';
+        daysLabel.textContent = 'DÍAS TOTALES';
 
         // Agregar clase showing-general
         cards.forEach(card => card.classList.add('showing-general'));
@@ -187,7 +275,7 @@ function restoreMonthStats() {
 
         // Restaurar labels
         document.getElementById('pendingLabel').textContent = 'Pendiente';
-        document.getElementById('daysLabel').textContent = 'Dias';
+        document.getElementById('daysLabel').textContent = 'Días';
 
         // Quitar clase showing-general
         cards.forEach(card => card.classList.remove('showing-general'));
@@ -201,14 +289,15 @@ function restoreMonthStats() {
     isShowingGeneral = false;
 }
 
-// Tab switching - mantener seleccion al cambiar de pestaña
+// Tab switching - mantener selección al cambiar de pestaña
 function switchTab(tab) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-    document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
+    const targetTab = document.querySelector(`.tab[data-tab="${tab}"]`);
+    if (targetTab) targetTab.classList.add('active');
     document.getElementById(tab + 'Section').classList.add('active');
 
-    // Si hay dias seleccionados y vamos a registros, sincronizar
+    // Si hay días seleccionados y vamos a registros, sincronizar
     if (tab === 'registros' && selectedDays.size > 0) {
         syncSelectionToEntries();
     }
@@ -324,19 +413,20 @@ function renderJobs() {
     const sortedJobs = [...configured, ...unconfigured];
 
     grid.innerHTML = sortedJobs.map(job => {
-        const displayName = getJobDisplayName(job);
         const isConfigured = job.price > 0 || job.dailyRate > 0;
+        const safeProduct = escapeHtml(job.product);
+        const safeEmployer = escapeHtml(job.employer);
 
         return `
             <div class="job-card ${isConfigured ? 'active' : ''}" onclick="editJob('${job.id}')">
                 <div class="job-header">
-                    <span class="job-title">${job.product}</span>
+                    <span class="job-title">${safeProduct}</span>
                     <span class="job-status ${!isConfigured ? 'inactive' : ''}">${isConfigured ? 'Configurado' : 'Sin configurar'}</span>
                 </div>
                 <div class="job-details">
-                    <span>${job.type === 'dia' ? '📅 Al Dia' : '📦 Al Trato'}</span>
-                    ${job.employer ? `<span>📍 ${job.employer}</span>` : '<span>📍 Sin ubicacion</span>'}
-                    <span>${job.type === 'dia' ? '$' + (job.dailyRate || 0) + '/dia' : '$' + (job.price || 0) + '/' + (unitNames[job.unit] || 'unidad')}</span>
+                    <span>${job.type === 'dia' ? '📅 Al Día' : '📦 Al Trato'}</span>
+                    ${safeEmployer ? `<span>📍 ${safeEmployer}</span>` : '<span>📍 Sin ubicación</span>'}
+                    <span>${job.type === 'dia' ? '$' + (job.dailyRate || 0) + '/día' : '$' + (job.price || 0) + '/' + (unitNames[job.unit] || 'unidad')}</span>
                 </div>
             </div>
         `;
@@ -352,7 +442,7 @@ function selectJobForQuickAdd(jobId) {
 
     selectedJob = job;
     document.getElementById('quickAddTitle').textContent = `Agregar a: ${getJobDisplayName(job)}`;
-    document.getElementById('quickDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('quickDate').value = getLocalDateString();
     document.getElementById('quickQuantity').value = '';
     document.getElementById('quickAddBar').classList.add('visible');
 }
@@ -422,7 +512,7 @@ function openJobModal(jobId = null) {
         }
     }
 
-    document.getElementById('jobModal').classList.add('visible');
+    openModal('jobModal');
 }
 
 function editJob(jobId) {
@@ -430,7 +520,7 @@ function editJob(jobId) {
 }
 
 function closeJobModal() {
-    document.getElementById('jobModal').classList.remove('visible');
+    closeModal('jobModal');
 }
 
 function selectJobType(type) {
@@ -460,8 +550,13 @@ async function saveJob() {
     if (jobType === 'trato') {
         data.unit = document.getElementById('jobUnit').value;
         data.price = parseFloat(document.getElementById('jobPrice').value) || 0;
+        // Limpiar campos del tipo contrario
+        data.dailyRate = null;
     } else {
         data.dailyRate = parseFloat(document.getElementById('jobDailyRate').value) || 0;
+        // Limpiar campos del tipo contrario
+        data.unit = null;
+        data.price = null;
     }
 
     if (!data.product) {
@@ -507,7 +602,7 @@ function openEntryModal(entryId = null, preselectedJobId = null) {
 
     document.getElementById('entryId').value = '';
     document.getElementById('entryJob').value = preselectedJobId || '';
-    document.getElementById('entryDate').value = selectedDayDate || new Date().toISOString().split('T')[0];
+    document.getElementById('entryDate').value = selectedDayDate || getLocalDateString();
     document.getElementById('entryQuantity').value = '';
     document.getElementById('entryHours').value = '';
     document.getElementById('entryNotes').value = '';
@@ -536,11 +631,11 @@ function openEntryModal(entryId = null, preselectedJobId = null) {
         }
     }
 
-    document.getElementById('entryModal').classList.add('visible');
+    openModal('entryModal');
 }
 
 function closeEntryModal() {
-    document.getElementById('entryModal').classList.remove('visible');
+    closeModal('entryModal');
     selectedDayDate = null;
 }
 
@@ -687,7 +782,7 @@ async function saveEntryConfig() {
 
     try {
         await db.ref(`jobs/${currentUser.uid}/${jobId}`).update(data);
-        showToast('Configuracion guardada');
+        showToast('Configuración guardada');
         document.getElementById('entryConfigFields').classList.remove('visible');
     } catch (error) {
         showToast('Error al guardar', 'error');
@@ -708,7 +803,8 @@ function calculateEntryTotal() {
 
             // Si es bins, dividir entre personas
             if (job.unit === 'bins') {
-                const people = parseInt(document.getElementById('entryPeople').value) || 1;
+                let people = parseInt(document.getElementById('entryPeople').value) || 1;
+                people = Math.max(1, Math.min(50, people));
                 total = total / people;
             }
         }
@@ -753,11 +849,18 @@ async function saveEntry() {
         data.hours = parseFloat(document.getElementById('entryHours').value) || null;
     } else {
         data.quantity = parseFloat(document.getElementById('entryQuantity').value) || 0;
+
+        if (data.quantity <= 0) {
+            showToast('Ingresa una cantidad válida', 'error');
+            return;
+        }
+
         data.total = data.quantity * (job.price || 0);
 
         // Si es bins, dividir entre personas
         if (job.unit === 'bins') {
-            const people = parseInt(document.getElementById('entryPeople').value) || 1;
+            let people = parseInt(document.getElementById('entryPeople').value) || 1;
+            people = Math.max(1, Math.min(50, people));
             data.people = people;
             data.total = data.total / people;
         }
@@ -811,7 +914,7 @@ function renderCalendar() {
     const grid = document.getElementById('calendarGrid');
     grid.innerHTML = '';
 
-    const dayNames = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
+    const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
     dayNames.forEach((day, idx) => {
         const header = document.createElement('div');
         header.className = 'calendar-day-header';
@@ -821,14 +924,18 @@ function renderCalendar() {
         grid.appendChild(header);
     });
 
+    // Días del mes anterior (relleno)
     const prevMonth = new Date(year, month, 0);
     for (let i = startDay - 1; i >= 0; i--) {
         const dayOfWeek = startDay - 1 - i;
+        const prevDayNum = prevMonth.getDate() - i;
         const day = document.createElement('div');
         day.className = 'calendar-day other-month';
         if (dayOfWeek === 0) day.classList.add('sunday');
         if (dayOfWeek === 6) day.classList.add('saturday');
-        day.innerHTML = `<span class="day-number">${prevMonth.getDate() - i}</span>`;
+        day.innerHTML = `<span class="day-number">${prevDayNum}</span>`;
+        // Click navega al mes anterior
+        day.onclick = () => { changeMonth(-1); };
         grid.appendChild(day);
     }
 
@@ -856,12 +963,12 @@ function renderCalendar() {
             day.classList.add(hasPending ? 'has-pending' : 'has-entries');
         }
 
-        // Marcar si esta seleccionado
+        // Marcar si está seleccionado
         if (selectedDays.has(dateStr)) {
             day.classList.add('selected');
         }
 
-        // Obtener notas del dia
+        // Obtener notas del día (sanitizado)
         const dayNotes = dayEntries.filter(e => e.notes).map(e => e.notes).join(' | ');
         const truncatedNotes = dayNotes.length > 30 ? dayNotes.substring(0, 30) + '...' : dayNotes;
 
@@ -869,11 +976,15 @@ function renderCalendar() {
             <span class="day-number">${i}</span>
             ${dayEntries.length > 0 ? `<span class="day-entries-count">${dayEntries.length} reg</span>` : ''}
             ${dayTotal > 0 ? `<span class="day-amount">$${dayTotal.toFixed(0)}</span>` : ''}
-            ${truncatedNotes ? `<span class="day-notes">${truncatedNotes}</span>` : ''}
+            ${truncatedNotes ? `<span class="day-notes">${escapeHtml(truncatedNotes)}</span>` : ''}
         `;
 
         // Click normal abre modal, con Ctrl/Cmd selecciona
         day.onclick = (e) => {
+            if (longPressTriggered) {
+                longPressTriggered = false;
+                return;
+            }
             if (e.ctrlKey || e.metaKey || selectionMode) {
                 toggleDaySelection(dateStr);
             } else {
@@ -881,23 +992,35 @@ function renderCalendar() {
             }
         };
 
-        // Long press para activar modo seleccion
+        // Long press para activar modo selección
         let pressTimer;
-        day.onmousedown = day.ontouchstart = () => {
+        const startPress = (e) => {
+            longPressTriggered = false;
             pressTimer = setTimeout(() => {
+                longPressTriggered = true;
                 selectionMode = true;
                 toggleDaySelection(dateStr);
-                showToast('Modo seleccion activado');
+                showToast('Modo selección activado');
             }, 500);
         };
-        day.onmouseup = day.ontouchend = day.onmouseleave = () => {
+        const cancelPress = () => {
             clearTimeout(pressTimer);
         };
+
+        day.addEventListener('mousedown', startPress);
+        day.addEventListener('touchstart', startPress, { passive: true });
+        day.addEventListener('mouseup', cancelPress);
+        day.addEventListener('touchend', cancelPress);
+        day.addEventListener('mouseleave', cancelPress);
 
         grid.appendChild(day);
     }
 
-    const remainingDays = 42 - (startDay + daysInMonth);
+    // Calcular filas dinámicas (solo las necesarias)
+    const totalCells = startDay + daysInMonth;
+    const totalRows = Math.ceil(totalCells / 7);
+    const remainingDays = (totalRows * 7) - totalCells;
+
     for (let i = 1; i <= remainingDays; i++) {
         const dayDate = new Date(year, month + 1, i);
         const dayOfWeek = dayDate.getDay();
@@ -907,10 +1030,12 @@ function renderCalendar() {
         if (dayOfWeek === 0) day.classList.add('sunday');
         if (dayOfWeek === 6) day.classList.add('saturday');
         day.innerHTML = `<span class="day-number">${i}</span>`;
+        // Click navega al mes siguiente
+        day.onclick = () => { changeMonth(1); };
         grid.appendChild(day);
     }
 
-    // Mostrar boton para limpiar seleccion si hay dias seleccionados
+    // Mostrar botón para limpiar selección si hay días seleccionados
     updateSelectionUI();
 }
 
@@ -921,7 +1046,7 @@ function toggleDaySelection(dateStr) {
         selectedDays.add(dateStr);
     }
 
-    // Si no queda ninguna seleccion, desactivar modo seleccion
+    // Si no queda ninguna selección, desactivar modo selección
     if (selectedDays.size === 0) {
         selectionMode = false;
     }
@@ -972,9 +1097,9 @@ function updateSelectionStats() {
     document.getElementById('totalEarnings').textContent = '$' + total.toFixed(2);
     document.getElementById('pendingAmount').textContent = '$' + pending.toFixed(2);
     document.getElementById('totalDays').textContent = days;
-    document.getElementById('totalLabel').textContent = 'Seleccion';
+    document.getElementById('totalLabel').textContent = 'Selección';
     document.getElementById('pendingLabel').textContent = 'Pendiente';
-    document.getElementById('daysLabel').textContent = 'Dias';
+    document.getElementById('daysLabel').textContent = 'Días';
 
     // Agregar clase visual
     document.querySelectorAll('.stat-card').forEach(card => {
@@ -1015,11 +1140,11 @@ function showConfirmModal(title, messageHtml, confirmLabel, callback) {
     document.getElementById('confirmModalMessage').innerHTML = messageHtml;
     document.getElementById('confirmModalBtn').textContent = confirmLabel || 'Confirmar';
     confirmCallback = callback;
-    document.getElementById('confirmModal').classList.add('visible');
+    openModal('confirmModal');
 }
 
 function closeConfirmModal(accepted) {
-    document.getElementById('confirmModal').classList.remove('visible');
+    closeModal('confirmModal');
     if (accepted && confirmCallback) {
         confirmCallback();
     }
@@ -1038,7 +1163,7 @@ function confirmMarkAsPaid() {
 
     const pendingOnly = selected.filter(e => !e.paid);
     if (pendingOnly.length === 0) {
-        showToast('No hay registros pendientes en la seleccion', 'error');
+        showToast('No hay registros pendientes en la selección', 'error');
         return;
     }
 
@@ -1064,7 +1189,7 @@ function confirmMarkAsPaid() {
         <div class="confirm-summary">${fruitLines}</div>
         <div class="confirm-totals">Total: $${total.toFixed(2)}</div>
         <div class="confirm-stats">
-            <span>Dias: ${days}</span>
+            <span>Días: ${days}</span>
             <span>Registros: ${pendingOnly.length}</span>
         </div>
     `;
@@ -1122,14 +1247,15 @@ function openDayModal(dateStr, dayEntries) {
 
     const list = document.getElementById('dayEntriesList');
     if (dayEntries.length === 0) {
-        list.innerHTML = '<p style="text-align: center; color: rgba(255,255,255,0.5); padding: 20px;">No hay registros para este dia</p>';
+        list.innerHTML = '<p style="text-align: center; color: rgba(255,255,255,0.5); padding: 20px;">No hay registros para este día</p>';
     } else {
         list.innerHTML = dayEntries.map(e => {
             const job = jobs.find(j => j.id === e.jobId);
+            const safeDisplayName = escapeHtml(job ? getJobDisplayName(job) : 'Trabajo eliminado');
             return `
                 <div class="entry-card" onclick="closeDayModal(); openEntryModal('${e.id}')">
                     <div class="entry-info">
-                        <div class="entry-date">${job ? getJobDisplayName(job) : 'Trabajo eliminado'}</div>
+                        <div class="entry-date">${safeDisplayName}</div>
                         <div class="entry-details">${e.quantity ? e.quantity + ' unidades' : 'Jornada'} ${e.paid ? '• Pagado' : '• Pendiente'}</div>
                     </div>
                     <div class="entry-total">$${(e.total || 0).toFixed(2)}</div>
@@ -1138,11 +1264,11 @@ function openDayModal(dateStr, dayEntries) {
         }).join('');
     }
 
-    document.getElementById('dayModal').classList.add('visible');
+    openModal('dayModal');
 }
 
 function closeDayModal() {
-    document.getElementById('dayModal').classList.remove('visible');
+    closeModal('dayModal');
 }
 
 function addEntryForDay() {
@@ -1237,15 +1363,19 @@ function renderEntries() {
             const date = new Date(e.date + 'T12:00:00');
             const dayName = dayNames[date.getDay()];
             const dateStr = `${date.getDate()} ${monthNames[date.getMonth()].substring(0, 3)}`;
-            const fruta = job ? job.product : 'Sin trabajo';
+            const fruta = escapeHtml(job ? job.product : 'Sin trabajo');
+            const safeEmployer = escapeHtml(job?.employer || '');
             const precio = '$' + (e.total || 0).toFixed(2);
             const isSelected = selectedEntries.has(e.id);
 
             html += `
                 <div class="entry-card ${isSelected ? 'selected' : ''}" data-entry-id="${e.id}">
                     <div class="entry-info">
-                        <div class="entry-date">${dayName} - ${dateStr} - ${fruta} - ${precio}</div>
-                        <div class="entry-details">${e.quantity ? e.quantity + ' unidades' : 'Jornada'} ${job?.employer ? '• ' + job.employer : ''} ${e.paid ? '• Pagado' : '• Pendiente'}</div>
+                        <div class="entry-date">${dayName} - ${dateStr} - ${fruta}</div>
+                        <div class="entry-details">${e.quantity ? e.quantity + ' unidades' : 'Jornada'} ${safeEmployer ? '• ' + safeEmployer : ''} ${e.paid ? '• Pagado' : '• Pendiente'}</div>
+                    </div>
+                    <div class="entry-amount">
+                        <div class="entry-total">${precio}</div>
                     </div>
                 </div>
             `;
@@ -1261,6 +1391,10 @@ function renderEntries() {
 
         // Click normal o con Ctrl/Cmd
         card.onclick = (e) => {
+            if (longPressTriggered) {
+                longPressTriggered = false;
+                return;
+            }
             if (e.ctrlKey || e.metaKey || selectionMode) {
                 toggleEntrySelection(entryId);
             } else {
@@ -1268,18 +1402,25 @@ function renderEntries() {
             }
         };
 
-        // Long press para activar modo seleccion
-        card.onmousedown = card.ontouchstart = (e) => {
+        // Long press para activar modo selección
+        const startPress = () => {
+            longPressTriggered = false;
             pressTimer = setTimeout(() => {
+                longPressTriggered = true;
                 selectionMode = true;
                 toggleEntrySelection(entryId);
-                showToast('Modo seleccion activado');
+                showToast('Modo selección activado');
             }, 500);
         };
-
-        card.onmouseup = card.ontouchend = card.onmouseleave = () => {
+        const cancelPress = () => {
             clearTimeout(pressTimer);
         };
+
+        card.addEventListener('mousedown', startPress);
+        card.addEventListener('touchstart', startPress, { passive: true });
+        card.addEventListener('mouseup', cancelPress);
+        card.addEventListener('touchend', cancelPress);
+        card.addEventListener('mouseleave', cancelPress);
     });
 }
 
@@ -1290,7 +1431,7 @@ function toggleEntrySelection(entryId) {
         selectedEntries.add(entryId);
     }
 
-    // Si no queda ninguna seleccion, desactivar modo seleccion y limpiar dias
+    // Si no queda ninguna selección, desactivar modo selección y limpiar días
     if (selectedEntries.size === 0) {
         selectedDays.clear();
         selectionMode = false;
@@ -1364,11 +1505,24 @@ function setPaymentFilter(filter) {
 // ============================================
 // TOAST
 // ============================================
+let toastTimeout = null;
+
 function showToast(message, type = 'success') {
     const toast = document.getElementById('toast');
-    toast.textContent = message;
-    toast.className = 'toast visible' + (type === 'error' ? ' error' : '');
-    setTimeout(() => toast.classList.remove('visible'), 3000);
+    // Limpiar toast anterior
+    if (toastTimeout) {
+        clearTimeout(toastTimeout);
+        toast.classList.remove('visible');
+    }
+    // Pequeño delay para permitir la transición de salida si había un toast previo
+    requestAnimationFrame(() => {
+        toast.textContent = message;
+        toast.className = 'toast visible' + (type === 'error' ? ' error' : '');
+        toastTimeout = setTimeout(() => {
+            toast.classList.remove('visible');
+            toastTimeout = null;
+        }, 3000);
+    });
 }
 
 // ============================================
@@ -1376,11 +1530,11 @@ function showToast(message, type = 'success') {
 // ============================================
 function openAddFruitModal() {
     document.getElementById('newFruitName').value = '';
-    document.getElementById('addFruitModal').classList.add('visible');
+    openModal('addFruitModal');
 }
 
 function closeAddFruitModal() {
-    document.getElementById('addFruitModal').classList.remove('visible');
+    closeModal('addFruitModal');
 }
 
 async function saveNewFruit() {
@@ -1398,4 +1552,24 @@ async function saveNewFruit() {
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
     renderCalendar();
+
+    // Cerrar modales con Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const modals = [
+                { id: 'addFruitModal', close: closeAddFruitModal },
+                { id: 'confirmModal', close: () => closeConfirmModal(false) },
+                { id: 'dayModal', close: closeDayModal },
+                { id: 'entryModal', close: closeEntryModal },
+                { id: 'jobModal', close: closeJobModal }
+            ];
+            for (const modal of modals) {
+                const el = document.getElementById(modal.id);
+                if (el && el.classList.contains('visible')) {
+                    modal.close();
+                    break;
+                }
+            }
+        }
+    });
 });
