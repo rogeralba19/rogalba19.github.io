@@ -16,9 +16,38 @@
             <a href="index.html" class="back-btn" aria-label="Volver al inicio">← Volver</a>
             <button class="action-btn" onclick="openAddFruitModal()" aria-label="Agregar nueva fruta">+ Fruta</button>
             <button class="action-btn primary" onclick="openEntryModal()" aria-label="Agregar nuevo registro">+ Registro</button>
-            <div class="user-info" id="userInfo" style="display: none;">
-                <span class="user-email-display" id="userEmailDisplay"></span>
-                <button class="action-btn logout-action" onclick="logoutUser()" aria-label="Cerrar sesión">Salir</button>
+            <div class="user-menu-container" id="userMenuContainer" style="display: none;">
+                <button class="user-avatar-btn" id="userAvatarBtn" onclick="toggleUserDropdown()" aria-label="Menú de usuario">
+                    <img class="user-avatar-img" id="userAvatarImg" style="display: none;" alt="">
+                    <span class="user-avatar-initials" id="userAvatarInitials">?</span>
+                </button>
+                <div class="user-dropdown" id="userDropdown">
+                    <div class="user-dropdown-header">
+                        <div class="user-dropdown-avatar">
+                            <img class="user-dropdown-avatar-img" id="dropdownAvatarImg" style="display: none;" alt="">
+                            <span class="user-dropdown-avatar-initials" id="dropdownAvatarInitials">?</span>
+                        </div>
+                        <div class="user-dropdown-info">
+                            <span class="user-dropdown-name" id="dropdownUserName">Usuario</span>
+                            <span class="user-dropdown-email" id="dropdownUserEmail">correo@ejemplo.com</span>
+                        </div>
+                    </div>
+                    <div class="user-dropdown-divider"></div>
+                    <div class="user-dropdown-item boss-mode-item" onclick="toggleBossMode(event)">
+                        <span class="dropdown-item-icon">👑</span>
+                        <span class="dropdown-item-label">Modo Jefe</span>
+                        <div class="boss-mode-toggle" id="bossModeToggle">
+                            <div class="boss-mode-toggle-track">
+                                <div class="boss-mode-toggle-thumb"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="user-dropdown-divider"></div>
+                    <div class="user-dropdown-item logout-item" onclick="logoutUser()">
+                        <span class="dropdown-item-icon">🚪</span>
+                        <span class="dropdown-item-label">Cerrar Sesión</span>
+                    </div>
+                </div>
             </div>
         </div>
     </header>

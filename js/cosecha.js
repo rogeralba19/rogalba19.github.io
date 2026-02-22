@@ -72,6 +72,38 @@ const unitNames = {
     'bins': 'Bins'
 };
 
+// Helper: crear snapshot del trabajo para guardar en el registro
+function createJobSnapshot(job) {
+    if (!job) return null;
+    return {
+        product: job.product || '',
+        type: job.type || 'trato',
+        unit: job.unit || null,
+        price: job.price || null,
+        dailyRate: job.dailyRate || null,
+        employer: job.employer || ''
+    };
+}
+
+// Helper: obtener datos del trabajo desde el registro (snapshot o fallback al trabajo actual)
+function getEntryJobData(entry) {
+    if (entry.snapshot) return entry.snapshot;
+    // Fallback para registros antiguos sin snapshot
+    const job = jobs.find(j => j.id === entry.jobId);
+    if (job) return createJobSnapshot(job);
+    return { product: 'Trabajo eliminado', type: 'trato', unit: null, price: 0, dailyRate: 0, employer: '' };
+}
+
+// Helper: nombre para mostrar desde datos de trabajo (snapshot o job)
+function getDisplayName(jobData) {
+    const parts = [];
+    if (jobData.product) parts.push(jobData.product);
+    if (jobData.unit && unitNames[jobData.unit]) parts.push(unitNames[jobData.unit]);
+    if (jobData.price) parts.push('$' + jobData.price);
+    if (jobData.employer) parts.push(jobData.employer);
+    return parts.length > 0 ? parts.join(' - ') : 'Sin configurar';
+}
+
 // Lista de frutas disponibles
 const availableFruits = [
     'Fresa',
@@ -98,11 +130,10 @@ auth.onAuthStateChanged((user) => {
         // Mostrar contenido de la app
         document.querySelector('.header').style.display = '';
         document.querySelector('.container').style.display = '';
-        // Actualizar info de usuario en header
-        const userInfo = document.getElementById('userInfo');
-        const userEmailDisplay = document.getElementById('userEmailDisplay');
-        if (userInfo) userInfo.style.display = 'flex';
-        if (userEmailDisplay) userEmailDisplay.textContent = user.displayName || user.email;
+        // Actualizar menú de usuario en header
+        const userMenuContainer = document.getElementById('userMenuContainer');
+        if (userMenuContainer) userMenuContainer.style.display = 'flex';
+        updateUserProfileUI(user);
         showLoading(true);
         loadData();
     } else {
@@ -114,8 +145,8 @@ auth.onAuthStateChanged((user) => {
         // Ocultar contenido y mostrar formulario de registro/login
         document.querySelector('.header').style.display = 'none';
         document.querySelector('.container').style.display = 'none';
-        const userInfo = document.getElementById('userInfo');
-        if (userInfo) userInfo.style.display = 'none';
+        const userMenuContainer = document.getElementById('userMenuContainer');
+        if (userMenuContainer) userMenuContainer.style.display = 'none';
         const authOverlay = document.getElementById('authModalOverlay');
         if (authOverlay) {
             authOverlay.classList.add('visible');
@@ -472,7 +503,8 @@ async function quickAddEntry() {
             quantity,
             total,
             paid: false,
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            snapshot: createJobSnapshot(selectedJob)
         });
         showToast('Registro agregado');
         document.getElementById('quickQuantity').value = '';
@@ -836,12 +868,19 @@ async function saveEntry() {
         return;
     }
 
+    if (!job) {
+        showToast('Trabajo no encontrado', 'error');
+        return;
+    }
+
     const data = {
         jobId,
         date,
         paid: entryPaid,
         notes: document.getElementById('entryNotes').value,
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        // Snapshot: guardar copia del trabajo al momento de crear/editar el registro
+        snapshot: createJobSnapshot(job)
     };
 
     if (job.type === 'dia') {
@@ -1170,11 +1209,11 @@ function confirmMarkAsPaid() {
     const total = pendingOnly.reduce((sum, e) => sum + (e.total || 0), 0);
     const days = new Set(pendingOnly.map(e => e.date)).size;
 
-    // Agrupar por fruta
+    // Agrupar por fruta (usar snapshot)
     const byFruit = {};
     pendingOnly.forEach(e => {
-        const job = jobs.find(j => j.id === e.jobId);
-        const fruit = job?.product || 'Sin trabajo';
+        const jobData = getEntryJobData(e);
+        const fruit = jobData.product || 'Sin trabajo';
         if (!byFruit[fruit]) byFruit[fruit] = { count: 0, total: 0 };
         byFruit[fruit].count++;
         byFruit[fruit].total += (e.total || 0);
@@ -1250,8 +1289,8 @@ function openDayModal(dateStr, dayEntries) {
         list.innerHTML = '<p style="text-align: center; color: rgba(255,255,255,0.5); padding: 20px;">No hay registros para este día</p>';
     } else {
         list.innerHTML = dayEntries.map(e => {
-            const job = jobs.find(j => j.id === e.jobId);
-            const safeDisplayName = escapeHtml(job ? getJobDisplayName(job) : 'Trabajo eliminado');
+            const jobData = getEntryJobData(e);
+            const safeDisplayName = escapeHtml(getDisplayName(jobData));
             return `
                 <div class="entry-card" onclick="closeDayModal(); openEntryModal('${e.id}')">
                     <div class="entry-info">
@@ -1288,10 +1327,10 @@ function renderEntries() {
     // Aplicar filtros
     const fruitFilter = document.getElementById('filterFruit')?.value || '';
     let filteredEntries = entries.filter(e => {
-        const job = jobs.find(j => j.id === e.jobId);
+        const jobData = getEntryJobData(e);
 
-        // Filtro por fruta
-        if (fruitFilter && job?.product !== fruitFilter) return false;
+        // Filtro por fruta (usar snapshot)
+        if (fruitFilter && jobData.product !== fruitFilter) return false;
 
         // Filtro por pago
         if (paymentFilter === 'pending' && e.paid) return false;
@@ -1359,12 +1398,12 @@ function renderEntries() {
 
         // Entradas del mes
         group.entries.forEach(e => {
-            const job = jobs.find(j => j.id === e.jobId);
+            const jobData = getEntryJobData(e);
             const date = new Date(e.date + 'T12:00:00');
             const dayName = dayNames[date.getDay()];
             const dateStr = `${date.getDate()} ${monthNames[date.getMonth()].substring(0, 3)}`;
-            const fruta = escapeHtml(job ? job.product : 'Sin trabajo');
-            const safeEmployer = escapeHtml(job?.employer || '');
+            const fruta = escapeHtml(jobData.product || 'Sin trabajo');
+            const safeEmployer = escapeHtml(jobData.employer || '');
             const precio = '$' + (e.total || 0).toFixed(2);
             const isSelected = selectedEntries.has(e.id);
 
@@ -1474,11 +1513,11 @@ function updateFruitFilter() {
 
     const currentVal = select.value;
 
-    // Obtener frutas unicas de los registros
+    // Obtener frutas unicas de los registros (usar snapshot)
     const fruitsInEntries = new Set();
     entries.forEach(e => {
-        const job = jobs.find(j => j.id === e.jobId);
-        if (job?.product) fruitsInEntries.add(job.product);
+        const jobData = getEntryJobData(e);
+        if (jobData.product) fruitsInEntries.add(jobData.product);
     });
 
     let options = '<option value="">Todas las frutas</option>';
@@ -1548,10 +1587,97 @@ async function saveNewFruit() {
 }
 
 // ============================================
+// USER PROFILE DROPDOWN
+// ============================================
+let bossMode = false;
+
+function updateUserProfileUI(user) {
+    if (!user) return;
+
+    const name = user.displayName || '';
+    const email = user.email || '';
+    const photoURL = user.photoURL || '';
+
+    // Generar iniciales
+    let initials = '?';
+    if (name) {
+        const parts = name.split(' ');
+        initials = parts.length >= 2
+            ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+            : name.substring(0, 2).toUpperCase();
+    } else if (email) {
+        initials = email[0].toUpperCase();
+    }
+
+    // Avatar en botón
+    const avatarImg = document.getElementById('userAvatarImg');
+    const avatarInitials = document.getElementById('userAvatarInitials');
+    if (photoURL) {
+        avatarImg.src = photoURL;
+        avatarImg.style.display = 'block';
+        avatarInitials.style.display = 'none';
+    } else {
+        avatarImg.style.display = 'none';
+        avatarInitials.style.display = 'flex';
+        avatarInitials.textContent = initials;
+    }
+
+    // Avatar en dropdown
+    const dropdownImg = document.getElementById('dropdownAvatarImg');
+    const dropdownInitials = document.getElementById('dropdownAvatarInitials');
+    if (photoURL) {
+        dropdownImg.src = photoURL;
+        dropdownImg.style.display = 'block';
+        dropdownInitials.style.display = 'none';
+    } else {
+        dropdownImg.style.display = 'none';
+        dropdownInitials.style.display = 'flex';
+        dropdownInitials.textContent = initials;
+    }
+
+    // Info en dropdown
+    document.getElementById('dropdownUserName').textContent = name || 'Usuario';
+    document.getElementById('dropdownUserEmail').textContent = email;
+}
+
+function toggleUserDropdown() {
+    const dropdown = document.getElementById('userDropdown');
+    dropdown.classList.toggle('visible');
+}
+
+function closeUserDropdown() {
+    const dropdown = document.getElementById('userDropdown');
+    if (dropdown) dropdown.classList.remove('visible');
+}
+
+function toggleBossMode(event) {
+    event.stopPropagation();
+    bossMode = !bossMode;
+    const toggle = document.getElementById('bossModeToggle');
+    toggle.classList.toggle('active', bossMode);
+
+    if (bossMode) {
+        document.body.classList.add('boss-mode');
+        showToast('Modo Jefe activado 👑');
+    } else {
+        document.body.classList.remove('boss-mode');
+        showToast('Modo Jefe desactivado');
+    }
+}
+
+// ============================================
 // INIT
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
     renderCalendar();
+
+    // Cerrar dropdown de usuario al hacer click fuera
+    document.addEventListener('click', (e) => {
+        const container = document.getElementById('userMenuContainer');
+        if (container && !container.contains(e.target)) {
+            closeUserDropdown();
+        }
+    });
 
     // Cerrar modales con Escape
     document.addEventListener('keydown', (e) => {
