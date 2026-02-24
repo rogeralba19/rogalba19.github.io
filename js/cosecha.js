@@ -18,6 +18,7 @@ let jobType = 'trato';
 
 // Entry modal state
 let entryPaid = false;
+let editingEntry = null; // Registro que se está editando (para preservar snapshot)
 
 // Entries filter state
 let paymentFilter = 'all'; // 'all', 'pending', 'paid'
@@ -85,13 +86,11 @@ function createJobSnapshot(job) {
     };
 }
 
-// Helper: obtener datos del trabajo desde el registro (snapshot o fallback al trabajo actual)
+// Helper: obtener datos del trabajo desde el registro - SOLO usa snapshot, NUNCA el trabajo actual
 function getEntryJobData(entry) {
     if (entry.snapshot) return entry.snapshot;
-    // Fallback para registros antiguos sin snapshot
-    const job = jobs.find(j => j.id === entry.jobId);
-    if (job) return createJobSnapshot(job);
-    return { product: 'Trabajo eliminado', type: 'trato', unit: null, price: 0, dailyRate: 0, employer: '' };
+    // Registros sin snapshot (pendientes de migración) - NUNCA buscar el trabajo actual
+    return { product: 'Sin datos', type: 'trato', unit: null, price: 0, dailyRate: 0, employer: '' };
 }
 
 // Helper: nombre para mostrar desde datos de trabajo (snapshot o job)
@@ -102,6 +101,33 @@ function getDisplayName(jobData) {
     if (jobData.price) parts.push('$' + jobData.price);
     if (jobData.employer) parts.push(jobData.employer);
     return parts.length > 0 ? parts.join(' - ') : 'Sin configurar';
+}
+
+// Migración: agregar snapshot a registros antiguos que no lo tienen
+let migrationDone = false;
+
+async function migrateEntriesWithoutSnapshot() {
+    if (!currentUser || migrationDone) return;
+    migrationDone = true;
+
+    const entriesToMigrate = entries.filter(e => !e.snapshot && e.jobId);
+    if (entriesToMigrate.length === 0) return;
+
+    const updates = {};
+    entriesToMigrate.forEach(e => {
+        const job = jobs.find(j => j.id === e.jobId);
+        if (job) {
+            updates[`harvest/${currentUser.uid}/${e.id}/snapshot`] = createJobSnapshot(job);
+        }
+    });
+
+    if (Object.keys(updates).length > 0) {
+        try {
+            await db.ref().update(updates);
+        } catch (error) {
+            console.error('Error migrando registros:', error);
+        }
+    }
 }
 
 // Lista de frutas disponibles
@@ -166,6 +192,7 @@ function showLoading(show) {
 function checkDataReady() {
     if (jobsLoaded && entriesLoaded) {
         showLoading(false);
+        migrateEntriesWithoutSnapshot();
     }
 }
 
@@ -629,6 +656,9 @@ async function deleteJob() {
 // ENTRY MODAL
 // ============================================
 function openEntryModal(entryId = null, preselectedJobId = null) {
+    // Limpiar estado de edición
+    editingEntry = null;
+
     // Update job select options first
     updateJobSelect();
 
@@ -648,6 +678,7 @@ function openEntryModal(entryId = null, preselectedJobId = null) {
     if (entryId) {
         const entry = entries.find(e => e.id === entryId);
         if (entry) {
+            editingEntry = entry; // Guardar referencia para preservar snapshot
             document.getElementById('entryId').value = entry.id;
             document.getElementById('entryJob').value = entry.jobId || '';
             document.getElementById('entryDate').value = entry.date;
@@ -669,6 +700,7 @@ function openEntryModal(entryId = null, preselectedJobId = null) {
 function closeEntryModal() {
     closeModal('entryModal');
     selectedDayDate = null;
+    editingEntry = null;
 }
 
 function updateJobSelect() {
@@ -699,7 +731,6 @@ function getJobDisplayName(job) {
 
 function onJobSelect() {
     const jobId = document.getElementById('entryJob').value;
-    const job = jobs.find(j => j.id === jobId);
 
     const configFields = document.getElementById('entryConfigFields');
     const editBtn = document.getElementById('editJobBtn');
@@ -712,6 +743,33 @@ function onJobSelect() {
     document.getElementById('entryTratoFields').classList.remove('visible');
     document.getElementById('entryDiaFields').classList.remove('visible');
 
+    if (!jobId) return;
+
+    // Si estamos editando un registro existente con el mismo trabajo, usar snapshot
+    if (editingEntry && editingEntry.jobId === jobId && editingEntry.snapshot) {
+        const snap = editingEntry.snapshot;
+        const unitLabels = {
+            'totens': 'totens', 'capacho_grande': 'capachos grandes',
+            'capacho_pequeno': 'capachos pequeños', 'kilo': 'kilos',
+            'bandeja': 'bandejas', 'bins': 'bins'
+        };
+
+        if (snap.type === 'dia') {
+            document.getElementById('entryDiaFields').classList.add('visible');
+            document.getElementById('entryTotal').textContent = '$' + (snap.dailyRate || 0).toFixed(2);
+        } else {
+            document.getElementById('entryTratoFields').classList.add('visible');
+            document.getElementById('entryUnitLabel').textContent = `(${unitLabels[snap.unit] || 'unidades'})`;
+            if (snap.unit === 'bins') {
+                binsFields.classList.add('visible');
+            }
+            calculateEntryTotal();
+        }
+        return;
+    }
+
+    // Para registros nuevos o si cambió el trabajo, usar trabajo actual
+    const job = jobs.find(j => j.id === jobId);
     if (!job) return;
 
     const isConfigured = (job.type === 'dia' && job.dailyRate > 0) || (job.type === 'trato' && job.price > 0);
@@ -823,24 +881,40 @@ async function saveEntryConfig() {
 
 function calculateEntryTotal() {
     const jobId = document.getElementById('entryJob').value;
-    const job = jobs.find(j => j.id === jobId);
     const quantity = parseFloat(document.getElementById('entryQuantity').value) || 0;
 
     let total = 0;
-    if (job) {
-        if (job.type === 'dia') {
-            total = job.dailyRate || 0;
-        } else {
-            total = quantity * (job.price || 0);
 
-            // Si es bins, dividir entre personas
-            if (job.unit === 'bins') {
+    // Si estamos editando con el mismo trabajo, usar precio del snapshot
+    if (editingEntry && editingEntry.jobId === jobId && editingEntry.snapshot) {
+        const snap = editingEntry.snapshot;
+        if (snap.type === 'dia') {
+            total = snap.dailyRate || 0;
+        } else {
+            total = quantity * (snap.price || 0);
+            if (snap.unit === 'bins') {
                 let people = parseInt(document.getElementById('entryPeople').value) || 1;
                 people = Math.max(1, Math.min(50, people));
                 total = total / people;
             }
         }
+    } else {
+        // Registro nuevo o trabajo cambiado - usar trabajo actual
+        const job = jobs.find(j => j.id === jobId);
+        if (job) {
+            if (job.type === 'dia') {
+                total = job.dailyRate || 0;
+            } else {
+                total = quantity * (job.price || 0);
+                if (job.unit === 'bins') {
+                    let people = parseInt(document.getElementById('entryPeople').value) || 1;
+                    people = Math.max(1, Math.min(50, people));
+                    total = total / people;
+                }
+            }
+        }
     }
+
     document.getElementById('entryTotal').textContent = '$' + total.toFixed(2);
     return total;
 }
@@ -860,7 +934,6 @@ async function saveEntry() {
 
     const id = document.getElementById('entryId').value;
     const jobId = document.getElementById('entryJob').value;
-    const job = jobs.find(j => j.id === jobId);
     const date = document.getElementById('entryDate').value;
 
     if (!jobId || !date) {
@@ -868,9 +941,29 @@ async function saveEntry() {
         return;
     }
 
-    if (!job) {
-        showToast('Trabajo no encontrado', 'error');
-        return;
+    // Determinar fuente de datos: snapshot original o trabajo actual
+    const isEditingSameJob = id && editingEntry && editingEntry.jobId === jobId && editingEntry.snapshot;
+    let snapshot, entryType, entryPrice, entryDailyRate, entryUnit;
+
+    if (isEditingSameJob) {
+        // PRESERVAR snapshot original - lo que se guardó NO se toca
+        snapshot = editingEntry.snapshot;
+        entryType = snapshot.type;
+        entryPrice = snapshot.price || 0;
+        entryDailyRate = snapshot.dailyRate || 0;
+        entryUnit = snapshot.unit;
+    } else {
+        // Registro nuevo o cambió de trabajo - usar trabajo actual
+        const job = jobs.find(j => j.id === jobId);
+        if (!job) {
+            showToast('Trabajo no encontrado', 'error');
+            return;
+        }
+        snapshot = createJobSnapshot(job);
+        entryType = job.type;
+        entryPrice = job.price || 0;
+        entryDailyRate = job.dailyRate || 0;
+        entryUnit = job.unit;
     }
 
     const data = {
@@ -879,12 +972,11 @@ async function saveEntry() {
         paid: entryPaid,
         notes: document.getElementById('entryNotes').value,
         updatedAt: Date.now(),
-        // Snapshot: guardar copia del trabajo al momento de crear/editar el registro
-        snapshot: createJobSnapshot(job)
+        snapshot: snapshot
     };
 
-    if (job.type === 'dia') {
-        data.total = job.dailyRate || 0;
+    if (entryType === 'dia') {
+        data.total = entryDailyRate;
         data.hours = parseFloat(document.getElementById('entryHours').value) || null;
     } else {
         data.quantity = parseFloat(document.getElementById('entryQuantity').value) || 0;
@@ -894,10 +986,10 @@ async function saveEntry() {
             return;
         }
 
-        data.total = data.quantity * (job.price || 0);
+        data.total = data.quantity * entryPrice;
 
         // Si es bins, dividir entre personas
-        if (job.unit === 'bins') {
+        if (entryUnit === 'bins') {
             let people = parseInt(document.getElementById('entryPeople').value) || 1;
             people = Math.max(1, Math.min(50, people));
             data.people = people;
