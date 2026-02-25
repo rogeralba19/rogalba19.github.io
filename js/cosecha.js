@@ -86,11 +86,13 @@ function createJobSnapshot(job) {
     };
 }
 
-// Helper: obtener datos del trabajo desde el registro - SOLO usa snapshot, NUNCA el trabajo actual
+// Helper: obtener datos del trabajo desde el registro (snapshot o fallback para registros viejos)
 function getEntryJobData(entry) {
     if (entry.snapshot) return entry.snapshot;
-    // Registros sin snapshot (pendientes de migración) - NUNCA buscar el trabajo actual
-    return { product: 'Sin datos', type: 'trato', unit: null, price: 0, dailyRate: 0, employer: '' };
+    // Fallback para registros antiguos sin snapshot (solo lectura, para mostrar en lista)
+    const job = jobs.find(j => j.id === entry.jobId);
+    if (job) return createJobSnapshot(job);
+    return { product: 'Trabajo eliminado', type: 'trato', unit: null, price: 0, dailyRate: 0, employer: '' };
 }
 
 // Helper: nombre para mostrar desde datos de trabajo (snapshot o job)
@@ -101,33 +103,6 @@ function getDisplayName(jobData) {
     if (jobData.price) parts.push('$' + jobData.price);
     if (jobData.employer) parts.push(jobData.employer);
     return parts.length > 0 ? parts.join(' - ') : 'Sin configurar';
-}
-
-// Migración: agregar snapshot a registros antiguos que no lo tienen
-let migrationDone = false;
-
-async function migrateEntriesWithoutSnapshot() {
-    if (!currentUser || migrationDone) return;
-    migrationDone = true;
-
-    const entriesToMigrate = entries.filter(e => !e.snapshot && e.jobId);
-    if (entriesToMigrate.length === 0) return;
-
-    const updates = {};
-    entriesToMigrate.forEach(e => {
-        const job = jobs.find(j => j.id === e.jobId);
-        if (job) {
-            updates[`harvest/${currentUser.uid}/${e.id}/snapshot`] = createJobSnapshot(job);
-        }
-    });
-
-    if (Object.keys(updates).length > 0) {
-        try {
-            await db.ref().update(updates);
-        } catch (error) {
-            console.error('Error migrando registros:', error);
-        }
-    }
 }
 
 // Lista de frutas disponibles
@@ -192,7 +167,6 @@ function showLoading(show) {
 function checkDataReady() {
     if (jobsLoaded && entriesLoaded) {
         showLoading(false);
-        migrateEntriesWithoutSnapshot();
     }
 }
 
@@ -662,6 +636,7 @@ function openEntryModal(entryId = null, preselectedJobId = null) {
     // Update job select options first
     updateJobSelect();
 
+    // Reset todos los campos
     document.getElementById('entryId').value = '';
     document.getElementById('entryJob').value = preselectedJobId || '';
     document.getElementById('entryDate').value = selectedDayDate || getLocalDateString();
@@ -673,12 +648,11 @@ function openEntryModal(entryId = null, preselectedJobId = null) {
     updateEntryPaidUI();
     document.getElementById('deleteEntryBtn').style.display = 'none';
     document.getElementById('entryModalTitle').textContent = 'Nuevo Registro';
-    onJobSelect();
 
     if (entryId) {
         const entry = entries.find(e => e.id === entryId);
         if (entry) {
-            editingEntry = entry; // Guardar referencia para preservar snapshot
+            editingEntry = entry;
             document.getElementById('entryId').value = entry.id;
             document.getElementById('entryJob').value = entry.jobId || '';
             document.getElementById('entryDate').value = entry.date;
@@ -690,10 +664,11 @@ function openEntryModal(entryId = null, preselectedJobId = null) {
             updateEntryPaidUI();
             document.getElementById('deleteEntryBtn').style.display = 'block';
             document.getElementById('entryModalTitle').textContent = 'Editar Registro';
-            onJobSelect();
         }
     }
 
+    // Una sola llamada a onJobSelect después de configurar todo
+    onJobSelect();
     openModal('entryModal');
 }
 
@@ -731,28 +706,46 @@ function getJobDisplayName(job) {
 
 function onJobSelect() {
     const jobId = document.getElementById('entryJob').value;
-
+    const selectWrapper = document.getElementById('entryJobSelectWrapper');
+    const jobDisplay = document.getElementById('entryJobDisplay');
     const configFields = document.getElementById('entryConfigFields');
-    const editBtn = document.getElementById('editJobBtn');
     const binsFields = document.getElementById('entryBinsFields');
 
     // Ocultar todo primero
     configFields.classList.remove('visible');
-    editBtn.style.display = 'none';
     binsFields.classList.remove('visible');
     document.getElementById('entryTratoFields').classList.remove('visible');
     document.getElementById('entryDiaFields').classList.remove('visible');
+    document.getElementById('entryTotal').textContent = '$0.00';
 
-    if (!jobId) return;
+    if (!jobId) {
+        // Sin trabajo seleccionado: mostrar selector, ocultar display
+        selectWrapper.style.display = '';
+        jobDisplay.style.display = 'none';
+        return;
+    }
+
+    // Trabajo seleccionado: ocultar selector, mostrar display fijo
+    selectWrapper.style.display = 'none';
+    jobDisplay.style.display = 'flex';
+
+    // Limpiar campos al cambiar de trabajo (no al abrir para editar)
+    if (!editingEntry) {
+        document.getElementById('entryQuantity').value = '';
+        document.getElementById('entryHours').value = '';
+        document.getElementById('entryPeople').value = '1';
+    }
+
+    const unitLabels = {
+        'totens': 'totens', 'capacho_grande': 'capachos grandes',
+        'capacho_pequeno': 'capachos pequeños', 'kilo': 'kilos',
+        'bandeja': 'bandejas', 'bins': 'bins'
+    };
 
     // Si estamos editando un registro existente con el mismo trabajo, usar snapshot
     if (editingEntry && editingEntry.jobId === jobId && editingEntry.snapshot) {
         const snap = editingEntry.snapshot;
-        const unitLabels = {
-            'totens': 'totens', 'capacho_grande': 'capachos grandes',
-            'capacho_pequeno': 'capachos pequeños', 'kilo': 'kilos',
-            'bandeja': 'bandejas', 'bins': 'bins'
-        };
+        document.getElementById('entryJobName').textContent = getDisplayName(snap);
 
         if (snap.type === 'dia') {
             document.getElementById('entryDiaFields').classList.add('visible');
@@ -772,10 +765,12 @@ function onJobSelect() {
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
 
+    document.getElementById('entryJobName').textContent = getJobDisplayName(job);
+
     const isConfigured = (job.type === 'dia' && job.dailyRate > 0) || (job.type === 'trato' && job.price > 0);
 
     if (!isConfigured) {
-        // Mostrar campos de configuracion
+        // Mostrar campos de configuración inline
         configFields.classList.add('visible');
         document.getElementById('entryConfigUnit').value = job.unit || 'totens';
         document.getElementById('entryConfigPrice').value = job.price || '';
@@ -783,42 +778,28 @@ function onJobSelect() {
         document.getElementById('entryConfigEmployer').value = job.employer || '';
         document.getElementById('entryConfigType').value = job.type || 'trato';
         updateEntryConfigType();
-
-        // Mostrar campo de cantidad tambien para que pueda llenar todo junto
-        const configType = document.getElementById('entryConfigType').value;
-        if (configType === 'trato') {
-            document.getElementById('entryTratoFields').classList.add('visible');
-        } else {
-            document.getElementById('entryDiaFields').classList.add('visible');
-        }
     } else {
-        // Mostrar boton de editar
-        editBtn.style.display = 'inline-block';
-
-        const unitLabels = {
-            'totens': 'totens',
-            'capacho_grande': 'capachos grandes',
-            'capacho_pequeno': 'capachos pequeños',
-            'kilo': 'kilos',
-            'bandeja': 'bandejas',
-            'bins': 'bins'
-        };
-
         if (job.type === 'dia') {
             document.getElementById('entryDiaFields').classList.add('visible');
             document.getElementById('entryTotal').textContent = '$' + (job.dailyRate || 0).toFixed(2);
         } else {
             document.getElementById('entryTratoFields').classList.add('visible');
             document.getElementById('entryUnitLabel').textContent = `(${unitLabels[job.unit] || 'unidades'})`;
-
-            // Si es bins, mostrar selector de personas
             if (job.unit === 'bins') {
                 binsFields.classList.add('visible');
             }
-
             calculateEntryTotal();
         }
     }
+}
+
+// Volver a mostrar el selector de trabajo
+function changeEntryJob() {
+    document.getElementById('entryJobSelectWrapper').style.display = '';
+    document.getElementById('entryJobDisplay').style.display = 'none';
+    document.getElementById('entryJob').focus();
+    // Si cambia de trabajo estando editando, limpiar editingEntry para que use datos del nuevo trabajo
+    editingEntry = null;
 }
 
 function updateEntryConfigType() {
@@ -826,92 +807,89 @@ function updateEntryConfigType() {
     document.getElementById('entryConfigTratoFields').style.display = type === 'trato' ? 'block' : 'none';
     document.getElementById('entryConfigDiaFields').style.display = type === 'dia' ? 'block' : 'none';
 
-    // Tambien actualizar campos de cantidad/horas si config esta visible
+    // Actualizar campos de cantidad/horas y bins
     const configFields = document.getElementById('entryConfigFields');
     if (configFields.classList.contains('visible')) {
         document.getElementById('entryTratoFields').classList.toggle('visible', type === 'trato');
         document.getElementById('entryDiaFields').classList.toggle('visible', type === 'dia');
+
+        // Mostrar/ocultar bins según unidad seleccionada
+        const unit = document.getElementById('entryConfigUnit').value;
+        document.getElementById('entryBinsFields').classList.toggle('visible', type === 'trato' && unit === 'bins');
+
+        calculateEntryTotal();
     }
 }
 
-function toggleEntryEdit() {
-    const configFields = document.getElementById('entryConfigFields');
-    const jobId = document.getElementById('entryJob').value;
-    const job = jobs.find(j => j.id === jobId);
-
-    if (!job) return;
-
-    configFields.classList.toggle('visible');
-    if (configFields.classList.contains('visible')) {
-        document.getElementById('entryConfigUnit').value = job.unit || 'totens';
-        document.getElementById('entryConfigPrice').value = job.price || '';
-        document.getElementById('entryConfigDailyRate').value = job.dailyRate || '';
-        document.getElementById('entryConfigEmployer').value = job.employer || '';
-        document.getElementById('entryConfigType').value = job.type || 'trato';
-        updateEntryConfigType();
-    }
+// Cuando cambia el recipiente en config: mostrar/ocultar bins y recalcular
+function onConfigUnitChange() {
+    const unit = document.getElementById('entryConfigUnit').value;
+    document.getElementById('entryBinsFields').classList.toggle('visible', unit === 'bins');
+    calculateEntryTotal();
 }
 
-async function saveEntryConfig() {
-    const jobId = document.getElementById('entryJob').value;
-    if (!jobId || !currentUser) return;
-
+// Leer datos de configuración desde los campos del formulario
+function readConfigFields() {
     const type = document.getElementById('entryConfigType').value;
-    const data = {
+    const config = {
         type: type,
-        employer: document.getElementById('entryConfigEmployer').value,
-        updatedAt: Date.now()
+        employer: document.getElementById('entryConfigEmployer').value
     };
-
     if (type === 'trato') {
-        data.unit = document.getElementById('entryConfigUnit').value;
-        data.price = parseFloat(document.getElementById('entryConfigPrice').value) || 0;
+        config.unit = document.getElementById('entryConfigUnit').value;
+        config.price = parseFloat(document.getElementById('entryConfigPrice').value) || 0;
+        config.dailyRate = null;
     } else {
-        data.dailyRate = parseFloat(document.getElementById('entryConfigDailyRate').value) || 0;
+        config.dailyRate = parseFloat(document.getElementById('entryConfigDailyRate').value) || 0;
+        config.unit = null;
+        config.price = null;
     }
-
-    try {
-        await db.ref(`jobs/${currentUser.uid}/${jobId}`).update(data);
-        showToast('Configuración guardada');
-        document.getElementById('entryConfigFields').classList.remove('visible');
-    } catch (error) {
-        showToast('Error al guardar', 'error');
-    }
+    return config;
 }
 
 function calculateEntryTotal() {
     const jobId = document.getElementById('entryJob').value;
     const quantity = parseFloat(document.getElementById('entryQuantity').value) || 0;
+    const configVisible = document.getElementById('entryConfigFields').classList.contains('visible');
 
     let total = 0;
+    let type, price, dailyRate, unit;
 
-    // Si estamos editando con el mismo trabajo, usar precio del snapshot
-    if (editingEntry && editingEntry.jobId === jobId && editingEntry.snapshot) {
+    if (configVisible) {
+        // Leer precios directamente de los campos de configuración visibles
+        const config = readConfigFields();
+        type = config.type;
+        price = config.price || 0;
+        dailyRate = config.dailyRate || 0;
+        unit = config.unit;
+    } else if (editingEntry && editingEntry.jobId === jobId && editingEntry.snapshot) {
+        // Editando mismo trabajo: usar snapshot
         const snap = editingEntry.snapshot;
-        if (snap.type === 'dia') {
-            total = snap.dailyRate || 0;
-        } else {
-            total = quantity * (snap.price || 0);
-            if (snap.unit === 'bins') {
-                let people = parseInt(document.getElementById('entryPeople').value) || 1;
-                people = Math.max(1, Math.min(50, people));
-                total = total / people;
-            }
-        }
+        type = snap.type;
+        price = snap.price || 0;
+        dailyRate = snap.dailyRate || 0;
+        unit = snap.unit;
     } else {
-        // Registro nuevo o trabajo cambiado - usar trabajo actual
+        // Registro nuevo con trabajo configurado
         const job = jobs.find(j => j.id === jobId);
-        if (job) {
-            if (job.type === 'dia') {
-                total = job.dailyRate || 0;
-            } else {
-                total = quantity * (job.price || 0);
-                if (job.unit === 'bins') {
-                    let people = parseInt(document.getElementById('entryPeople').value) || 1;
-                    people = Math.max(1, Math.min(50, people));
-                    total = total / people;
-                }
-            }
+        if (!job) {
+            document.getElementById('entryTotal').textContent = '$0.00';
+            return 0;
+        }
+        type = job.type;
+        price = job.price || 0;
+        dailyRate = job.dailyRate || 0;
+        unit = job.unit;
+    }
+
+    if (type === 'dia') {
+        total = dailyRate;
+    } else {
+        total = quantity * price;
+        if (unit === 'bins') {
+            let people = parseInt(document.getElementById('entryPeople').value) || 1;
+            people = Math.max(1, Math.min(50, people));
+            total = total / people;
         }
     }
 
@@ -935,35 +913,83 @@ async function saveEntry() {
     const id = document.getElementById('entryId').value;
     const jobId = document.getElementById('entryJob').value;
     const date = document.getElementById('entryDate').value;
+    const configVisible = document.getElementById('entryConfigFields').classList.contains('visible');
 
     if (!jobId || !date) {
         showToast('Selecciona trabajo y fecha', 'error');
         return;
     }
 
-    // Determinar fuente de datos: snapshot original o trabajo actual
+    const job = jobs.find(j => j.id === jobId);
     const isEditingSameJob = id && editingEntry && editingEntry.jobId === jobId && editingEntry.snapshot;
-    let snapshot, entryType, entryPrice, entryDailyRate, entryUnit;
 
-    if (isEditingSameJob) {
-        // PRESERVAR snapshot original - lo que se guardó NO se toca
+    // Determinar fuente de datos para el snapshot y precios
+    let snapshot, sType, sPrice, sDailyRate, sUnit;
+
+    if (configVisible) {
+        // Config fields visibles: leer valores de ahí y también guardar en el trabajo
+        const config = readConfigFields();
+        sType = config.type;
+        sPrice = config.price || 0;
+        sDailyRate = config.dailyRate || 0;
+        sUnit = config.unit;
+
+        // Guardar configuración en el trabajo para usos futuros
+        if (job) {
+            const jobUpdate = {
+                type: sType,
+                employer: config.employer,
+                updatedAt: Date.now()
+            };
+            if (sType === 'trato') {
+                jobUpdate.unit = sUnit;
+                jobUpdate.price = sPrice;
+                jobUpdate.dailyRate = null;
+            } else {
+                jobUpdate.dailyRate = sDailyRate;
+                jobUpdate.unit = null;
+                jobUpdate.price = null;
+            }
+            await db.ref(`jobs/${currentUser.uid}/${jobId}`).update(jobUpdate);
+        }
+
+        // Crear snapshot desde los campos de config
+        snapshot = {
+            product: job ? job.product : '',
+            type: sType,
+            unit: sUnit,
+            price: sPrice,
+            dailyRate: sDailyRate,
+            employer: config.employer || ''
+        };
+    } else if (isEditingSameJob) {
+        // Editando mismo trabajo: PRESERVAR snapshot original
         snapshot = editingEntry.snapshot;
-        entryType = snapshot.type;
-        entryPrice = snapshot.price || 0;
-        entryDailyRate = snapshot.dailyRate || 0;
-        entryUnit = snapshot.unit;
+        sType = snapshot.type;
+        sPrice = snapshot.price || 0;
+        sDailyRate = snapshot.dailyRate || 0;
+        sUnit = snapshot.unit;
     } else {
-        // Registro nuevo o cambió de trabajo - usar trabajo actual
-        const job = jobs.find(j => j.id === jobId);
+        // Registro nuevo con trabajo ya configurado
         if (!job) {
             showToast('Trabajo no encontrado', 'error');
             return;
         }
         snapshot = createJobSnapshot(job);
-        entryType = job.type;
-        entryPrice = job.price || 0;
-        entryDailyRate = job.dailyRate || 0;
-        entryUnit = job.unit;
+        sType = job.type;
+        sPrice = job.price || 0;
+        sDailyRate = job.dailyRate || 0;
+        sUnit = job.unit;
+    }
+
+    // Validaciones
+    if (sType === 'dia' && sDailyRate <= 0) {
+        showToast('Configura el pago por día', 'error');
+        return;
+    }
+    if (sType === 'trato' && sPrice <= 0) {
+        showToast('Configura el precio por unidad', 'error');
+        return;
     }
 
     const data = {
@@ -975,8 +1001,8 @@ async function saveEntry() {
         snapshot: snapshot
     };
 
-    if (entryType === 'dia') {
-        data.total = entryDailyRate;
+    if (sType === 'dia') {
+        data.total = sDailyRate;
         data.hours = parseFloat(document.getElementById('entryHours').value) || null;
     } else {
         data.quantity = parseFloat(document.getElementById('entryQuantity').value) || 0;
@@ -986,10 +1012,9 @@ async function saveEntry() {
             return;
         }
 
-        data.total = data.quantity * entryPrice;
+        data.total = data.quantity * sPrice;
 
-        // Si es bins, dividir entre personas
-        if (entryUnit === 'bins') {
+        if (sUnit === 'bins') {
             let people = parseInt(document.getElementById('entryPeople').value) || 1;
             people = Math.max(1, Math.min(50, people));
             data.people = people;

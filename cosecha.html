@@ -222,11 +222,14 @@
 
                 <div class="form-group">
                     <label>Trabajo</label>
-                    <div class="input-with-btn">
+                    <div id="entryJobSelectWrapper">
                         <select id="entryJob" onchange="onJobSelect()">
                             <option value="">Seleccionar trabajo</option>
                         </select>
-                        <button type="button" class="btn-edit" id="editJobBtn" style="display: none;" onclick="toggleEntryEdit()">✏️ Editar</button>
+                    </div>
+                    <div id="entryJobDisplay" class="job-selected-display" style="display: none;">
+                        <span id="entryJobName" class="job-selected-name"></span>
+                        <button type="button" class="btn-change" onclick="changeEntryJob()">Cambiar</button>
                     </div>
                 </div>
 
@@ -243,7 +246,7 @@
                     <div id="entryConfigTratoFields">
                         <div class="form-group">
                             <label>Recipiente</label>
-                            <select id="entryConfigUnit">
+                            <select id="entryConfigUnit" onchange="onConfigUnitChange()">
                                 <option value="totens">Totens</option>
                                 <option value="capacho_grande">Capacho Grande</option>
                                 <option value="capacho_pequeno">Capacho Pequeño</option>
@@ -254,20 +257,19 @@
                         </div>
                         <div class="form-group">
                             <label>Precio por unidad ($)</label>
-                            <input type="number" id="entryConfigPrice" placeholder="0.00" step="0.01">
+                            <input type="number" id="entryConfigPrice" placeholder="0.00" step="0.01" oninput="calculateEntryTotal()">
                         </div>
                     </div>
                     <div id="entryConfigDiaFields" style="display: none;">
                         <div class="form-group">
                             <label>Pago por día ($)</label>
-                            <input type="number" id="entryConfigDailyRate" placeholder="0.00" step="0.01">
+                            <input type="number" id="entryConfigDailyRate" placeholder="0.00" step="0.01" oninput="calculateEntryTotal()">
                         </div>
                     </div>
                     <div class="form-group">
                         <label>Ubicación / Empleador</label>
                         <input type="text" id="entryConfigEmployer" placeholder="Ej: Rancho Norte">
                     </div>
-                    <button type="button" class="btn btn-primary" style="width: 100%;" onclick="saveEntryConfig()">Guardar Configuración</button>
                 </div>
 
                 <div class="form-group">
