@@ -714,6 +714,7 @@ function onJobSelect() {
     // Ocultar todo primero
     configFields.classList.remove('visible');
     binsFields.classList.remove('visible');
+    document.getElementById('editJobBtn').style.display = 'none';
     document.getElementById('entryTratoFields').classList.remove('visible');
     document.getElementById('entryDiaFields').classList.remove('visible');
     document.getElementById('entryTotal').textContent = '$0.00';
@@ -746,6 +747,7 @@ function onJobSelect() {
     if (editingEntry && editingEntry.jobId === jobId && editingEntry.snapshot) {
         const snap = editingEntry.snapshot;
         document.getElementById('entryJobName').textContent = getDisplayName(snap);
+        document.getElementById('editJobBtn').style.display = 'inline-block';
 
         if (snap.type === 'dia') {
             document.getElementById('entryDiaFields').classList.add('visible');
@@ -779,6 +781,9 @@ function onJobSelect() {
         document.getElementById('entryConfigType').value = job.type || 'trato';
         updateEntryConfigType();
     } else {
+        // Trabajo configurado: mostrar botón editar y campos correspondientes
+        document.getElementById('editJobBtn').style.display = 'inline-block';
+
         if (job.type === 'dia') {
             document.getElementById('entryDiaFields').classList.add('visible');
             document.getElementById('entryTotal').textContent = '$' + (job.dailyRate || 0).toFixed(2);
@@ -800,6 +805,34 @@ function changeEntryJob() {
     document.getElementById('entryJob').focus();
     // Si cambia de trabajo estando editando, limpiar editingEntry para que use datos del nuevo trabajo
     editingEntry = null;
+}
+
+// Abrir/cerrar campos de configuración del trabajo (botón lápiz)
+function toggleEntryEdit() {
+    const configFields = document.getElementById('entryConfigFields');
+    const jobId = document.getElementById('entryJob').value;
+
+    configFields.classList.toggle('visible');
+    if (configFields.classList.contains('visible')) {
+        // Decidir fuente de datos: snapshot (editando) o trabajo actual (nuevo)
+        if (editingEntry && editingEntry.jobId === jobId && editingEntry.snapshot) {
+            const snap = editingEntry.snapshot;
+            document.getElementById('entryConfigUnit').value = snap.unit || 'totens';
+            document.getElementById('entryConfigPrice').value = snap.price || '';
+            document.getElementById('entryConfigDailyRate').value = snap.dailyRate || '';
+            document.getElementById('entryConfigEmployer').value = snap.employer || '';
+            document.getElementById('entryConfigType').value = snap.type || 'trato';
+        } else {
+            const job = jobs.find(j => j.id === jobId);
+            if (!job) return;
+            document.getElementById('entryConfigUnit').value = job.unit || 'totens';
+            document.getElementById('entryConfigPrice').value = job.price || '';
+            document.getElementById('entryConfigDailyRate').value = job.dailyRate || '';
+            document.getElementById('entryConfigEmployer').value = job.employer || '';
+            document.getElementById('entryConfigType').value = job.type || 'trato';
+        }
+        updateEntryConfigType();
+    }
 }
 
 function updateEntryConfigType() {
