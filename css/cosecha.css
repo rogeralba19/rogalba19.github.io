@@ -972,6 +972,40 @@ body {
     background: rgba(255, 170, 0, 0.3);
 }
 
+/* Job selected display */
+.job-selected-display {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    background: rgba(0, 170, 255, 0.1);
+    border: 1px solid rgba(0, 170, 255, 0.3);
+    border-radius: 10px;
+}
+
+.job-selected-name {
+    flex: 1;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.btn-change {
+    padding: 6px 14px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.btn-change:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+
 /* Config Section */
 .config-section {
     background: rgba(0, 170, 255, 0.1);
