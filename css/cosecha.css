@@ -593,6 +593,161 @@ body {
     margin-top: auto;
 }
 
+/* ==========================================
+   Activity Calendar (GitHub-style)
+   ========================================== */
+.activity-calendar {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+.ac-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.ac-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.7);
+}
+.ac-legend {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 10px;
+    color: rgba(255,255,255,0.4);
+}
+.ac-legend-label { margin: 0 4px; }
+.ac-legend-box {
+    width: 11px;
+    height: 11px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.06);
+}
+/* Paid levels (green-fuchsia) */
+.ac-lvl1 { background: #0e4429; }
+.ac-lvl2 { background: #006d32; }
+.ac-lvl3 { background: #26a641; }
+.ac-lvl4 { background: #39d353; }
+.ac-lvl5 { background: #8bd450; }
+.ac-lvl6 { background: #c6ff4d; }
+/* Pending levels (orange-red) */
+.ac-plvl1 { background: #4a2000; }
+.ac-plvl2 { background: #6d3200; }
+.ac-plvl3 { background: #a64b00; }
+.ac-plvl4 { background: #d36b00; }
+.ac-plvl5 { background: #ff8c00; }
+.ac-plvl6 { background: #ff4500; }
+
+.ac-scroll {
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 0;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+.ac-scroll::-webkit-scrollbar { height: 5px; }
+.ac-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+
+.ac-labels {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin-right: 4px;
+    flex-shrink: 0;
+    padding-top: 18px;
+}
+.ac-labels span {
+    height: 13px;
+    font-size: 9px;
+    color: rgba(255,255,255,0.35);
+    display: flex;
+    align-items: center;
+    line-height: 1;
+}
+.ac-graph-wrapper {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.ac-months {
+    display: flex;
+    height: 18px;
+    align-items: flex-end;
+    position: relative;
+}
+.ac-month-label {
+    font-size: 10px;
+    color: rgba(255,255,255,0.45);
+    position: absolute;
+    bottom: 2px;
+    white-space: nowrap;
+}
+.ac-graph {
+    display: flex;
+    gap: 3px;
+}
+.ac-week {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+.ac-day {
+    width: 13px;
+    height: 13px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.06);
+    cursor: pointer;
+    transition: outline 0.15s, transform 0.15s;
+    position: relative;
+}
+.ac-day:hover {
+    outline: 2px solid rgba(255,255,255,0.5);
+    outline-offset: -1px;
+    transform: scale(1.15);
+    z-index: 2;
+}
+.ac-day.ac-current-month {
+    outline: 1px solid rgba(0,170,255,0.5);
+    outline-offset: -1px;
+}
+.ac-day.ac-today {
+    outline: 2px solid #00aaff;
+    outline-offset: -1px;
+}
+/* Month separator */
+.ac-week.ac-month-start {
+    border-left: 2px solid rgba(255,255,255,0.12);
+    padding-left: 2px;
+}
+/* Tooltip */
+.ac-tooltip {
+    position: fixed;
+    background: rgba(10,10,21,0.95);
+    border: 1px solid rgba(0,170,255,0.4);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 11px;
+    color: #fff;
+    pointer-events: none;
+    z-index: 3000;
+    white-space: nowrap;
+    display: none;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}
+.ac-tooltip.visible { display: block; }
+.ac-tooltip-amount { color: #00ff88; font-weight: 600; }
+.ac-tooltip-pending { color: #ffaa00; }
+.ac-tooltip-date { color: rgba(255,255,255,0.5); margin-top: 2px; }
+
 /* Filters Bar */
 .filters-bar {
     display: flex;
@@ -1320,6 +1475,12 @@ body {
 }
 
 @media (max-width: 480px) {
+    .ac-day { width: 11px; height: 11px; }
+    .ac-labels span { height: 11px; font-size: 8px; }
+    .ac-graph { gap: 2px; }
+    .ac-week { gap: 1px; }
+    .activity-calendar { padding: 10px; }
+
     .calendar-grid {
         gap: 3px;
     }
