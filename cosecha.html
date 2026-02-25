@@ -97,7 +97,34 @@
 
         <!-- Calendario Section -->
         <div class="section active" id="calendarioSection" role="tabpanel">
-            <div class="calendar-container">
+            <!-- Activity Calendar (GitHub-style) -->
+            <div class="activity-calendar" id="activityCalendar">
+                <div class="ac-header">
+                    <span class="ac-title" id="acTitle">Actividad 2024</span>
+                    <div class="ac-legend">
+                        <span class="ac-legend-label">Menos</span>
+                        <span class="ac-legend-box" style="background:rgba(255,255,255,0.06)"></span>
+                        <span class="ac-legend-box ac-lvl1"></span>
+                        <span class="ac-legend-box ac-lvl2"></span>
+                        <span class="ac-legend-box ac-lvl3"></span>
+                        <span class="ac-legend-box ac-lvl4"></span>
+                        <span class="ac-legend-box ac-lvl5"></span>
+                        <span class="ac-legend-box ac-lvl6"></span>
+                        <span class="ac-legend-label">Más</span>
+                    </div>
+                </div>
+                <div class="ac-scroll">
+                    <div class="ac-labels">
+                        <span></span><span>Lun</span><span></span><span>Mié</span><span></span><span>Vie</span><span></span>
+                    </div>
+                    <div class="ac-graph-wrapper">
+                        <div class="ac-months" id="acMonths"></div>
+                        <div class="ac-graph" id="acGraph"></div>
+                    </div>
+                </div>
+            </div>
+            <!-- Monthly Calendar -->
+            <div class="calendar-container" id="monthlyCalendarContainer">
                 <div class="calendar-header">
                     <div class="calendar-nav">
                         <button onclick="changeMonth(-1)">‹</button>
