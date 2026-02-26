@@ -1089,6 +1089,11 @@ async function deleteEntry() {
 // ============================================
 // ACTIVITY CALENDAR (GitHub-style)
 // ============================================
+const AC_PAID_COLOR = '0,255,136';      // green neon
+const AC_PENDING_COLOR = '255,90,30';   // orange-red
+const AC_OPACITIES = [0, 0.15, 0.3, 0.45, 0.65, 0.8, 1.0];
+const AC_MONTH_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
 function renderActivityCalendar() {
     const graph = document.getElementById('acGraph');
     const monthsBar = document.getElementById('acMonths');
@@ -1099,120 +1104,159 @@ function renderActivityCalendar() {
     const year = now.getFullYear();
     titleEl.textContent = `Actividad ${year}`;
 
-    // Build day->earnings map for the year
-    const dayMap = {}; // dateStr -> { total, allPaid }
+    // Build day->earnings map
+    const dayMap = {};
     entries.forEach(e => {
         const d = new Date(e.date + 'T12:00:00');
         if (d.getFullYear() !== year) return;
-        if (!dayMap[e.date]) dayMap[e.date] = { total: 0, paid: 0, pending: 0, allPaid: true };
+        if (!dayMap[e.date]) dayMap[e.date] = { total: 0, pending: 0, allPaid: true };
         dayMap[e.date].total += (e.total || 0);
-        if (e.paid) dayMap[e.date].paid += (e.total || 0);
-        else { dayMap[e.date].pending += (e.total || 0); dayMap[e.date].allPaid = false; }
+        if (!e.paid) { dayMap[e.date].pending += (e.total || 0); dayMap[e.date].allPaid = false; }
     });
 
-    // Determine max for level scaling
+    // Max for level scaling
     const totals = Object.values(dayMap).map(d => d.total);
     const maxTotal = totals.length ? Math.max(...totals) : 1;
 
-    // Level thresholds (6 levels)
     function getLevel(amount) {
         if (amount <= 0) return 0;
-        const ratio = amount / maxTotal;
-        if (ratio <= 0.1) return 1;
-        if (ratio <= 0.25) return 2;
-        if (ratio <= 0.45) return 3;
-        if (ratio <= 0.65) return 4;
-        if (ratio <= 0.85) return 5;
+        const r = amount / maxTotal;
+        if (r <= 0.08) return 1;
+        if (r <= 0.2) return 2;
+        if (r <= 0.4) return 3;
+        if (r <= 0.6) return 4;
+        if (r <= 0.8) return 5;
         return 6;
     }
 
-    // Start from Jan 1 of current year
+    // Build 2D grid: gridData[col][row] where col=week, row=dayOfWeek(0=Sun)
     const jan1 = new Date(year, 0, 1);
-    const startOffset = jan1.getDay(); // 0=Sun
-    // Build weeks: start from the Sunday on or before Jan 1
     const startDate = new Date(jan1);
-    startDate.setDate(startDate.getDate() - startOffset);
+    startDate.setDate(startDate.getDate() - jan1.getDay());
 
     const dec31 = new Date(year, 11, 31);
-    const endOffset = dec31.getDay();
     const endDate = new Date(dec31);
-    endDate.setDate(endDate.getDate() + (6 - endOffset));
+    endDate.setDate(endDate.getDate() + (6 - dec31.getDay()));
 
     const todayStr = getLocalDateString(now);
-    const currentMonth = now.getMonth();
+    const curMonth = now.getMonth();
 
+    const gridData = [];
+    let cursor = new Date(startDate);
+    while (cursor <= endDate) {
+        const week = [];
+        for (let d = 0; d < 7; d++) {
+            const dateStr = getLocalDateString(cursor);
+            const m = cursor.getMonth();
+            const y = cursor.getFullYear();
+            const inYear = y === year;
+            week.push({
+                dateStr, month: inYear ? m : -1, inYear,
+                info: inYear ? (dayMap[dateStr] || null) : null,
+                isToday: dateStr === todayStr
+            });
+            cursor.setDate(cursor.getDate() + 1);
+        }
+        gridData.push(week);
+    }
+
+    const numWeeks = gridData.length;
+    const cellSize = 13, gap = 2, weekWidth = cellSize + gap;
+    const curBorder = '1.5px solid rgba(0,170,255,0.55)';
+    const sepBorder = '1px solid rgba(255,255,255,0.13)';
+
+    // Helper: get month of neighbor cell
+    function neighborMonth(col, row) {
+        if (col < 0 || col >= numWeeks || row < 0 || row > 6) return -1;
+        return gridData[col][row].month;
+    }
+
+    // Render
     graph.innerHTML = '';
     monthsBar.innerHTML = '';
+    monthsBar.style.width = (numWeeks * weekWidth) + 'px';
 
-    let cursor = new Date(startDate);
-    let lastMonth = -1;
-    let weekIdx = 0;
+    // Month labels
+    let lastLabelMonth = -1;
+    for (let col = 0; col < numWeeks; col++) {
+        for (let row = 0; row < 7; row++) {
+            const c = gridData[col][row];
+            if (c.inYear && c.month !== lastLabelMonth) {
+                const lbl = document.createElement('span');
+                lbl.className = 'ac-month-label';
+                lbl.textContent = AC_MONTH_NAMES[c.month];
+                lbl.style.left = (col * weekWidth) + 'px';
+                monthsBar.appendChild(lbl);
+                lastLabelMonth = c.month;
+                break;
+            }
+        }
+    }
 
-    const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
-                        'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-
-    // Track column positions for month labels
-    const weekWidth = 16; // 13px cell + 3px gap
-
-    while (cursor <= endDate) {
+    // Render cells with per-cell borders
+    for (let col = 0; col < numWeeks; col++) {
         const weekEl = document.createElement('div');
         weekEl.className = 'ac-week';
 
-        // Check if this week starts a new month
-        const weekMonday = new Date(cursor);
-        weekMonday.setDate(weekMonday.getDate() + 1); // Monday of this week
-        const firstDayMonth = weekMonday.getMonth();
+        for (let row = 0; row < 7; row++) {
+            const cell = gridData[col][row];
+            const el = document.createElement('div');
+            el.className = 'ac-day';
 
-        if (firstDayMonth !== lastMonth && weekMonday.getFullYear() === year) {
-            weekEl.classList.add('ac-month-start');
-            const label = document.createElement('span');
-            label.className = 'ac-month-label';
-            label.textContent = monthNames[firstDayMonth];
-            label.style.left = (weekIdx * weekWidth) + 'px';
-            monthsBar.appendChild(label);
-            lastMonth = firstDayMonth;
-        }
-
-        for (let d = 0; d < 7; d++) {
-            const cell = document.createElement('div');
-            cell.className = 'ac-day';
-            const dateStr = getLocalDateString(cursor);
-            const cellMonth = cursor.getMonth();
-            const cellYear = cursor.getFullYear();
-
-            if (cellYear === year) {
-                const info = dayMap[dateStr];
-                if (info) {
-                    const lvl = getLevel(info.total);
-                    const prefix = info.allPaid ? 'ac-lvl' : 'ac-plvl';
-                    cell.classList.add(prefix + lvl);
-                }
-                if (cellMonth === currentMonth) cell.classList.add('ac-current-month');
-                if (dateStr === todayStr) cell.classList.add('ac-today');
-
-                // Click -> navigate to that month
-                const clickMonth = cellMonth;
-                cell.onclick = () => navigateToMonth(year, clickMonth);
-
-                // Tooltip
-                cell.onmouseenter = (ev) => showAcTooltip(ev, dateStr, info);
-                cell.onmouseleave = hideAcTooltip;
-            } else {
-                cell.style.visibility = 'hidden';
+            if (!cell.inYear) {
+                el.style.visibility = 'hidden';
+                weekEl.appendChild(el);
+                continue;
             }
 
-            weekEl.appendChild(cell);
-            cursor.setDate(cursor.getDate() + 1);
+            // Color: opacity-based on single base color
+            if (cell.info) {
+                const lvl = getLevel(cell.info.total);
+                const base = cell.info.allPaid ? AC_PAID_COLOR : AC_PENDING_COLOR;
+                el.style.background = `rgba(${base},${AC_OPACITIES[lvl]})`;
+            }
+
+            if (cell.isToday) el.classList.add('ac-today');
+
+            // Borders: irregular month boundaries + current month outline
+            const m = cell.month;
+            const isCur = m === curMonth;
+            const topM = neighborMonth(col, row - 1);
+            const botM = neighborMonth(col, row + 1);
+            const leftM = neighborMonth(col - 1, row);
+            const rightM = neighborMonth(col + 1, row);
+            const borders = [];
+
+            if (isCur) {
+                // Current month: full outline on all edges touching different months
+                if (topM !== m) borders.push('border-top:' + curBorder);
+                if (botM !== m) borders.push('border-bottom:' + curBorder);
+                if (leftM !== m) borders.push('border-left:' + curBorder);
+                if (rightM !== m) borders.push('border-right:' + curBorder);
+            } else {
+                // Separator: draw on the cell with GREATER month to avoid double borders
+                // Skip edges adjacent to current month (those are drawn by the current month cell)
+                if (topM >= 0 && topM !== m && m > topM && topM !== curMonth) borders.push('border-top:' + sepBorder);
+                if (botM >= 0 && botM !== m && m > botM && botM !== curMonth) borders.push('border-bottom:' + sepBorder);
+                if (leftM >= 0 && leftM !== m && m > leftM && leftM !== curMonth) borders.push('border-left:' + sepBorder);
+                if (rightM >= 0 && rightM !== m && m > rightM && rightM !== curMonth) borders.push('border-right:' + sepBorder);
+            }
+
+            if (borders.length) el.style.cssText += borders.join(';') + ';';
+
+            // Events
+            const clickMonth = m;
+            el.onclick = () => navigateToMonth(year, clickMonth);
+            el.onmouseenter = (ev) => showAcTooltip(ev, cell.dateStr, cell.info);
+            el.onmouseleave = hideAcTooltip;
+
+            weekEl.appendChild(el);
         }
         graph.appendChild(weekEl);
-        weekIdx++;
     }
-
-    // Set months bar width
-    monthsBar.style.width = (weekIdx * weekWidth) + 'px';
 }
 
-// Tooltip helpers
+// Tooltip
 let acTooltipEl = null;
 function getAcTooltip() {
     if (!acTooltipEl) {
@@ -1226,13 +1270,12 @@ function getAcTooltip() {
 function showAcTooltip(ev, dateStr, info) {
     const tip = getAcTooltip();
     const d = new Date(dateStr + 'T12:00:00');
-    const opts = { weekday: 'short', day: 'numeric', month: 'short' };
-    const dateLabel = d.toLocaleDateString('es-ES', opts);
+    const dateLabel = d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
 
     if (info && info.total > 0) {
         let html = `<span class="ac-tooltip-amount">$${info.total.toFixed(0)}</span>`;
         if (info.pending > 0) html += ` <span class="ac-tooltip-pending">(pend: $${info.pending.toFixed(0)})</span>`;
-        if (info.allPaid) html += ' <span style="color:#39d353">✓</span>';
+        if (info.allPaid) html += ' <span style="color:#00ff88">&#10003;</span>';
         html += `<div class="ac-tooltip-date">${dateLabel}</div>`;
         tip.innerHTML = html;
     } else {
@@ -1241,20 +1284,18 @@ function showAcTooltip(ev, dateStr, info) {
 
     tip.classList.add('visible');
     const rect = ev.target.getBoundingClientRect();
-    tip.style.left = (rect.left + rect.width / 2 - tip.offsetWidth / 2) + 'px';
+    tip.style.left = Math.max(0, rect.left + rect.width / 2 - tip.offsetWidth / 2) + 'px';
     tip.style.top = (rect.top - tip.offsetHeight - 6) + 'px';
 }
 
 function hideAcTooltip() {
-    const tip = getAcTooltip();
-    tip.classList.remove('visible');
+    if (acTooltipEl) acTooltipEl.classList.remove('visible');
 }
 
 function navigateToMonth(year, month) {
     currentDate = new Date(year, month, 1);
     renderCalendar();
     updateStats();
-    // Scroll to monthly calendar
     const container = document.getElementById('monthlyCalendarContainer');
     if (container) container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
