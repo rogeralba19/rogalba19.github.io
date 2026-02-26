@@ -630,21 +630,9 @@ body {
     border-radius: 2px;
     background: rgba(255,255,255,0.06);
 }
-/* Paid levels (green-fuchsia) */
-.ac-lvl1 { background: #0e4429; }
-.ac-lvl2 { background: #006d32; }
-.ac-lvl3 { background: #26a641; }
-.ac-lvl4 { background: #39d353; }
-.ac-lvl5 { background: #8bd450; }
-.ac-lvl6 { background: #c6ff4d; }
-/* Pending levels (orange-red) */
-.ac-plvl1 { background: #4a2000; }
-.ac-plvl2 { background: #6d3200; }
-.ac-plvl3 { background: #a64b00; }
-.ac-plvl4 { background: #d36b00; }
-.ac-plvl5 { background: #ff8c00; }
-.ac-plvl6 { background: #ff4500; }
-
+.ac-legend-sep {
+    width: 6px;
+}
 .ac-scroll {
     display: flex;
     overflow-x: auto;
@@ -656,7 +644,6 @@ body {
 }
 .ac-scroll::-webkit-scrollbar { height: 5px; }
 .ac-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
-
 .ac-labels {
     display: flex;
     flex-direction: column;
@@ -693,12 +680,12 @@ body {
 }
 .ac-graph {
     display: flex;
-    gap: 3px;
+    gap: 2px;
 }
 .ac-week {
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: 2px;
 }
 .ac-day {
     width: 13px;
@@ -706,27 +693,16 @@ body {
     border-radius: 2px;
     background: rgba(255,255,255,0.06);
     cursor: pointer;
-    transition: outline 0.15s, transform 0.15s;
-    position: relative;
+    transition: transform 0.12s;
+    box-sizing: border-box;
 }
 .ac-day:hover {
-    outline: 2px solid rgba(255,255,255,0.5);
-    outline-offset: -1px;
-    transform: scale(1.15);
+    transform: scale(1.3);
     z-index: 2;
-}
-.ac-day.ac-current-month {
-    outline: 1px solid rgba(0,170,255,0.5);
-    outline-offset: -1px;
+    filter: brightness(1.3);
 }
 .ac-day.ac-today {
-    outline: 2px solid #00aaff;
-    outline-offset: -1px;
-}
-/* Month separator */
-.ac-week.ac-month-start {
-    border-left: 2px solid rgba(255,255,255,0.12);
-    padding-left: 2px;
+    box-shadow: 0 0 0 2px #00aaff;
 }
 /* Tooltip */
 .ac-tooltip {
@@ -1475,11 +1451,12 @@ body {
 }
 
 @media (max-width: 480px) {
-    .ac-day { width: 11px; height: 11px; }
-    .ac-labels span { height: 11px; font-size: 8px; }
+    .ac-day { width: 10px; height: 10px; }
+    .ac-labels span { height: 10px; font-size: 8px; }
     .ac-graph { gap: 2px; }
-    .ac-week { gap: 1px; }
+    .ac-week { gap: 2px; }
     .activity-calendar { padding: 10px; }
+    .ac-legend { display: none; }
 
     .calendar-grid {
         gap: 3px;
