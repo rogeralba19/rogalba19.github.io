@@ -1843,3 +1843,411 @@ body.boss-mode .boss-only-tab {
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+/* ==========================================
+   CUADRILLA - Subtabs, Cards, FAB, Modals
+   ========================================== */
+
+/* Subtabs */
+.subtabs {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 170, 0, 0.2);
+    overflow-x: auto;
+}
+
+.subtab {
+    padding: 10px 18px;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.3s;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+}
+
+.subtab.active {
+    color: #ffaa00;
+    border-bottom-color: #ffaa00;
+}
+
+/* Subsections */
+.subsection {
+    display: none;
+    position: relative;
+    padding-bottom: 80px;
+}
+
+.subsection.active {
+    display: block;
+}
+
+/* Floating Action Button */
+.fab {
+    position: fixed;
+    bottom: 28px;
+    right: 24px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ffaa00, #ffdd44);
+    border: none;
+    color: #000;
+    font-size: 28px;
+    font-weight: 300;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 6px 24px rgba(255, 170, 0, 0.45);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fab:hover {
+    transform: scale(1.1) translateY(-2px);
+    box-shadow: 0 10px 30px rgba(255, 170, 0, 0.6);
+}
+
+.fab:active {
+    transform: scale(0.96);
+}
+
+/* Worker Card */
+.worker-card {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 16px 18px;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-bottom: 10px;
+}
+
+.worker-card:hover {
+    border-color: rgba(255, 170, 0, 0.45);
+    transform: translateY(-2px);
+}
+
+.worker-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.worker-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1;
+    min-width: 0;
+}
+
+.worker-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.worker-username {
+    font-size: 12px;
+    color: #00aaff;
+    font-family: monospace;
+}
+
+.worker-rut {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.worker-last-worked {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.4);
+    margin-top: 8px;
+}
+
+/* Badges */
+.worker-badge {
+    font-size: 10px;
+    padding: 4px 9px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.5);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.worker-badge.linked {
+    background: rgba(0, 255, 136, 0.15);
+    color: #00ff88;
+    border: 1px solid rgba(0, 255, 136, 0.3);
+}
+
+.worker-badge.small {
+    font-size: 9px;
+    padding: 2px 7px;
+}
+
+/* Squad Card */
+.squad-card {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 18px;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-bottom: 10px;
+}
+
+.squad-card:hover {
+    border-color: rgba(255, 170, 0, 0.45);
+    transform: translateY(-2px);
+}
+
+.squad-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 6px;
+}
+
+.squad-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.squad-member-count {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 10px;
+    background: rgba(255, 170, 0, 0.15);
+    color: #ffaa00;
+    white-space: nowrap;
+}
+
+.squad-last-used {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+/* Worker Mode Selector (inside modal) */
+.worker-mode-selector {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.worker-mode-option {
+    padding: 14px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.worker-mode-option:hover {
+    border-color: rgba(255, 170, 0, 0.3);
+}
+
+.worker-mode-option.selected {
+    border-color: #ffaa00;
+    background: rgba(255, 170, 0, 0.08);
+}
+
+.worker-mode-option .icon {
+    font-size: 22px;
+    margin-bottom: 5px;
+}
+
+.worker-mode-option .label {
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Worker search result */
+.worker-search-status {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.5);
+    padding: 12px;
+    text-align: center;
+}
+
+.worker-search-status.empty {
+    color: rgba(255, 100, 100, 0.8);
+}
+
+.worker-found-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: rgba(0, 255, 136, 0.07);
+    border: 1px solid rgba(0, 255, 136, 0.25);
+    border-radius: 10px;
+    margin-top: 8px;
+}
+
+.worker-found-photo {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 2px solid rgba(0, 170, 255, 0.4);
+}
+
+.worker-found-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(0, 170, 255, 0.2), rgba(0, 255, 136, 0.15));
+    border: 2px solid rgba(0, 170, 255, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 700;
+    color: #00aaff;
+    flex-shrink: 0;
+}
+
+.worker-found-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.worker-found-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.worker-found-username {
+    font-size: 12px;
+    color: #00aaff;
+    font-family: monospace;
+}
+
+/* Squad members list in modal */
+.squad-members-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 40px;
+}
+
+.squad-no-members {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.4);
+    padding: 10px;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+}
+
+.squad-member-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+}
+
+.squad-member-name {
+    flex: 1;
+    font-size: 14px;
+    color: #fff;
+}
+
+.squad-member-remove {
+    background: none;
+    border: none;
+    color: rgba(255, 100, 100, 0.7);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+    transition: color 0.2s;
+    flex-shrink: 0;
+}
+
+.squad-member-remove:hover {
+    color: #ff4466;
+}
+
+/* Squad member search results */
+.squad-member-results {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 220px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+
+.squad-member-results::-webkit-scrollbar {
+    width: 4px;
+}
+
+.squad-member-results::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.15);
+    border-radius: 2px;
+}
+
+.squad-member-result {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.squad-member-result:hover {
+    background: rgba(255, 170, 0, 0.08);
+    border-color: rgba(255, 170, 0, 0.25);
+}
+
+.btn-add-member {
+    background: rgba(255, 170, 0, 0.15);
+    border: 1px solid rgba(255, 170, 0, 0.35);
+    border-radius: 6px;
+    color: #ffaa00;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 2px 9px;
+    line-height: 1.4;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.btn-add-member:hover {
+    background: rgba(255, 170, 0, 0.25);
+}
+
+/* Boss mode accent for cuadrilla modals */
+body.boss-mode .modal-header h2 {
+    /* keep default blue; override only in cuadrilla context via class if needed */
+}

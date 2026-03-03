@@ -162,6 +162,7 @@ auth.onAuthStateChanged(async (user) => {
         userProfile = null;
         bossMode = false;
         applyBossModeUI(false);
+        if (typeof unloadCuadrillaData === 'function') unloadCuadrillaData();
         jobs = [];
         entries = [];
         jobsLoaded = false;
@@ -357,6 +358,11 @@ function switchTab(tab) {
     // Si hay días seleccionados y vamos a registros, sincronizar
     if (tab === 'registros' && selectedDays.size > 0) {
         syncSelectionToEntries();
+    }
+
+    // Cargar datos de cuadrilla cuando se abre esa tab (lazy)
+    if (tab === 'cuadrilla' && bossMode && typeof loadCuadrillaData === 'function') {
+        loadCuadrillaData();
     }
 }
 
@@ -2114,6 +2120,10 @@ function applyBossModeUI(active) {
         const cuadrillaTab = document.querySelector('.tab[data-tab="cuadrilla"]');
         if (cuadrillaTab && cuadrillaTab.classList.contains('active')) {
             switchTab('calendario');
+        }
+        // Unsubscribe cuadrilla data listeners
+        if (typeof unloadCuadrillaData === 'function') {
+            unloadCuadrillaData();
         }
     }
 }

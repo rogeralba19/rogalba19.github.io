@@ -165,12 +165,22 @@
 
         <!-- Cuadrilla Section (Boss Mode) -->
         <div class="section" id="cuadrillaSection" role="tabpanel">
-            <div class="cuadrilla-placeholder">
-                <div class="empty-state">
-                    <div class="icon">👷</div>
-                    <h3>Cuadrilla</h3>
-                    <p>Gestiona tu equipo de trabajo desde aqui.</p>
-                </div>
+            <!-- Subtabs -->
+            <div class="subtabs" role="tablist">
+                <button class="subtab active" data-subtab="directorio" onclick="switchCuadrillaTab('directorio')" role="tab">Directorio</button>
+                <button class="subtab" data-subtab="cuadrillas" onclick="switchCuadrillaTab('cuadrillas')" role="tab">Cuadrillas</button>
+            </div>
+
+            <!-- Directorio Subsection -->
+            <div class="subsection active" id="directorioSubsection" role="tabpanel">
+                <div id="workersList"></div>
+                <button class="fab" onclick="openWorkerModal()" aria-label="Agregar trabajador">+</button>
+            </div>
+
+            <!-- Cuadrillas Subsection -->
+            <div class="subsection" id="cuadrillasSubsection" role="tabpanel">
+                <div id="squadsList"></div>
+                <button class="fab" onclick="openSquadModal()" aria-label="Crear cuadrilla">+</button>
             </div>
         </div>
     </div>
@@ -517,6 +527,92 @@
         </div>
     </div>
 
+    <!-- Worker Modal (Boss Mode) -->
+    <div class="modal-overlay" id="workerModal" role="dialog" aria-modal="true" aria-labelledby="workerModalTitle">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="workerModalTitle">Agregar Trabajador</h2>
+                <button class="modal-close" onclick="closeWorkerModal()" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Mode selector -->
+                <div class="worker-mode-selector">
+                    <div class="worker-mode-option selected" id="workerModeSearch" onclick="setWorkerMode('search')">
+                        <div class="icon">🔍</div>
+                        <div class="label">Buscar por @username</div>
+                    </div>
+                    <div class="worker-mode-option" id="workerModeManual" onclick="setWorkerMode('manual')">
+                        <div class="icon">✏️</div>
+                        <div class="label">Agregar manual</div>
+                    </div>
+                </div>
+
+                <!-- Search by username -->
+                <div id="workerSearchSection">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="workerUsernameSearch" placeholder="@username"
+                            oninput="onUsernameSearchInput(this)" autocomplete="off" spellcheck="false">
+                        <small class="username-hint">Solo letras minúsculas y números, sin el @</small>
+                    </div>
+                    <div id="workerSearchResult"></div>
+                </div>
+
+                <!-- Manual entry -->
+                <div id="workerManualSection" style="display: none;">
+                    <div class="form-group">
+                        <label>Nombre completo <span style="color:#ff4466">*</span></label>
+                        <input type="text" id="workerManualName" placeholder="Nombre del trabajador">
+                    </div>
+                    <div class="form-group">
+                        <label>RUT / CI (opcional)</label>
+                        <input type="text" id="workerManualRut" placeholder="12.345.678-9">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" id="workerDeleteBtn" style="display: none;" onclick="deleteWorker()">Eliminar</button>
+                <button class="btn btn-secondary" onclick="closeWorkerModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveWorker()">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Squad Modal (Boss Mode) -->
+    <div class="modal-overlay" id="squadModal" role="dialog" aria-modal="true" aria-labelledby="squadModalTitle">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="squadModalTitle">Nueva Cuadrilla</h2>
+                <button class="modal-close" onclick="closeSquadModal()" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Nombre de la cuadrilla <span style="color:#ff4466">*</span></label>
+                    <input type="text" id="squadName" placeholder="Ej: Cuadrilla Norte">
+                </div>
+
+                <!-- Current members -->
+                <div class="form-group">
+                    <label>Miembros</label>
+                    <div id="squadCurrentMembers" class="squad-members-list"></div>
+                </div>
+
+                <!-- Add members -->
+                <div class="form-group">
+                    <label>Agregar miembro</label>
+                    <input type="text" id="squadMemberSearch" placeholder="Buscar por nombre, @username o RUT..."
+                        oninput="onSquadMemberSearch(this)" autocomplete="off">
+                    <div id="squadMemberResults" class="squad-member-results"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" id="squadDeleteBtn" style="display: none;" onclick="deleteSquad()">Eliminar</button>
+                <button class="btn btn-secondary" onclick="closeSquadModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveSquad()">Guardar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Loading Overlay -->
     <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-spinner"></div>
@@ -532,5 +628,6 @@
     <script src="js/firebase-config.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/cosecha.js"></script>
+    <script src="js/cuadrilla.js"></script>
 </body>
 </html>
