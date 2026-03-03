@@ -118,8 +118,11 @@ const availableFruits = [
     'Uva'
 ];
 
+// User profile data from Firebase
+let userProfile = null;
+
 // Auth listener (single unified listener - auth.js only handles UI elements it owns)
-auth.onAuthStateChanged((user) => {
+auth.onAuthStateChanged(async (user) => {
     if (user) {
         currentUser = user;
         // Cerrar modal de auth si estaba abierto
@@ -131,14 +134,34 @@ auth.onAuthStateChanged((user) => {
         // Mostrar contenido de la app
         document.querySelector('.header').style.display = '';
         document.querySelector('.container').style.display = '';
-        // Actualizar menú de usuario en header
+        // Actualizar menu de usuario en header
         const userMenuContainer = document.getElementById('userMenuContainer');
         if (userMenuContainer) userMenuContainer.style.display = 'flex';
         updateUserProfileUI(user);
         showLoading(true);
+
+        // Ensure user profile exists (creates on first login)
+        try {
+            const result = await ensureUserProfile(user);
+            userProfile = result.userProfile;
+
+            // Load boss mode state from Firebase
+            await loadBossModeState();
+
+            // Show welcome modal for new users
+            if (result.isNewUser) {
+                showWelcomeModal(userProfile);
+            }
+        } catch (e) {
+            console.error('Error creating user profile:', e);
+        }
+
         loadData();
     } else {
         currentUser = null;
+        userProfile = null;
+        bossMode = false;
+        applyBossModeUI(false);
         jobs = [];
         entries = [];
         jobsLoaded = false;
@@ -1975,7 +1998,7 @@ function updateUserProfileUI(user) {
         initials = email[0].toUpperCase();
     }
 
-    // Avatar en botón
+    // Avatar en boton
     const avatarImg = document.getElementById('userAvatarImg');
     const avatarInitials = document.getElementById('userAvatarInitials');
     if (photoURL) {
@@ -2016,19 +2039,236 @@ function closeUserDropdown() {
     if (dropdown) dropdown.classList.remove('visible');
 }
 
-function toggleBossMode(event) {
-    event.stopPropagation();
-    bossMode = !bossMode;
-    const toggle = document.getElementById('bossModeToggle');
-    toggle.classList.toggle('active', bossMode);
+// ============================================
+// BOSS MODE - REAL LOGIC
+// ============================================
 
-    if (bossMode) {
+/**
+ * Carga el estado del modo jefe desde Firebase al iniciar la app.
+ */
+async function loadBossModeState() {
+    if (!currentUser) return;
+
+    const userSnap = await db.ref(`users/${currentUser.uid}`).once('value');
+    const userData = userSnap.val();
+    if (!userData) return;
+
+    const { bossActivatedAt, bossPermanent } = userData;
+
+    if (bossPermanent) {
+        // Permanently a boss - just activate
+        bossMode = true;
+        applyBossModeUI(true);
+        return;
+    }
+
+    if (!bossActivatedAt) {
+        // Never activated
+        bossMode = false;
+        applyBossModeUI(false);
+        return;
+    }
+
+    // Check if 24 hours have passed since activation
+    const hoursSinceActivation = (Date.now() - bossActivatedAt) / (1000 * 60 * 60);
+
+    if (hoursSinceActivation >= 24) {
+        // Check if there are any bossHarvest documents
+        const bossHarvestSnap = await db.ref(`bossHarvest/${currentUser.uid}`).once('value');
+
+        if (bossHarvestSnap.exists()) {
+            // Has boss harvest data - make permanent
+            await db.ref(`users/${currentUser.uid}`).update({
+                bossPermanent: true
+            });
+            bossMode = true;
+            applyBossModeUI(true);
+        } else {
+            // No boss harvest data after 24h - deactivate
+            await db.ref(`users/${currentUser.uid}`).update({
+                bossActivatedAt: null,
+                bossPermanent: false
+            });
+            bossMode = false;
+            applyBossModeUI(false);
+        }
+    } else {
+        // Within 24h window - boss mode is active
+        bossMode = true;
+        applyBossModeUI(true);
+    }
+}
+
+/**
+ * Aplica los cambios visuales del modo jefe.
+ */
+function applyBossModeUI(active) {
+    const toggle = document.getElementById('bossModeToggle');
+    if (toggle) toggle.classList.toggle('active', active);
+
+    if (active) {
         document.body.classList.add('boss-mode');
-        showToast('Modo Jefe activado 👑');
     } else {
         document.body.classList.remove('boss-mode');
+        // If currently on cuadrilla tab, switch away
+        const cuadrillaTab = document.querySelector('.tab[data-tab="cuadrilla"]');
+        if (cuadrillaTab && cuadrillaTab.classList.contains('active')) {
+            switchTab('calendario');
+        }
+    }
+}
+
+/**
+ * Toggle del modo jefe conectado a Firebase.
+ */
+async function toggleBossMode(event) {
+    event.stopPropagation();
+    if (!currentUser) return;
+
+    const newState = !bossMode;
+
+    if (newState) {
+        // Activating boss mode
+        const userSnap = await db.ref(`users/${currentUser.uid}`).once('value');
+        const userData = userSnap.val() || {};
+
+        if (userData.bossPermanent) {
+            // Already permanent - just toggle UI
+            bossMode = true;
+            applyBossModeUI(true);
+            showToast('Modo Jefe activado');
+            return;
+        }
+
+        if (!userData.bossActivatedAt) {
+            // First time activation - write timestamp
+            await db.ref(`users/${currentUser.uid}`).update({
+                bossActivatedAt: Date.now()
+            });
+        }
+
+        bossMode = true;
+        applyBossModeUI(true);
+        showToast('Modo Jefe activado');
+    } else {
+        // Deactivating boss mode (UI only, keeps bossActivatedAt for the 24h check)
+        bossMode = false;
+        applyBossModeUI(false);
         showToast('Modo Jefe desactivado');
     }
+}
+
+// ============================================
+// WELCOME MODAL
+// ============================================
+
+let welcomeUsernameTimer = null;
+
+function showWelcomeModal(profile) {
+    const modal = document.getElementById('welcomeModal');
+    if (!modal) return;
+
+    const usernameInput = document.getElementById('welcomeUsername');
+    if (usernameInput) {
+        usernameInput.value = profile.username || '';
+    }
+
+    const statusEl = document.getElementById('welcomeUsernameStatus');
+    if (statusEl) statusEl.textContent = '';
+
+    openModal('welcomeModal');
+}
+
+function onWelcomeUsernameInput(input) {
+    // Clean input: only lowercase letters and numbers
+    input.value = input.value.replace(/[^a-z0-9]/g, '').substring(0, 12);
+
+    const statusEl = document.getElementById('welcomeUsernameStatus');
+    const hintEl = document.getElementById('welcomeUsernameHint');
+
+    if (!input.value) {
+        if (statusEl) statusEl.textContent = '';
+        if (hintEl) {
+            hintEl.textContent = 'Solo letras minusculas y numeros, max 12 caracteres. Solo puedes cambiarlo 1 vez.';
+            hintEl.className = 'username-hint';
+        }
+        return;
+    }
+
+    // Debounce the availability check
+    clearTimeout(welcomeUsernameTimer);
+    if (statusEl) statusEl.textContent = '...';
+
+    welcomeUsernameTimer = setTimeout(async () => {
+        const username = input.value;
+
+        // If same as current, it's available
+        if (userProfile && username === userProfile.username) {
+            if (statusEl) statusEl.textContent = '';
+            if (hintEl) {
+                hintEl.textContent = 'Tu username actual';
+                hintEl.className = 'username-hint success';
+            }
+            return;
+        }
+
+        const available = await checkUsernameAvailable(username);
+        if (input.value !== username) return; // Input changed
+
+        if (available) {
+            if (statusEl) statusEl.textContent = '';
+            if (hintEl) {
+                hintEl.textContent = 'Disponible';
+                hintEl.className = 'username-hint success';
+            }
+        } else {
+            if (statusEl) statusEl.textContent = '';
+            if (hintEl) {
+                hintEl.textContent = 'Este username ya esta en uso';
+                hintEl.className = 'username-hint error';
+            }
+        }
+    }, 400);
+}
+
+async function saveWelcomeProfile() {
+    if (!currentUser || !userProfile) return;
+
+    const usernameInput = document.getElementById('welcomeUsername');
+    const rutInput = document.getElementById('welcomeRut');
+    const saveBtn = document.getElementById('welcomeSaveBtn');
+
+    const newUsername = usernameInput ? usernameInput.value.trim() : '';
+    const rut = rutInput ? rutInput.value.trim() : '';
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Guardando...';
+
+    try {
+        // Handle username change
+        if (newUsername && newUsername !== userProfile.username) {
+            await changeUsername(currentUser.uid, userProfile.username, newUsername);
+            userProfile.username = newUsername;
+        }
+
+        // Handle RUT
+        if (rut) {
+            await db.ref(`users/${currentUser.uid}/rut`).set(rut);
+            userProfile.rut = rut;
+        }
+
+        closeModal('welcomeModal');
+        showToast('Perfil guardado');
+    } catch (e) {
+        showToast(e.message || 'Error al guardar', 'error');
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Guardar';
+    }
+}
+
+function skipWelcomeModal() {
+    closeModal('welcomeModal');
 }
 
 // ============================================

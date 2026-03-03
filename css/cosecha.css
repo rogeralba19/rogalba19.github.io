@@ -1719,9 +1719,9 @@ body.modal-open {
     color: #ff6666;
 }
 
-/* Boss Mode active state on body (visual only for now) */
+/* Boss Mode active state on body */
 body.boss-mode .header {
-    border-bottom-color: rgba(255, 170, 0, 0.3);
+    border-bottom-color: rgba(255, 170, 0, 0.4);
 }
 
 body.boss-mode .header h1 {
@@ -1736,6 +1736,73 @@ body.boss-mode .user-avatar-btn {
 body.boss-mode .user-avatar-initials {
     color: #ffaa00;
     background: linear-gradient(135deg, rgba(255, 170, 0, 0.15), rgba(255, 215, 0, 0.1));
+}
+
+body.boss-mode .tab.active[data-tab="cuadrilla"] {
+    color: #ffaa00;
+    border-bottom-color: #ffaa00;
+}
+
+/* Boss-only tab hidden by default */
+.boss-only-tab {
+    display: none !important;
+}
+
+body.boss-mode .boss-only-tab {
+    display: block !important;
+}
+
+/* Welcome Modal Styles */
+.welcome-text {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+.username-input-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.username-input-row input {
+    flex: 1;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    font-family: monospace;
+}
+
+.username-input-row input:focus {
+    outline: none;
+    border-color: #00aaff;
+}
+
+.username-status {
+    font-size: 18px;
+    width: 24px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.username-hint, .rut-hint {
+    display: block;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.4);
+    margin-top: 6px;
+    line-height: 1.4;
+}
+
+.username-hint.error {
+    color: #ff4466;
+}
+
+.username-hint.success {
+    color: #00ff88;
 }
 
 /* Loading Overlay */
