@@ -93,6 +93,7 @@
             <button class="tab active" data-tab="calendario" onclick="switchTab('calendario')" role="tab" aria-selected="true">Calendario</button>
             <button class="tab" data-tab="registros" onclick="switchTab('registros')" role="tab" aria-selected="false">Registros</button>
             <button class="tab" data-tab="trabajos" onclick="switchTab('trabajos')" role="tab" aria-selected="false">Trabajos</button>
+            <button class="tab boss-only-tab" data-tab="cuadrilla" onclick="switchTab('cuadrilla')" role="tab" aria-selected="false" style="display: none;">Cuadrilla</button>
         </div>
 
         <!-- Calendario Section -->
@@ -160,6 +161,17 @@
         <!-- Trabajos Section -->
         <div class="section" id="trabajosSection" role="tabpanel">
             <div class="jobs-grid" id="jobsGrid"></div>
+        </div>
+
+        <!-- Cuadrilla Section (Boss Mode) -->
+        <div class="section" id="cuadrillaSection" role="tabpanel">
+            <div class="cuadrilla-placeholder">
+                <div class="empty-state">
+                    <div class="icon">👷</div>
+                    <h3>Cuadrilla</h3>
+                    <p>Gestiona tu equipo de trabajo desde aqui.</p>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -448,6 +460,37 @@
                 </div>
                 <button type="submit" class="auth-submit" id="registerSubmit">Crear Cuenta</button>
             </form>
+        </div>
+    </div>
+
+    <!-- Welcome Modal (first login) -->
+    <div class="modal-overlay" id="welcomeModal" role="dialog" aria-modal="true">
+        <div class="modal" style="max-width: 440px;">
+            <div class="modal-header">
+                <h2>Bienvenido</h2>
+            </div>
+            <div class="modal-body">
+                <p class="welcome-text">Tu perfil ha sido creado. Este es tu nombre de usuario:</p>
+
+                <div class="form-group">
+                    <label>Username</label>
+                    <div class="username-input-row">
+                        <input type="text" id="welcomeUsername" maxlength="12" pattern="[a-z0-9]+" placeholder="username" oninput="onWelcomeUsernameInput(this)">
+                        <span class="username-status" id="welcomeUsernameStatus"></span>
+                    </div>
+                    <small class="username-hint" id="welcomeUsernameHint">Solo letras minusculas y numeros, max 12 caracteres. Solo puedes cambiarlo 1 vez.</small>
+                </div>
+
+                <div class="form-group">
+                    <label>RUT / CI (opcional)</label>
+                    <input type="text" id="welcomeRut" placeholder="12.345.678-9">
+                    <small class="rut-hint">Permite que tu jefe de cuadrilla comparta tus registros contigo aunque no tengas cuenta aun.</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="skipWelcomeModal()">Saltar por ahora</button>
+                <button class="btn btn-primary" id="welcomeSaveBtn" onclick="saveWelcomeProfile()">Guardar</button>
+            </div>
         </div>
     </div>
 
