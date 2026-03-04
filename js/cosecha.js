@@ -2079,25 +2079,12 @@ async function loadBossModeState() {
     const hoursSinceActivation = (Date.now() - bossActivatedAt) / (1000 * 60 * 60);
 
     if (hoursSinceActivation >= 24) {
-        // Check if there are any bossHarvest documents
-        const bossHarvestSnap = await db.ref(`bossHarvest/${currentUser.uid}`).once('value');
-
-        if (bossHarvestSnap.exists()) {
-            // Has boss harvest data - make permanent
-            await db.ref(`users/${currentUser.uid}`).update({
-                bossPermanent: true
-            });
-            bossMode = true;
-            applyBossModeUI(true);
-        } else {
-            // No boss harvest data after 24h - deactivate
-            await db.ref(`users/${currentUser.uid}`).update({
-                bossActivatedAt: null,
-                bossPermanent: false
-            });
-            bossMode = false;
-            applyBossModeUI(false);
-        }
+        // 24h elapsed - grant permanent boss mode
+        await db.ref(`users/${currentUser.uid}`).update({
+            bossPermanent: true
+        });
+        bossMode = true;
+        applyBossModeUI(true);
     } else {
         // Within 24h window - boss mode is active
         bossMode = true;
@@ -2150,12 +2137,10 @@ async function toggleBossMode(event) {
             return;
         }
 
-        if (!userData.bossActivatedAt) {
-            // First time activation - write timestamp
-            await db.ref(`users/${currentUser.uid}`).update({
-                bossActivatedAt: Date.now()
-            });
-        }
+        // Write/renew activation timestamp (resets the 24h window)
+        await db.ref(`users/${currentUser.uid}`).update({
+            bossActivatedAt: Date.now()
+        });
 
         bossMode = true;
         applyBossModeUI(true);
@@ -2303,7 +2288,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 { id: 'confirmModal', close: () => closeConfirmModal(false) },
                 { id: 'dayModal', close: closeDayModal },
                 { id: 'entryModal', close: closeEntryModal },
-                { id: 'jobModal', close: closeJobModal }
+                { id: 'jobModal', close: closeJobModal },
+                { id: 'workerModal', close: closeWorkerModal },
+                { id: 'squadModal', close: closeSquadModal }
             ];
             for (const modal of modals) {
                 const el = document.getElementById(modal.id);

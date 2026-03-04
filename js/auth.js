@@ -99,16 +99,16 @@ async function ensureUserProfile(user) {
         displayName: displayName,
         email: email,
         photoURL: photoURL,
-        rut: null,
-        role: 'worker',
-        bossActivatedAt: null,
-        bossPermanent: false,
+        rut: existingData ? existingData.rut || null : null,
+        role: existingData ? existingData.role || 'worker' : 'worker',
+        bossActivatedAt: existingData ? existingData.bossActivatedAt || null : null,
+        bossPermanent: existingData ? existingData.bossPermanent || false : false,
         usernameChangedAt: null,
         createdAt: existingData ? existingData.createdAt || Date.now() : Date.now(),
         lastLogin: Date.now()
     };
 
-    await userRef.set(profile);
+    await userRef.update(profile);
 
     return { isNewUser: true, userProfile: { ...profile, uid: user.uid } };
 }
