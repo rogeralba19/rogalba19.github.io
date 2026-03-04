@@ -9,7 +9,7 @@
 let bossWorkers = [];
 let squads = [];
 let cuadrillaDataListening = false;
-let currentCuadrillaTab = 'directorio';
+let currentCuadrillaTab = 'bossCalendario';
 
 // Worker modal state
 let editingWorkerId = null;

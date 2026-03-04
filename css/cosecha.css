@@ -2251,3 +2251,307 @@ body.boss-mode .boss-only-tab {
 body.boss-mode .modal-header h2 {
     /* keep default blue; override only in cuadrilla context via class if needed */
 }
+
+/* ==========================================
+   BOSS ENTRY MODAL - Step Wizard
+   ========================================== */
+
+.boss-entry-modal {
+    max-width: 560px;
+}
+
+.boss-steps-bar {
+    display: flex;
+    gap: 4px;
+    padding: 0 20px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.boss-step-indicator {
+    flex: 1;
+    text-align: center;
+    padding: 8px 6px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.35);
+    border-bottom: 2px solid transparent;
+    transition: all 0.3s;
+}
+
+.boss-step-indicator span {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    line-height: 20px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    font-size: 11px;
+    font-weight: 700;
+    margin-right: 5px;
+    vertical-align: middle;
+}
+
+.boss-step-indicator.active {
+    color: #ffaa00;
+    border-bottom-color: #ffaa00;
+}
+
+.boss-step-indicator.active span {
+    background: rgba(255, 170, 0, 0.25);
+    color: #ffaa00;
+}
+
+.boss-step-indicator.completed {
+    color: #00ff88;
+}
+
+.boss-step-indicator.completed span {
+    background: rgba(0, 255, 136, 0.2);
+    color: #00ff88;
+}
+
+.boss-step {
+    display: none;
+}
+
+.boss-step.active {
+    display: block;
+}
+
+/* Members checklist */
+.boss-members-checklist {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 250px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+.boss-member-check {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.boss-member-check:hover {
+    background: rgba(255, 170, 0, 0.06);
+    border-color: rgba(255, 170, 0, 0.2);
+}
+
+.boss-member-check input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #ffaa00;
+    flex-shrink: 0;
+}
+
+.boss-member-check .boss-member-name {
+    flex: 1;
+    font-size: 14px;
+    color: #fff;
+}
+
+.boss-member-check.small {
+    padding: 6px 10px;
+}
+
+.boss-member-check.small .boss-member-name {
+    font-size: 13px;
+}
+
+/* Amounts table */
+.boss-amounts-table {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.boss-amount-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+}
+
+.boss-amount-name {
+    flex: 1;
+    font-size: 14px;
+    color: #fff;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.boss-amount-input {
+    width: 80px;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: #fff;
+    font-size: 14px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.boss-amount-input:focus {
+    outline: none;
+    border-color: #ffaa00;
+}
+
+.boss-amount-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #00ff88;
+    min-width: 60px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.boss-amounts-total {
+    margin-top: 12px;
+    padding: 12px 16px;
+    background: rgba(0, 255, 136, 0.08);
+    border: 1px solid rgba(0, 255, 136, 0.2);
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #00ff88;
+    text-align: center;
+}
+
+/* Bins segments */
+.boss-segment {
+    margin-bottom: 12px;
+    padding: 14px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 170, 0, 0.2);
+    border-radius: 10px;
+}
+
+.boss-segment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.boss-segment-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #ffaa00;
+}
+
+.boss-segment-remove {
+    background: none;
+    border: none;
+    color: rgba(255, 100, 100, 0.7);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+}
+
+.boss-segment-remove:hover {
+    color: #ff4466;
+}
+
+.boss-segment-members-label {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 8px;
+}
+
+.boss-segment-checkboxes {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-bottom: 10px;
+}
+
+.boss-segment-bins-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.boss-segment-bins-row label {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.7);
+    flex-shrink: 0;
+}
+
+.boss-segment-bins-input {
+    flex: 1;
+    max-width: 120px;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: #fff;
+    font-size: 14px;
+    text-align: center;
+}
+
+.boss-segment-bins-input:focus {
+    outline: none;
+    border-color: #ffaa00;
+}
+
+.boss-add-segment-btn {
+    width: 100%;
+    margin-bottom: 10px;
+    border-style: dashed !important;
+    border-color: rgba(255, 170, 0, 0.35) !important;
+    color: #ffaa00 !important;
+}
+
+/* Bins summary */
+.boss-bins-summary {
+    margin-top: 10px;
+}
+
+.boss-summary-title {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 6px;
+}
+
+.boss-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 12px;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 6px;
+    margin-bottom: 3px;
+    font-size: 13px;
+}
+
+.boss-summary-row span:first-child {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.boss-summary-row span:last-child {
+    color: #00ff88;
+    font-weight: 600;
+}
+
+/* Boss calendar day alert icon */
+.day-alert-icon {
+    font-size: 11px;
+    display: block;
+    text-align: center;
+    line-height: 1;
+}
