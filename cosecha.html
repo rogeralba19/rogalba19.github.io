@@ -167,12 +167,28 @@
         <div class="section" id="cuadrillaSection" role="tabpanel">
             <!-- Subtabs -->
             <div class="subtabs" role="tablist">
-                <button class="subtab active" data-subtab="directorio" onclick="switchCuadrillaTab('directorio')" role="tab">Directorio</button>
+                <button class="subtab active" data-subtab="bossCalendario" onclick="switchCuadrillaTab('bossCalendario')" role="tab">Calendario</button>
+                <button class="subtab" data-subtab="directorio" onclick="switchCuadrillaTab('directorio')" role="tab">Directorio</button>
                 <button class="subtab" data-subtab="cuadrillas" onclick="switchCuadrillaTab('cuadrillas')" role="tab">Cuadrillas</button>
             </div>
 
+            <!-- Boss Calendario Subsection -->
+            <div class="subsection active" id="bossCalendarioSubsection" role="tabpanel">
+                <div id="bossCalendarContainer" class="calendar-container">
+                    <div class="calendar-header">
+                        <div class="calendar-nav">
+                            <button onclick="changeBossMonth(-1)">‹</button>
+                            <span class="calendar-month" id="bossCurrentMonth">Enero 2024</span>
+                            <button onclick="changeBossMonth(1)">›</button>
+                        </div>
+                    </div>
+                    <div class="calendar-grid" id="bossCalendarGrid"></div>
+                </div>
+                <button class="fab" onclick="openBossEntryModal()" aria-label="Nuevo registro de cuadrilla">+</button>
+            </div>
+
             <!-- Directorio Subsection -->
-            <div class="subsection active" id="directorioSubsection" role="tabpanel">
+            <div class="subsection" id="directorioSubsection" role="tabpanel">
                 <div id="workersList"></div>
                 <button class="fab" onclick="openWorkerModal()" aria-label="Agregar trabajador">+</button>
             </div>
@@ -613,6 +629,112 @@
         </div>
     </div>
 
+    <!-- Boss Entry Modal (3-step wizard) -->
+    <div class="modal-overlay" id="bossEntryModal" role="dialog" aria-modal="true" aria-labelledby="bossEntryModalTitle">
+        <div class="modal boss-entry-modal">
+            <div class="modal-header">
+                <h2 id="bossEntryModalTitle">Registro de Cuadrilla</h2>
+                <button class="modal-close" onclick="closeBossEntryModal()" aria-label="Cerrar">&times;</button>
+            </div>
+            <!-- Step indicators -->
+            <div class="boss-steps-bar">
+                <div class="boss-step-indicator active" data-step="1"><span>1</span> Cuadrilla</div>
+                <div class="boss-step-indicator" data-step="2"><span>2</span> Trabajo</div>
+                <div class="boss-step-indicator" data-step="3"><span>3</span> Cantidades</div>
+            </div>
+            <div class="modal-body">
+                <!-- Step 1: Squad selection -->
+                <div class="boss-step active" id="bossStep1">
+                    <div class="form-group">
+                        <label>Fecha</label>
+                        <input type="date" id="bossEntryDate">
+                    </div>
+                    <div class="form-group">
+                        <label>Cuadrilla</label>
+                        <select id="bossSquadSelect" onchange="onBossSquadSelect()">
+                            <option value="">Seleccionar cuadrilla</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="bossSquadMembersGroup" style="display: none;">
+                        <label>Miembros activos para esta jornada</label>
+                        <div id="bossSquadMembersList" class="boss-members-checklist"></div>
+                    </div>
+                </div>
+
+                <!-- Step 2: Product & pricing -->
+                <div class="boss-step" id="bossStep2">
+                    <div class="form-group">
+                        <label>Producto</label>
+                        <select id="bossProduct">
+                            <option value="">Seleccionar fruta</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Recipiente/Unidad</label>
+                        <select id="bossUnit" onchange="onBossUnitChange()">
+                            <option value="totens">Totens</option>
+                            <option value="capacho_grande">Capacho Grande</option>
+                            <option value="capacho_pequeno">Capacho Pequeño</option>
+                            <option value="kilo">Kilo</option>
+                            <option value="bandeja">Bandeja</option>
+                            <option value="bins">Bins (grupo)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Precio por unidad ($)</label>
+                        <input type="number" id="bossPrice" placeholder="0.00" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label>Empleador / Ubicación</label>
+                        <input type="text" id="bossEmployer" placeholder="Nombre del empleador o ubicación">
+                    </div>
+                </div>
+
+                <!-- Step 3: Amounts -->
+                <div class="boss-step" id="bossStep3">
+                    <!-- Non-bins: per-member amounts -->
+                    <div id="bossAmountsSection" style="display: none;">
+                        <div class="form-group">
+                            <label>Cantidad por miembro <span id="bossAmountUnitLabel">(unidades)</span></label>
+                        </div>
+                        <div id="bossMemberAmountsTable" class="boss-amounts-table"></div>
+                        <div class="boss-amounts-total" id="bossAmountsTotal">Total cuadrilla: $0.00</div>
+                    </div>
+
+                    <!-- Bins: segments -->
+                    <div id="bossBinsSection" style="display: none;">
+                        <div id="bossBinSegments"></div>
+                        <button type="button" class="btn btn-secondary boss-add-segment-btn" onclick="addBossSegment()">+ Alguien se retiró</button>
+                        <div class="boss-amounts-total" id="bossBinsTotal">Total cuadrilla: $0.00</div>
+                        <div id="bossBinsSummary" class="boss-bins-summary"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="bossPrevBtn" onclick="bossPrevStep()" style="display: none;">Anterior</button>
+                <button class="btn btn-secondary" onclick="closeBossEntryModal()">Cancelar</button>
+                <button class="btn btn-primary" id="bossNextBtn" onclick="bossNextStep()">Siguiente</button>
+                <button class="btn btn-primary" id="bossSaveBtn" onclick="saveBossEntry()" style="display: none;">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Boss Day Modal -->
+    <div class="modal-overlay" id="bossDayModal" role="dialog" aria-modal="true" aria-labelledby="bossDayModalTitle">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="bossDayModalTitle">Registros del día</h2>
+                <button class="modal-close" onclick="closeBossDayModal()" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="bossDayEntriesList"></div>
+                <button class="btn btn-primary" style="width: 100%; margin-top: 15px;" onclick="closeBossDayModal(); openBossEntryModal();">
+                    + Agregar registro
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Loading Overlay -->
     <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-spinner"></div>
@@ -629,5 +751,6 @@
     <script src="js/auth.js"></script>
     <script src="js/cosecha.js"></script>
     <script src="js/cuadrilla.js"></script>
+    <script src="js/boss-harvest.js"></script>
 </body>
 </html>

@@ -2290,7 +2290,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 { id: 'entryModal', close: closeEntryModal },
                 { id: 'jobModal', close: closeJobModal },
                 { id: 'workerModal', close: closeWorkerModal },
-                { id: 'squadModal', close: closeSquadModal }
+                { id: 'squadModal', close: closeSquadModal },
+                { id: 'bossEntryModal', close: typeof closeBossEntryModal === 'function' ? closeBossEntryModal : () => {} },
+                { id: 'bossDayModal', close: typeof closeBossDayModal === 'function' ? closeBossDayModal : () => {} }
             ];
             for (const modal of modals) {
                 const el = document.getElementById(modal.id);
