@@ -310,6 +310,12 @@ async function saveWorker() {
             showToast('Busca y confirma un usuario primero', 'error');
             return;
         }
+        // Check for duplicate linked worker
+        const duplicate = bossWorkers.find(w => w.linkedUid === foundUser.uid && w.id !== editingWorkerId);
+        if (duplicate) {
+            showToast(`${foundUser.displayName} ya está en tu directorio`, 'error');
+            return;
+        }
         workerData = {
             displayName: foundUser.displayName,
             username: foundUser.username,
