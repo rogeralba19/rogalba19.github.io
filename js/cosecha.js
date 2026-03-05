@@ -2037,7 +2037,11 @@ function updateUserProfileUI(user) {
 
 function toggleUserDropdown() {
     const dropdown = document.getElementById('userDropdown');
+    const isOpening = !dropdown.classList.contains('visible');
     dropdown.classList.toggle('visible');
+    if (isOpening && typeof renderNotificationsInDropdown === 'function') {
+        renderNotificationsInDropdown();
+    }
 }
 
 function closeUserDropdown() {

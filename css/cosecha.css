@@ -2555,3 +2555,396 @@ body.boss-mode .modal-header h2 {
     text-align: center;
     line-height: 1;
 }
+
+/* ============================================
+   WORKER INTEGRATION STYLES
+   ============================================ */
+
+/* Notification badge on avatar */
+.notif-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    background: #ff4466;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    z-index: 2;
+    box-shadow: 0 2px 6px rgba(255, 68, 102, 0.6);
+    animation: notifPulse 2s infinite;
+}
+
+@keyframes notifPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+/* Notification list in dropdown */
+.notif-header-item {
+    cursor: default !important;
+}
+.notif-header-item:hover {
+    background: transparent !important;
+}
+
+.notif-list-container {
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 0;
+}
+
+.notif-empty {
+    text-align: center;
+    padding: 16px;
+    color: rgba(255,255,255,0.4);
+    font-size: 12px;
+}
+
+.notif-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: background 0.2s;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.notif-item:hover {
+    background: rgba(0, 170, 255, 0.1);
+}
+
+.notif-item.unread {
+    background: rgba(0, 170, 255, 0.05);
+    border-left: 3px solid #00aaff;
+}
+
+.notif-text {
+    font-size: 12px;
+    color: rgba(255,255,255,0.85);
+    line-height: 1.3;
+}
+
+.notif-time {
+    font-size: 10px;
+    color: rgba(255,255,255,0.4);
+    margin-top: 3px;
+}
+
+/* Boss record badge */
+.boss-record-badge {
+    display: inline-block;
+    background: rgba(255, 170, 0, 0.2);
+    color: #ffaa00;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 8px;
+    margin-top: 4px;
+    font-weight: 600;
+}
+
+/* Boss record card styling */
+.entry-card.boss-record {
+    border-color: rgba(255, 170, 0, 0.3);
+    flex-wrap: wrap;
+}
+
+.entry-card.boss-record:hover {
+    border-color: rgba(255, 170, 0, 0.5);
+}
+
+/* Boss record actions */
+.boss-record-actions {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.difference-note {
+    font-size: 12px;
+    color: rgba(255, 170, 0, 0.8);
+    font-style: italic;
+}
+
+/* Small buttons */
+.btn-sm {
+    padding: 5px 12px;
+    font-size: 11px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.btn-accept {
+    background: rgba(0, 255, 136, 0.2);
+    color: #00ff88;
+}
+.btn-accept:hover {
+    background: rgba(0, 255, 136, 0.35);
+}
+
+.btn-difference {
+    background: rgba(255, 170, 0, 0.2);
+    color: #ffaa00;
+}
+.btn-difference:hover {
+    background: rgba(255, 170, 0, 0.35);
+}
+
+.btn-confirm {
+    background: rgba(0, 255, 136, 0.2);
+    color: #00ff88;
+}
+.btn-confirm:hover {
+    background: rgba(0, 255, 136, 0.35);
+}
+
+.btn-pay {
+    background: rgba(0, 170, 255, 0.2);
+    color: #00aaff;
+}
+.btn-pay:hover {
+    background: rgba(0, 170, 255, 0.35);
+}
+
+.btn-share {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    padding: 5px 8px;
+}
+.btn-share:hover {
+    background: rgba(255,255,255,0.2);
+}
+
+/* Payment status badges */
+.payment-badge {
+    display: inline-block;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 8px;
+    margin-top: 4px;
+    font-weight: 600;
+}
+
+.payment-badge.completed {
+    background: rgba(0, 255, 136, 0.2);
+    color: #00ff88;
+}
+
+.payment-badge.boss-confirmed {
+    background: rgba(255, 200, 0, 0.2);
+    color: #ffc800;
+}
+
+.payment-badge.boss-confirmed.blink {
+    animation: payBlink 1.5s infinite;
+}
+
+@keyframes payBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.payment-badge.worker-confirmed {
+    background: rgba(0, 170, 255, 0.2);
+    color: #00aaff;
+}
+
+.payment-badge.accepted {
+    background: rgba(0, 255, 136, 0.15);
+    color: #00ff88;
+}
+
+.payment-badge.difference {
+    background: rgba(255, 68, 102, 0.2);
+    color: #ff4466;
+}
+
+.payment-badge.pending-pay {
+    background: rgba(255, 170, 0, 0.2);
+    color: #ffaa00;
+}
+
+/* Grouped card (own + boss) */
+.entry-card-grouped {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(138, 43, 226, 0.3);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.3s;
+}
+
+.entry-card-grouped:hover {
+    border-color: rgba(138, 43, 226, 0.5);
+}
+
+.grouped-header {
+    padding: 12px 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+}
+
+.grouped-badge {
+    display: inline-block;
+    background: rgba(138, 43, 226, 0.2);
+    color: #da70d6;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 8px;
+    margin-top: 4px;
+    font-weight: 600;
+}
+
+.grouped-toggle {
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.5);
+    font-size: 12px;
+    cursor: pointer;
+    transition: transform 0.3s;
+    padding: 4px;
+}
+
+.entry-card-grouped.expanded .grouped-toggle {
+    transform: rotate(180deg);
+}
+
+.grouped-body {
+    display: none;
+    padding: 0 15px 12px;
+}
+
+.entry-card-grouped.expanded .grouped-body {
+    display: block;
+}
+
+.grouped-comparison {
+    display: flex;
+    gap: 0;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.grouped-side {
+    flex: 1;
+    padding: 10px 12px;
+    text-align: center;
+}
+
+.own-side {
+    background: rgba(0, 170, 255, 0.05);
+}
+
+.boss-side {
+    background: rgba(255, 170, 0, 0.05);
+}
+
+.grouped-divider {
+    width: 1px;
+    background: rgba(255,255,255,0.1);
+}
+
+.grouped-side-label {
+    font-size: 10px;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+
+.grouped-side-qty {
+    font-size: 14px;
+    color: rgba(255,255,255,0.8);
+    margin-bottom: 2px;
+}
+
+.grouped-side-total {
+    font-size: 16px;
+    font-weight: bold;
+    color: #00ff88;
+}
+
+/* Boss day modal - member breakdown */
+.boss-day-members {
+    margin: 4px 0 12px;
+    padding: 0;
+}
+
+.boss-day-member-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.boss-day-member-row:last-child {
+    border-bottom: none;
+}
+
+.boss-day-member-row .member-name {
+    flex: 1;
+    font-size: 13px;
+    color: rgba(255,255,255,0.85);
+}
+
+.boss-day-member-row .member-total {
+    font-size: 14px;
+    font-weight: 600;
+    color: #00ff88;
+    min-width: 60px;
+    text-align: right;
+}
+
+.boss-day-member-row .member-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+/* Boss day entry card in modal */
+.boss-day-entry {
+    margin-bottom: 4px;
+    border-bottom: none;
+}
+
+/* Public link row */
+.public-link-row {
+    display: flex;
+    gap: 8px;
+}
+
+.public-link-row input {
+    flex: 1;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 12px;
+}
+
+.public-link-row .btn {
+    white-space: nowrap;
+}
+
+/* Entries list gap for mixed records */
+.entries-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}

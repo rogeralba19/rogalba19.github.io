@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Consulta pública de registros de cosecha">
+    <title>Consulta de Registros | ALBA STUDIO</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍎</text></svg>">
+    <link rel="stylesheet" href="css/cosecha.css">
+    <style>
+        .consulta-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .consulta-header {
+            text-align: center;
+            padding: 30px 0 20px;
+        }
+        .consulta-header h1 {
+            font-size: 22px;
+            color: #00aaff;
+            margin-bottom: 8px;
+        }
+        .consulta-header p {
+            color: rgba(255,255,255,0.6);
+            font-size: 14px;
+        }
+        .consulta-error {
+            text-align: center;
+            padding: 60px 20px;
+            color: rgba(255,255,255,0.5);
+        }
+        .consulta-error .icon { font-size: 48px; margin-bottom: 16px; }
+        .consulta-error h2 { font-size: 18px; color: #ff4466; margin-bottom: 8px; }
+        .consulta-summary {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .consulta-stat {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+        }
+        .consulta-stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #00ff88;
+        }
+        .consulta-stat-label {
+            font-size: 11px;
+            color: rgba(255,255,255,0.5);
+            margin-top: 4px;
+        }
+        .consulta-records { display: flex; flex-direction: column; gap: 8px; }
+        .consulta-record {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .consulta-record-info { flex: 1; }
+        .consulta-record-date { font-size: 14px; font-weight: 600; color: #00aaff; margin-bottom: 4px; }
+        .consulta-record-details { font-size: 12px; color: rgba(255,255,255,0.6); }
+        .consulta-record-total { font-size: 18px; font-weight: bold; color: #00ff88; }
+        .consulta-record .payment-badge { margin-top: 4px; display: inline-block; }
+        .consulta-loading { text-align: center; padding: 60px; color: rgba(255,255,255,0.5); }
+    </style>
+</head>
+<body>
+    <div class="consulta-container">
+        <div class="consulta-header">
+            <h1>🍎 Consulta de Registros</h1>
+            <p>Vista pública — solo lectura</p>
+        </div>
+        <div id="consultaContent">
+            <div class="consulta-loading">
+                <div class="loading-spinner"></div>
+                <p>Validando acceso...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script>
+        (async function() {
+            const params = new URLSearchParams(window.location.search);
+            const rut = params.get('id');
+            const token = params.get('t');
+            const content = document.getElementById('consultaContent');
+
+            function escapeHtml(str) {
+                if (!str) return '';
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            }
+
+            if (!rut || !token) {
+                content.innerHTML = `
+                    <div class="consulta-error">
+                        <div class="icon">🔒</div>
+                        <h2>Link inválido</h2>
+                        <p>Este link no contiene los parámetros necesarios.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Normalize rut
+            const normalizedRut = rut.replace(/[.\-]/g, '');
+
+            try {
+                // Validate token
+                const tokenSnap = await db.ref(`publicTokens/${normalizedRut}/${token}`).once('value');
+                const tokenData = tokenSnap.val();
+
+                if (!tokenData) {
+                    content.innerHTML = `
+                        <div class="consulta-error">
+                            <div class="icon">🔒</div>
+                            <h2>Token inválido</h2>
+                            <p>Este link no es válido o ya fue eliminado.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Check expiration
+                if (tokenData.expiresAt && Date.now() > tokenData.expiresAt) {
+                    content.innerHTML = `
+                        <div class="consulta-error">
+                            <div class="icon">⏰</div>
+                            <h2>Link expirado</h2>
+                            <p>Este link ha expirado. Solicita uno nuevo a tu jefe de cuadrilla.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const bossUid = tokenData.bossUid;
+
+                // Fetch all bossHarvest records for this boss
+                const harvestSnap = await db.ref(`bossHarvest/${bossUid}`).once('value');
+                const allRecords = [];
+
+                harvestSnap.forEach(child => {
+                    const rec = { id: child.key, ...child.val() };
+                    // Check if this rut is in squadSnapshot.members
+                    if (rec.squadSnapshot && rec.squadSnapshot.members) {
+                        const members = rec.squadSnapshot.members;
+                        for (const wid of Object.keys(members)) {
+                            const m = members[wid];
+                            const memberRut = (m.rut || '').replace(/[.\-]/g, '');
+                            if (memberRut === normalizedRut) {
+                                allRecords.push({
+                                    ...rec,
+                                    _workerId: wid,
+                                    _workerTotal: rec.totalByMember ? (rec.totalByMember[wid] || 0) : 0,
+                                    _paymentStatus: rec.paymentStatus ? (rec.paymentStatus[wid] || 'pending') : 'pending'
+                                });
+                                break;
+                            }
+                        }
+                    }
+                });
+
+                // Sort by date descending
+                allRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                if (allRecords.length === 0) {
+                    content.innerHTML = `
+                        <div class="consulta-error">
+                            <div class="icon">📋</div>
+                            <h2>Sin registros</h2>
+                            <p>No se encontraron registros para este RUT.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Summary
+                const totalEarned = allRecords.reduce((s, r) => s + r._workerTotal, 0);
+                const totalPending = allRecords.filter(r => r._paymentStatus !== 'completed').reduce((s, r) => s + r._workerTotal, 0);
+                const totalDays = new Set(allRecords.map(r => r.date)).size;
+
+                const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+                let html = `
+                    <div class="consulta-summary">
+                        <div class="consulta-stat">
+                            <div class="consulta-stat-value">$${totalEarned.toFixed(0)}</div>
+                            <div class="consulta-stat-label">Total</div>
+                        </div>
+                        <div class="consulta-stat">
+                            <div class="consulta-stat-value" style="color: #ffaa00;">$${totalPending.toFixed(0)}</div>
+                            <div class="consulta-stat-label">Pendiente</div>
+                        </div>
+                        <div class="consulta-stat">
+                            <div class="consulta-stat-value" style="color: #00aaff;">${totalDays}</div>
+                            <div class="consulta-stat-label">Días</div>
+                        </div>
+                    </div>
+                    <div class="consulta-records">
+                `;
+
+                allRecords.forEach(rec => {
+                    const date = new Date(rec.date + 'T12:00:00');
+                    const dateStr = `${date.getDate()} ${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+                    const product = escapeHtml(rec.product || '');
+                    const total = '$' + rec._workerTotal.toFixed(2);
+
+                    let statusHtml = '';
+                    if (rec._paymentStatus === 'completed') {
+                        statusHtml = '<span class="payment-badge completed">Pagado ✓✓</span>';
+                    } else if (rec._paymentStatus === 'boss_confirmed') {
+                        statusHtml = '<span class="payment-badge boss-confirmed">Pago enviado</span>';
+                    } else {
+                        statusHtml = '<span class="payment-badge pending-pay">Pendiente</span>';
+                    }
+
+                    html += `
+                        <div class="consulta-record">
+                            <div class="consulta-record-info">
+                                <div class="consulta-record-date">${dateStr} — ${product}</div>
+                                <div class="consulta-record-details">${rec.unit || ''} • $${rec.pricePerUnit || 0}/ud</div>
+                                ${statusHtml}
+                            </div>
+                            <div class="consulta-record-total">${total}</div>
+                        </div>
+                    `;
+                });
+
+                html += '</div>';
+                content.innerHTML = html;
+
+            } catch (err) {
+                console.error('Error loading public data:', err);
+                content.innerHTML = `
+                    <div class="consulta-error">
+                        <div class="icon">⚠️</div>
+                        <h2>Error</h2>
+                        <p>No se pudieron cargar los datos. Intenta de nuevo más tarde.</p>
+                    </div>
+                `;
+            }
+        })();
+    </script>
+</body>
+</html>
