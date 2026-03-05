@@ -1787,6 +1787,18 @@ body.boss-mode .boss-only-tab {
     width: 24px;
     text-align: center;
     flex-shrink: 0;
+    color: rgba(255, 255, 255, 0.5);
+    transition: color 0.2s;
+}
+
+.username-hint.success ~ .username-status,
+.username-input-row:has(~ .username-hint.success) .username-status {
+    color: #00ff88;
+}
+
+.username-hint.error ~ .username-status,
+.username-input-row:has(~ .username-hint.error) .username-status {
+    color: #ff4466;
 }
 
 .username-hint, .rut-hint {
@@ -2783,6 +2795,13 @@ body.boss-mode .modal-header h2 {
     border-radius: 12px;
     overflow: hidden;
     transition: all 0.3s;
+    margin-bottom: 6px;
+}
+
+/* Boss record card spacing */
+.entry-card.boss-record {
+    border-left: 3px solid #ffaa00;
+    flex-wrap: wrap;
 }
 
 .entry-card-grouped:hover {

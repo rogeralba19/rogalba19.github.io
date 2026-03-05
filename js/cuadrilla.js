@@ -258,46 +258,128 @@ function onUsernameSearchInput(input) {
 async function _searchByUsername(username) {
     const resultEl = document.getElementById('workerSearchResult');
     try {
+        // First try exact match
         const uidSnap = await db.ref(`usernames/${username}`).once('value');
-        if (!uidSnap.exists()) {
+        if (uidSnap.exists()) {
+            const uid = uidSnap.val();
+            const profileSnap = await db.ref(`users/${uid}`).once('value');
+            const profile = profileSnap.val();
+
+            if (profile) {
+                foundUser = {
+                    uid,
+                    displayName: profile.displayName || username,
+                    username,
+                    photoURL: profile.photoURL || ''
+                };
+
+                const safeName = escapeHtml(foundUser.displayName);
+                const avatarHtml = foundUser.photoURL
+                    ? `<img src="${escapeHtml(foundUser.photoURL)}" class="worker-found-photo" alt="">`
+                    : `<div class="worker-found-avatar">${safeName.charAt(0).toUpperCase()}</div>`;
+
+                resultEl.innerHTML = `
+                    <div class="worker-found-card" onclick="document.getElementById('workerUsernameSearch').value='${escapeHtml(username)}'">
+                        ${avatarHtml}
+                        <div class="worker-found-info">
+                            <span class="worker-found-name">${safeName}</span>
+                            <span class="worker-found-username">@${escapeHtml(username)}</span>
+                        </div>
+                        <span class="worker-badge linked">Encontrado ✓</span>
+                    </div>
+                `;
+                return;
+            }
+        }
+
+        // Partial match: search usernames starting with this prefix
+        const partialSnap = await db.ref('usernames')
+            .orderByKey()
+            .startAt(username)
+            .endAt(username + '\uf8ff')
+            .limitToFirst(5)
+            .once('value');
+
+        if (!partialSnap.exists()) {
             resultEl.innerHTML = '<div class="worker-search-status empty">Usuario no encontrado</div>';
             return;
         }
 
-        const uid = uidSnap.val();
-        const profileSnap = await db.ref(`users/${uid}`).once('value');
-        const profile = profileSnap.val();
+        const results = [];
+        partialSnap.forEach(child => {
+            results.push({ username: child.key, uid: child.val() });
+        });
 
-        if (!profile) {
+        if (results.length === 0) {
             resultEl.innerHTML = '<div class="worker-search-status empty">Usuario no encontrado</div>';
             return;
         }
 
-        foundUser = {
-            uid,
-            displayName: profile.displayName || username,
-            username,
-            photoURL: profile.photoURL || ''
-        };
+        // Fetch profiles for all results
+        const profiles = await Promise.all(results.map(async r => {
+            const pSnap = await db.ref(`users/${r.uid}`).once('value');
+            return { ...r, profile: pSnap.val() };
+        }));
 
-        const safeName = escapeHtml(foundUser.displayName);
-        const avatarHtml = foundUser.photoURL
-            ? `<img src="${escapeHtml(foundUser.photoURL)}" class="worker-found-photo" alt="">`
-            : `<div class="worker-found-avatar">${safeName.charAt(0).toUpperCase()}</div>`;
+        const validProfiles = profiles.filter(p => p.profile);
 
-        resultEl.innerHTML = `
-            <div class="worker-found-card">
-                ${avatarHtml}
-                <div class="worker-found-info">
-                    <span class="worker-found-name">${safeName}</span>
-                    <span class="worker-found-username">@${escapeHtml(username)}</span>
+        if (validProfiles.length === 0) {
+            resultEl.innerHTML = '<div class="worker-search-status empty">Usuario no encontrado</div>';
+            return;
+        }
+
+        // If only one result, auto-select
+        if (validProfiles.length === 1) {
+            const p = validProfiles[0];
+            foundUser = {
+                uid: p.uid,
+                displayName: p.profile.displayName || p.username,
+                username: p.username,
+                photoURL: p.profile.photoURL || ''
+            };
+        }
+
+        resultEl.innerHTML = validProfiles.map(p => {
+            const safeName = escapeHtml(p.profile.displayName || p.username);
+            const avatarHtml = p.profile.photoURL
+                ? `<img src="${escapeHtml(p.profile.photoURL)}" class="worker-found-photo" alt="">`
+                : `<div class="worker-found-avatar">${safeName.charAt(0).toUpperCase()}</div>`;
+
+            return `
+                <div class="worker-found-card" onclick="_selectSearchResult('${escapeHtml(p.uid)}', '${escapeHtml(p.username)}', '${escapeHtml(p.profile.displayName || p.username)}', '${escapeHtml(p.profile.photoURL || '')}')">
+                    ${avatarHtml}
+                    <div class="worker-found-info">
+                        <span class="worker-found-name">${safeName}</span>
+                        <span class="worker-found-username">@${escapeHtml(p.username)}</span>
+                    </div>
+                    ${validProfiles.length === 1 ? '<span class="worker-badge linked">Encontrado ✓</span>' : '<span class="worker-badge">Seleccionar</span>'}
                 </div>
-                <span class="worker-badge linked">Encontrado ✓</span>
-            </div>
-        `;
+            `;
+        }).join('');
     } catch (err) {
         resultEl.innerHTML = '<div class="worker-search-status empty">Error al buscar</div>';
     }
+}
+
+function _selectSearchResult(uid, username, displayName, photoURL) {
+    foundUser = { uid, displayName, username, photoURL };
+    const resultEl = document.getElementById('workerSearchResult');
+    const safeName = escapeHtml(displayName);
+    const avatarHtml = photoURL
+        ? `<img src="${escapeHtml(photoURL)}" class="worker-found-photo" alt="">`
+        : `<div class="worker-found-avatar">${safeName.charAt(0).toUpperCase()}</div>`;
+
+    resultEl.innerHTML = `
+        <div class="worker-found-card">
+            ${avatarHtml}
+            <div class="worker-found-info">
+                <span class="worker-found-name">${safeName}</span>
+                <span class="worker-found-username">@${escapeHtml(username)}</span>
+            </div>
+            <span class="worker-badge linked">Seleccionado ✓</span>
+        </div>
+    `;
+    document.getElementById('workerUsernameSearch').value = username;
 }
 
 async function saveWorker() {

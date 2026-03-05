@@ -1908,12 +1908,19 @@ function updateFruitFilter() {
 
     const currentVal = select.value;
 
-    // Obtener frutas unicas de los registros (usar snapshot)
+    // Obtener frutas unicas de los registros propios (usar snapshot)
     const fruitsInEntries = new Set();
     entries.forEach(e => {
         const jobData = getEntryJobData(e);
         if (jobData.product) fruitsInEntries.add(jobData.product);
     });
+
+    // Incluir frutas de registros del jefe (workerRecords)
+    if (typeof workerRecords !== 'undefined') {
+        workerRecords.forEach(wr => {
+            if (wr.product) fruitsInEntries.add(wr.product);
+        });
+    }
 
     let options = '<option value="">Todas las frutas</option>';
     Array.from(fruitsInEntries).sort().forEach(fruit => {
@@ -2203,7 +2210,7 @@ function onWelcomeUsernameInput(input) {
 
         // If same as current, it's available
         if (userProfile && username === userProfile.username) {
-            if (statusEl) statusEl.textContent = '';
+            if (statusEl) statusEl.textContent = '✓';
             if (hintEl) {
                 hintEl.textContent = 'Tu username actual';
                 hintEl.className = 'username-hint success';
@@ -2215,13 +2222,13 @@ function onWelcomeUsernameInput(input) {
         if (input.value !== username) return; // Input changed
 
         if (available) {
-            if (statusEl) statusEl.textContent = '';
+            if (statusEl) statusEl.textContent = '✓';
             if (hintEl) {
                 hintEl.textContent = 'Disponible';
                 hintEl.className = 'username-hint success';
             }
         } else {
-            if (statusEl) statusEl.textContent = '';
+            if (statusEl) statusEl.textContent = '✗';
             if (hintEl) {
                 hintEl.textContent = 'Este username ya esta en uso';
                 hintEl.className = 'username-hint error';
