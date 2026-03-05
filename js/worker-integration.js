@@ -88,6 +88,11 @@ function updateNotifBadge() {
     } else {
         badge.style.display = 'none';
     }
+    // Also update dropdown if it's open
+    const dropdown = document.getElementById('userDropdown');
+    if (dropdown && dropdown.classList.contains('visible')) {
+        renderNotificationsInDropdown();
+    }
 }
 
 // ============================================
@@ -254,8 +259,14 @@ async function markWorkerPaid(bossRecordId, workerId, workerLinkedUid) {
 async function confirmBossPayment(bossRecordId, workerId, bossUid) {
     if (!currentUser) return;
     try {
+        // Use workerId from workerRecord if available (more reliable)
+        let actualWorkerId = workerId;
+        if (!actualWorkerId || actualWorkerId === bossRecordId) {
+            const wrSnap = await db.ref(`workerRecords/${currentUser.uid}/${bossRecordId}/workerId`).once('value');
+            actualWorkerId = wrSnap.val() || workerId;
+        }
         // Boss side
-        await db.ref(`bossHarvest/${bossUid}/${bossRecordId}/paymentStatus/${workerId}`).set('completed');
+        await db.ref(`bossHarvest/${bossUid}/${bossRecordId}/paymentStatus/${actualWorkerId}`).set('completed');
         // Worker side
         await db.ref(`workerRecords/${currentUser.uid}/${bossRecordId}/paymentStatus`).set('completed');
         await createNotification(bossUid, 'worker_payment_confirmed', bossRecordId);
@@ -269,7 +280,14 @@ async function confirmBossPayment(bossRecordId, workerId, bossUid) {
 async function workerInitiatePayment(bossRecordId, bossUid) {
     if (!currentUser) return;
     try {
+        // Get workerId from workerRecord
+        const wrSnap = await db.ref(`workerRecords/${currentUser.uid}/${bossRecordId}/workerId`).once('value');
+        const workerId = wrSnap.val();
         await db.ref(`workerRecords/${currentUser.uid}/${bossRecordId}/paymentStatus`).set('worker_confirmed');
+        // Also update boss side if we have workerId
+        if (workerId) {
+            await db.ref(`bossHarvest/${bossUid}/${bossRecordId}/paymentStatus/${workerId}`).set('worker_confirmed');
+        }
         await createNotification(bossUid, 'payment_request', bossRecordId);
         showToast('Solicitud de pago enviada');
     } catch (err) {
@@ -492,12 +510,14 @@ function renderBossCard(wr, dayName, dateStr) {
     const precio = '$' + (wr.total || 0).toFixed(2);
     const statusBadge = getBossRecordStatusBadge(wr);
     const actionButtons = getBossRecordActions(wr);
+    const unitLabel = wr.unit && unitNames[wr.unit] ? unitNames[wr.unit] : '';
+    const priceInfo = wr.pricePerUnit ? '$' + wr.pricePerUnit + '/' + (unitLabel || 'ud') : '';
 
     return `
         <div class="entry-card boss-record" data-entry-id="${wr.id}" data-source="boss">
             <div class="entry-info">
                 <div class="entry-date">${dayName} - ${dateStr} - ${fruta}</div>
-                <div class="entry-details">${wr.quantity ? wr.quantity + ' unidades' : ''} ${safeEmployer ? '• ' + safeEmployer : ''}</div>
+                <div class="entry-details">${priceInfo} ${safeEmployer ? '• ' + safeEmployer : ''}</div>
                 <span class="boss-record-badge">Registrado por jefe</span>
                 ${statusBadge}
             </div>
@@ -536,7 +556,7 @@ function renderGroupedCard(bossEntry, ownEntry, dayName, dateStr) {
                     <div class="grouped-divider"></div>
                     <div class="grouped-side boss-side">
                         <div class="grouped-side-label">Registro jefe</div>
-                        <div class="grouped-side-qty">${bossEntry.quantity || '-'} uds</div>
+                        <div class="grouped-side-qty">${bossEntry.pricePerUnit ? '$' + bossEntry.pricePerUnit + '/' + (unitNames[bossEntry.unit] || 'ud') : '-'}</div>
                         <div class="grouped-side-total">$${bossTotal}</div>
                     </div>
                 </div>
@@ -563,6 +583,9 @@ function getBossRecordStatusBadge(wr) {
     if (wr.status === 'accepted') {
         return '<span class="payment-badge accepted">Aceptado</span>';
     }
+    if (wr.status === 'pending_review') {
+        return '<span class="payment-badge pending-pay">Pendiente de revisión</span>';
+    }
     return '';
 }
 
@@ -576,7 +599,14 @@ function getBossRecordActions(wr) {
     if (wr.paymentStatus === 'boss_confirmed') {
         return `
             <div class="boss-record-actions">
-                <button class="btn btn-sm btn-confirm" onclick="event.stopPropagation(); confirmBossPayment('${wr.id}', '${wr.bossRecordId || wr.id}', '${wr.bossUid}')">Confirmar Pago</button>
+                <button class="btn btn-sm btn-confirm" onclick="event.stopPropagation(); confirmBossPayment('${wr.bossRecordId || wr.id}', '${wr.workerId || ''}', '${wr.bossUid}')">Confirmar Pago</button>
+            </div>
+        `;
+    }
+    if (wr.status === 'accepted' && wr.paymentStatus !== 'worker_confirmed') {
+        return `
+            <div class="boss-record-actions">
+                <button class="btn btn-sm btn-pay" onclick="event.stopPropagation(); workerInitiatePayment('${wr.bossRecordId || wr.id}', '${wr.bossUid}')">Solicitar Pago</button>
             </div>
         `;
     }

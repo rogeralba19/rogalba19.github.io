@@ -820,6 +820,7 @@ async function saveBossEntry() {
                 workerUpdates[`workerRecords/${m.linkedUid}/${recordId}`] = {
                     bossUid: currentUser.uid,
                     bossRecordId: recordId,
+                    workerId: wid,
                     date,
                     product,
                     unit,
