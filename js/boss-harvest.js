@@ -834,6 +834,15 @@ async function saveBossEntry() {
 
         if (Object.keys(workerUpdates).length > 0) {
             await db.ref().update(workerUpdates);
+
+            // Send notifications to linked workers
+            if (typeof createNotification === 'function') {
+                for (const [wid, m] of activeMembers) {
+                    if (m.linkedUid && totalByMember[wid] > 0) {
+                        createNotification(m.linkedUid, 'new_boss_record', recordId);
+                    }
+                }
+            }
         }
 
         // Update squad lastUsed

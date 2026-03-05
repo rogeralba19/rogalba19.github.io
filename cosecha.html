@@ -20,6 +20,7 @@
                 <button class="user-avatar-btn" id="userAvatarBtn" onclick="toggleUserDropdown()" aria-label="Menú de usuario">
                     <img class="user-avatar-img" id="userAvatarImg" style="display: none;" alt="">
                     <span class="user-avatar-initials" id="userAvatarInitials">?</span>
+                    <span class="notif-badge" id="notifBadge" style="display: none;">0</span>
                 </button>
                 <div class="user-dropdown" id="userDropdown">
                     <div class="user-dropdown-header">
@@ -31,6 +32,14 @@
                             <span class="user-dropdown-name" id="dropdownUserName">Usuario</span>
                             <span class="user-dropdown-email" id="dropdownUserEmail">correo@ejemplo.com</span>
                         </div>
+                    </div>
+                    <!-- Notifications section -->
+                    <div class="user-dropdown-item notif-header-item">
+                        <span class="dropdown-item-icon">🔔</span>
+                        <span class="dropdown-item-label">Notificaciones</span>
+                    </div>
+                    <div id="notifListContainer" class="notif-list-container">
+                        <div class="notif-empty">Sin notificaciones</div>
                     </div>
                     <div class="user-dropdown-divider"></div>
                     <div class="user-dropdown-item boss-mode-item" onclick="toggleBossMode(event)">
@@ -735,6 +744,50 @@
         </div>
     </div>
 
+    <!-- Difference Report Modal -->
+    <div class="modal-overlay" id="differenceModal" role="dialog" aria-modal="true">
+        <div class="modal" style="max-width: 440px;">
+            <div class="modal-header">
+                <h2>Reportar Diferencia</h2>
+                <button class="modal-close" onclick="closeDifferenceModal()" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="differenceRecordId">
+                <div class="form-group">
+                    <label>Describe la diferencia</label>
+                    <textarea id="differenceNote" rows="4" placeholder="Ej: Yo conté 15 totens, no 12..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeDifferenceModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="submitDifference()">Enviar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Public Link Modal -->
+    <div class="modal-overlay" id="publicLinkModal" role="dialog" aria-modal="true">
+        <div class="modal" style="max-width: 480px;">
+            <div class="modal-header">
+                <h2>Link Público</h2>
+                <button class="modal-close" onclick="closePublicLinkModal()" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: rgba(255,255,255,0.6); margin-bottom: 12px; font-size: 13px;">Este link permite consultar los registros sin necesidad de cuenta. Expira en 7 días.</p>
+                <div class="form-group">
+                    <label>Link para compartir</label>
+                    <div class="public-link-row">
+                        <input type="text" id="publicLinkUrl" readonly onclick="this.select()">
+                        <button class="btn btn-primary" onclick="copyPublicLink()">Copiar</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closePublicLinkModal()">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Loading Overlay -->
     <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-spinner"></div>
@@ -752,5 +805,6 @@
     <script src="js/cosecha.js"></script>
     <script src="js/cuadrilla.js"></script>
     <script src="js/boss-harvest.js"></script>
+    <script src="js/worker-integration.js"></script>
 </body>
 </html>
