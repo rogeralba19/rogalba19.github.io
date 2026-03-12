@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P2P Monitor | ALBA STUDIO</title>
+    <link rel="stylesheet" href="css/p2p.css">
+</head>
+<body>
+    <!-- Auth Gate -->
+    <div id="auth-gate">
+        <div class="auth-box">
+            <h2>P2P Monitor</h2>
+            <p>Herramienta interna - Ingresa la clave de acceso</p>
+            <input type="password" id="auth-password" placeholder="Clave de acceso" autofocus>
+            <button id="auth-submit">Ingresar</button>
+            <p id="auth-error" class="error-msg"></p>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app" class="hidden">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <a href="index.html" class="back-btn">< Inicio</a>
+                <h1>P2P Monitor</h1>
+            </div>
+            <div class="header-right">
+                <span id="last-update" class="timestamp"></span>
+                <span id="countdown" class="countdown"></span>
+                <button id="refresh-btn" class="action-btn" title="Actualizar ahora">Actualizar</button>
+            </div>
+        </header>
+
+        <!-- Status bar -->
+        <div class="status-bar">
+            <div id="status-indicator" class="status-dot"></div>
+            <span id="status-text">Conectando...</span>
+        </div>
+
+        <!-- Panels Grid -->
+        <div class="container">
+            <div class="panels-grid">
+                <!-- Panel CLP -> USDT -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Compra USDT con CLP</h2>
+                        <span class="panel-tag buy">COMPRAR</span>
+                    </div>
+                    <div class="panel-subtitle">Mejores ofertas para comprar USDT en Chile</div>
+                    <div id="clp-offers" class="offers-list">
+                        <div class="loading-placeholder">Cargando ofertas...</div>
+                    </div>
+                </div>
+
+                <!-- Panel USDT -> BOB -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Vende USDT por BOB</h2>
+                        <span class="panel-tag sell">VENDER</span>
+                    </div>
+                    <div class="panel-subtitle">Mejores ofertas para vender USDT en Bolivia</div>
+                    <div id="bob-offers" class="offers-list">
+                        <div class="loading-placeholder">Cargando ofertas...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Calculator Section -->
+            <div class="calculator-section">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Calculadora de Margen</h2>
+                        <span class="panel-tag calc">CALC</span>
+                    </div>
+
+                    <div class="calc-grid">
+                        <div class="calc-input-group">
+                            <label>Monto CLP recibido del cliente</label>
+                            <div class="input-with-unit">
+                                <input type="number" id="input-clp" placeholder="500000" min="0">
+                                <span class="unit">CLP</span>
+                            </div>
+                        </div>
+
+                        <div class="calc-input-group">
+                            <label>Tasa ofrecida al cliente (CLP por 1 BOB)</label>
+                            <div class="input-with-unit">
+                                <input type="number" id="input-rate" placeholder="100" min="0" step="0.01">
+                                <span class="unit">CLP/BOB</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="calc-results" id="calc-results">
+                        <div class="result-row">
+                            <span class="result-label">Mejor precio compra (CLP/USDT)</span>
+                            <span class="result-value" id="res-best-clp">-</span>
+                        </div>
+                        <div class="result-row">
+                            <span class="result-label">USDT obtenibles</span>
+                            <span class="result-value highlight" id="res-usdt">-</span>
+                        </div>
+                        <div class="result-row">
+                            <span class="result-label">Mejor precio venta (BOB/USDT)</span>
+                            <span class="result-value" id="res-best-bob">-</span>
+                        </div>
+                        <div class="result-row">
+                            <span class="result-label">BOB resultantes (mercado)</span>
+                            <span class="result-value highlight" id="res-bob-market">-</span>
+                        </div>
+                        <div class="result-divider"></div>
+                        <div class="result-row">
+                            <span class="result-label">BOB a entregar al cliente</span>
+                            <span class="result-value" id="res-bob-client">-</span>
+                        </div>
+                        <div class="result-row big">
+                            <span class="result-label">Ganancia</span>
+                            <span class="result-value profit" id="res-profit">-</span>
+                        </div>
+                        <div class="result-row">
+                            <span class="result-label">Ganancia en USD</span>
+                            <span class="result-value" id="res-profit-usd">-</span>
+                        </div>
+                        <div class="result-row big">
+                            <span class="result-label">Margen</span>
+                            <span class="result-value margin" id="res-margin">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Suggested Price -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Precio Sugerido</h2>
+                        <span class="panel-tag suggest">SUGERIDO</span>
+                    </div>
+
+                    <div class="calc-input-group">
+                        <label>Tasa competencia (CLP por 1 BOB)</label>
+                        <div class="input-with-unit">
+                            <input type="number" id="input-competition" value="100" min="0" step="0.01">
+                            <span class="unit">CLP/BOB</span>
+                        </div>
+                        <small class="hint">Default: 1000 CLP = 10 BOB (100 CLP/BOB)</small>
+                    </div>
+
+                    <div class="suggested-results" id="suggested-results">
+                        <div class="suggested-card">
+                            <div class="suggested-label">Tasa sugerida (5% mejor)</div>
+                            <div class="suggested-value" id="sug-rate">-</div>
+                            <div class="suggested-detail" id="sug-detail"></div>
+                        </div>
+                        <div class="suggested-card">
+                            <div class="suggested-label">Margen estimado a tasa sugerida</div>
+                            <div class="suggested-value" id="sug-margin">-</div>
+                            <div class="suggested-detail" id="sug-margin-detail"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Proxy Config (collapsible) -->
+            <details class="config-section">
+                <summary>Configuracion del Proxy</summary>
+                <div class="config-content">
+                    <div class="calc-input-group">
+                        <label>URL del proxy API</label>
+                        <input type="text" id="proxy-url" placeholder="https://tu-worker.tu-cuenta.workers.dev">
+                        <small class="hint">Despliega el Cloudflare Worker incluido y pega la URL aqui</small>
+                    </div>
+                    <button id="save-proxy" class="action-btn primary">Guardar</button>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <script src="js/p2p.js"></script>
+</body>
+</html>
