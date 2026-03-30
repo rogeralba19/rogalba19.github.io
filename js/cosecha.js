@@ -70,7 +70,8 @@ const unitNames = {
     'capacho_pequeno': 'Capacho Pequeño',
     'kilo': 'Kilos',
     'bandeja': 'Bandejas',
-    'bins': 'Bins'
+    'bins': 'Bins',
+    'gamela': 'Gamela'
 };
 
 // Helper: crear snapshot del trabajo para guardar en el registro
