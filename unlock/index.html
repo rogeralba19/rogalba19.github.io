@@ -607,10 +607,6 @@ function generateSimilar() {
     }
   });
 
-  const targetLen = history.length
-    ? Math.max(MIN_DOTS, Math.min(9, Math.round(totalLen / history.length)))
-    : MIN_DOTS + Math.floor(Math.random() * 3);
-
   // ── Weighted random pick ───────────────────────────────────────
   function wPick(weights, exclude) {
     let pool = [], total = 0;
@@ -627,6 +623,8 @@ function generateSimilar() {
 
   // ── Generation loop ────────────────────────────────────────────
   for (let attempt = 0; attempt < 300; attempt++) {
+    // Each attempt picks a fresh random length across the full valid range
+    const targetLen = MIN_DOTS + Math.floor(Math.random() * (9 - MIN_DOTS + 1));
     const pat = [];
 
     // Pick start
