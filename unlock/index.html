@@ -92,6 +92,11 @@
       border-color: rgba(255, 170, 0, 0.4);
       color: #ffaa00;
     }
+    .status-pill.s-dis {
+      background: rgba(255, 170, 0, 0.12);
+      border-color: rgba(255, 170, 0, 0.4);
+      color: #ffaa00;
+    }
 
     /* ── Canvas ──────────────────────────────────────────────────────────────── */
     .canvas-wrap {
@@ -155,6 +160,13 @@
     }
     .btn-clear:hover { background: rgba(255, 68, 102, 0.2); }
 
+    .btn-discard {
+      background: rgba(180, 60, 20, 0.15);
+      color: #ff7744;
+      border: 1px solid rgba(180, 60, 20, 0.35);
+    }
+    .btn-discard:hover { background: rgba(180, 60, 20, 0.28); }
+
     /* ── Counter ─────────────────────────────────────────────────────────────── */
     .counter {
       font-size: 11px;
@@ -183,6 +195,7 @@
   <div class="btn-row">
     <button class="btn btn-register" id="btnRegister" disabled>Registrar</button>
     <button class="btn btn-generate" id="btnGenerate">Generar parecido</button>
+    <button class="btn btn-discard" id="btnDiscard" style="display:none">Descartar</button>
     <button class="btn btn-clear" id="btnClear">Limpiar</button>
   </div>
 
@@ -193,8 +206,9 @@
 // ═══════════════════════════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════════════════════════
-const STORAGE_KEY = 'alba_unlock_patterns';
-const MIN_DOTS    = 4;
+const STORAGE_KEY  = 'alba_unlock_patterns';
+const DISCARD_KEY  = 'alba_unlock_discarded';
+const MIN_DOTS     = 4;
 
 const COLORS = {
   bg:          '#0d0d1a',
@@ -217,6 +231,7 @@ const COLORS = {
 // STATE
 // ═══════════════════════════════════════════════════════════════════
 let history    = [];
+let discarded  = [];
 let current    = [];       // dot indices 0-8 in draw order
 let drawing    = false;
 let phase      = 'idle';   // idle | drawing | new | dup | gen | registered
@@ -232,6 +247,7 @@ const wrap      = document.getElementById('canvasWrap');
 const pill      = document.getElementById('statusPill');
 const btnReg    = document.getElementById('btnRegister');
 const btnGen    = document.getElementById('btnGenerate');
+const btnDis    = document.getElementById('btnDiscard');
 const btnClr    = document.getElementById('btnClear');
 const countEl   = document.getElementById('countEl');
 
@@ -241,6 +257,8 @@ const countEl   = document.getElementById('countEl');
 function loadHistory() {
   try { history = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
   catch { history = []; }
+  try { discarded = JSON.parse(localStorage.getItem(DISCARD_KEY)) || []; }
+  catch { discarded = []; }
   countEl.textContent = history.length;
 }
 
@@ -250,10 +268,19 @@ function savePattern(pat) {
   countEl.textContent = history.length;
 }
 
+function discardPattern(pat) {
+  discarded.push([...pat]);
+  localStorage.setItem(DISCARD_KEY, JSON.stringify(discarded));
+}
+
 function patternKey(pat) { return pat.join('-'); }
 function isDuplicate(pat) {
   const k = patternKey(pat);
   return history.some(h => patternKey(h) === k);
+}
+function isDiscarded(pat) {
+  const k = patternKey(pat);
+  return discarded.some(d => patternKey(d) === k);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -310,7 +337,7 @@ function render() {
   let lineCol = COLORS.lineIdle;
   if (phase === 'new' || phase === 'registered') lineCol = COLORS.lineNew;
   if (phase === 'dup')  lineCol = COLORS.lineDup;
-  if (phase === 'gen')  lineCol = COLORS.lineGen;
+  if (phase === 'gen' || phase === 'dis')  lineCol = COLORS.lineGen;
 
   // Draw path lines
   if (current.length > 1) {
@@ -349,7 +376,7 @@ function render() {
     let dotColor = COLORS.dotActive;
     if (phase === 'new' || phase === 'registered') dotColor = COLORS.dotNew;
     if (phase === 'dup')  dotColor = COLORS.dotDup;
-    if (phase === 'gen')  dotColor = COLORS.dotGen;
+    if (phase === 'gen' || phase === 'dis')  dotColor = COLORS.dotGen;
 
     // Outer glow ring for active dots
     if (active) {
@@ -391,7 +418,7 @@ function render() {
     let dotColor = COLORS.dotActive;
     if (phase === 'new' || phase === 'registered') dotColor = COLORS.dotNew;
     if (phase === 'dup')  dotColor = COLORS.dotDup;
-    if (phase === 'gen')  dotColor = COLORS.dotGen;
+    if (phase === 'gen' || phase === 'dis')  dotColor = COLORS.dotGen;
 
     current.forEach((idx, order) => {
       if (order === 0) return;
@@ -464,6 +491,7 @@ function onStart(e) {
   current    = [hit];
   cursorPos  = pos;
   btnReg.disabled = true;
+  syncButtons();
   setStatus('Dibujando…', null);
   render();
 }
@@ -497,23 +525,35 @@ function onEnd(e) {
     phase = 'dup';
     setStatus('Patrón ya registrado', 'dup');
     btnReg.disabled = true;
+  } else if (isDiscarded(current)) {
+    phase = 'dis';
+    setStatus('Patrón descartado previamente', 'dis');
+    btnReg.disabled = true;
   } else {
     phase = 'new';
     setStatus('¡Patrón nuevo!  Puedes registrarlo', 'new');
     btnReg.disabled = false;
   }
+  syncButtons();
   render();
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // CONTROLS
 // ═══════════════════════════════════════════════════════════════════
+function syncButtons() {
+  const isGen = phase === 'gen';
+  btnGen.style.display = isGen ? 'none'  : '';
+  btnDis.style.display = isGen ? ''      : 'none';
+}
+
 function reset(full = true) {
   current    = [];
   drawing    = false;
   cursorPos  = null;
   phase      = 'idle';
   btnReg.disabled = true;
+  syncButtons();
   if (full) setStatus('Dibuja un patrón · mínimo 4 puntos', null);
   render();
 }
@@ -527,7 +567,15 @@ btnReg.addEventListener('click', () => {
   phase = 'registered';
   setStatus(`Patrón registrado (${current.length} puntos)`, 'new');
   btnReg.disabled = true;
+  syncButtons();
   render();
+});
+
+btnDis.addEventListener('click', () => {
+  if (phase !== 'gen' || current.length < MIN_DOTS) return;
+  discardPattern(current);
+  reset();
+  setStatus('Patrón descartado · no volverá a generarse', null);
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -603,7 +651,7 @@ function generateSimilar() {
       pat.push(next);
     }
 
-    if (!failed && pat.length >= MIN_DOTS && !isDuplicate(pat)) return pat;
+    if (!failed && pat.length >= MIN_DOTS && !isDuplicate(pat) && !isDiscarded(pat)) return pat;
   }
 
   // Fallback: random valid pattern
@@ -615,7 +663,7 @@ function generateRandom() {
     const len  = MIN_DOTS + Math.floor(Math.random() * (9 - MIN_DOTS + 1));
     const pool = [0,1,2,3,4,5,6,7,8].sort(() => Math.random() - 0.5);
     const pat  = pool.slice(0, len);
-    if (!isDuplicate(pat)) return pat;
+    if (!isDuplicate(pat) && !isDiscarded(pat)) return pat;
   }
   return null;
 }
@@ -629,7 +677,8 @@ btnGen.addEventListener('click', () => {
   current = pat;
   phase   = 'gen';
   btnReg.disabled = false;
-  setStatus(`Patrón generado · ${pat.length} puntos · puedes registrarlo`, 'gen');
+  syncButtons();
+  setStatus(`Patrón generado · ${pat.length} puntos · regístralo o descártalo`, 'gen');
   render();
 });
 
