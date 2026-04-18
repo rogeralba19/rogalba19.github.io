@@ -92,6 +92,11 @@
       border-color: rgba(255, 170, 0, 0.4);
       color: #ffaa00;
     }
+    .status-pill.s-dis {
+      background: rgba(255, 170, 0, 0.12);
+      border-color: rgba(255, 170, 0, 0.4);
+      color: #ffaa00;
+    }
 
     /* ── Canvas ──────────────────────────────────────────────────────────────── */
     .canvas-wrap {
@@ -332,7 +337,7 @@ function render() {
   let lineCol = COLORS.lineIdle;
   if (phase === 'new' || phase === 'registered') lineCol = COLORS.lineNew;
   if (phase === 'dup')  lineCol = COLORS.lineDup;
-  if (phase === 'gen')  lineCol = COLORS.lineGen;
+  if (phase === 'gen' || phase === 'dis')  lineCol = COLORS.lineGen;
 
   // Draw path lines
   if (current.length > 1) {
@@ -371,7 +376,7 @@ function render() {
     let dotColor = COLORS.dotActive;
     if (phase === 'new' || phase === 'registered') dotColor = COLORS.dotNew;
     if (phase === 'dup')  dotColor = COLORS.dotDup;
-    if (phase === 'gen')  dotColor = COLORS.dotGen;
+    if (phase === 'gen' || phase === 'dis')  dotColor = COLORS.dotGen;
 
     // Outer glow ring for active dots
     if (active) {
@@ -413,7 +418,7 @@ function render() {
     let dotColor = COLORS.dotActive;
     if (phase === 'new' || phase === 'registered') dotColor = COLORS.dotNew;
     if (phase === 'dup')  dotColor = COLORS.dotDup;
-    if (phase === 'gen')  dotColor = COLORS.dotGen;
+    if (phase === 'gen' || phase === 'dis')  dotColor = COLORS.dotGen;
 
     current.forEach((idx, order) => {
       if (order === 0) return;
@@ -519,6 +524,10 @@ function onEnd(e) {
   if (isDuplicate(current)) {
     phase = 'dup';
     setStatus('Patrón ya registrado', 'dup');
+    btnReg.disabled = true;
+  } else if (isDiscarded(current)) {
+    phase = 'dis';
+    setStatus('Patrón descartado previamente', 'dis');
     btnReg.disabled = true;
   } else {
     phase = 'new';
