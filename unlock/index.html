@@ -579,6 +579,32 @@ btnDis.addEventListener('click', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
+// ADJACENCY RULE  (0-indexed; user's 1-9 minus 1)
+// ═══════════════════════════════════════════════════════════════════
+const ADJACENCY = [
+  [1,3,4],             // 0 = dot 1
+  [0,2,3,4,5],         // 1 = dot 2
+  [1,4,5],             // 2 = dot 3
+  [0,1,4,6,7],         // 3 = dot 4
+  [0,1,2,3,5,6,7,8],   // 4 = dot 5
+  [1,2,4,7,8],         // 5 = dot 6
+  [3,4,7],             // 6 = dot 7
+  [3,4,5,6,8],         // 7 = dot 8
+  [4,5,7],             // 8 = dot 9
+];
+
+function isValidStep(from, to) {
+  return ADJACENCY[from].includes(to);
+}
+
+function hasInvalidStep(pat) {
+  for (let i = 0; i < pat.length - 1; i++) {
+    if (!isValidStep(pat[i], pat[i + 1])) return true;
+  }
+  return false;
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // SIMILARITY ENGINE
 // ═══════════════════════════════════════════════════════════════════
 function dotGridPos(idx) {
@@ -607,10 +633,6 @@ function generateSimilar() {
     }
   });
 
-  const targetLen = history.length
-    ? Math.max(MIN_DOTS, Math.min(9, Math.round(totalLen / history.length)))
-    : MIN_DOTS + Math.floor(Math.random() * 3);
-
   // ── Weighted random pick ───────────────────────────────────────
   function wPick(weights, exclude) {
     let pool = [], total = 0;
@@ -627,6 +649,8 @@ function generateSimilar() {
 
   // ── Generation loop ────────────────────────────────────────────
   for (let attempt = 0; attempt < 300; attempt++) {
+    // Each attempt picks a fresh random length across the full valid range
+    const targetLen = MIN_DOTS + Math.floor(Math.random() * (9 - MIN_DOTS + 1));
     const pat = [];
 
     // Pick start
@@ -638,10 +662,10 @@ function generateSimilar() {
     for (let step = 1; step < targetLen; step++) {
       const last = pat[pat.length - 1];
 
-      // Score each candidate dot
+      // Score each candidate dot (only adjacency-valid, unvisited)
       const scores = new Array(9).fill(0);
       for (let d = 0; d < 9; d++) {
-        if (pat.includes(d)) { scores[d] = -1; continue; }
+        if (pat.includes(d) || !isValidStep(last, d)) { scores[d] = -1; continue; }
         const dk = dirKey(last, d);
         scores[d] = (dirFreq[dk] || 0) * 2 + (dotFreq[d] || 0);
       }
@@ -659,17 +683,40 @@ function generateSimilar() {
 }
 
 function generateRandom() {
-  for (let a = 0; a < 200; a++) {
-    const len  = MIN_DOTS + Math.floor(Math.random() * (9 - MIN_DOTS + 1));
-    const pool = [0,1,2,3,4,5,6,7,8].sort(() => Math.random() - 0.5);
-    const pat  = pool.slice(0, len);
-    if (!isDuplicate(pat) && !isDiscarded(pat)) return pat;
+  for (let a = 0; a < 300; a++) {
+    const len   = MIN_DOTS + Math.floor(Math.random() * (9 - MIN_DOTS + 1));
+    const start = Math.floor(Math.random() * 9);
+    const pat   = [start];
+    const used  = new Set([start]);
+    let ok = true;
+    for (let step = 1; step < len; step++) {
+      const cands = ADJACENCY[pat[pat.length - 1]].filter(d => !used.has(d));
+      if (!cands.length) { ok = false; break; }
+      const next = cands[Math.floor(Math.random() * cands.length)];
+      pat.push(next);
+      used.add(next);
+    }
+    if (ok && pat.length >= MIN_DOTS && !isDuplicate(pat) && !isDiscarded(pat)) return pat;
   }
   return null;
 }
 
-btnGen.addEventListener('click', () => {
-  const pat = generateSimilar();
+btnGen.addEventListener('click', async function handleGen() {
+  btnGen.disabled = true;
+
+  let pat = generateSimilar();
+
+  // Safety net: if a generated pattern somehow has an invalid step,
+  // auto-discard it and retry after 2 s until one is valid.
+  while (pat && hasInvalidStep(pat)) {
+    if (!isDiscarded(pat)) discardPattern(pat);
+    setStatus('Patrón inválido descartado, reintentando…', null);
+    await new Promise(r => setTimeout(r, 2000));
+    pat = generateSimilar();
+  }
+
+  btnGen.disabled = false;
+
   if (!pat) {
     setStatus('No se pudo generar un patrón único', null);
     return;
