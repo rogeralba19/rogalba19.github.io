@@ -49,7 +49,7 @@
     .container {
       width: 100%;
       max-width: 440px;
-      padding: 28px 20px 40px;
+      padding: 28px 20px 90px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -167,13 +167,49 @@
     }
     .btn-discard:hover { background: rgba(180, 60, 20, 0.28); }
 
-    /* ── Counter ─────────────────────────────────────────────────────────────── */
-    .counter {
-      font-size: 11px;
-      color: rgba(255, 255, 255, 0.25);
-      letter-spacing: 0.5px;
+    /* ── Stats bar ───────────────────────────────────────────────────────────── */
+    .stats-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(5, 5, 18, 0.85);
+      border-top: 1px solid rgba(255, 255, 255, 0.07);
+      backdrop-filter: blur(10px);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      padding: 10px 16px 12px;
+      z-index: 100;
     }
-    .counter b { color: #00aaff; font-weight: 700; }
+
+    .stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .stat-num {
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1;
+      transition: transform 0.15s, color 0.3s;
+    }
+    .stat-num.bump {
+      transform: scale(1.25);
+    }
+
+    .stat-label {
+      font-size: 9px;
+      color: rgba(255, 255, 255, 0.3);
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+
+    .c-reg { color: #00ff88; }
+    .c-dis { color: #ffaa00; }
+    .c-rem { color: #00aaff; }
   </style>
 </head>
 <body>
@@ -199,8 +235,22 @@
     <button class="btn btn-clear" id="btnClear">Limpiar</button>
   </div>
 
-  <div class="counter">Patrones registrados: <b id="countEl">0</b></div>
-</div>
+  </div>
+
+<footer class="stats-bar">
+  <div class="stat">
+    <span class="stat-num c-reg" id="statReg">0</span>
+    <span class="stat-label">Registrados</span>
+  </div>
+  <div class="stat">
+    <span class="stat-num c-dis" id="statDis">0</span>
+    <span class="stat-label">Descartados</span>
+  </div>
+  <div class="stat">
+    <span class="stat-num c-rem" id="statRem">—</span>
+    <span class="stat-label">Restantes</span>
+  </div>
+</footer>
 
 <script>
 // ═══════════════════════════════════════════════════════════════════
@@ -249,7 +299,9 @@ const btnReg    = document.getElementById('btnRegister');
 const btnGen    = document.getElementById('btnGenerate');
 const btnDis    = document.getElementById('btnDiscard');
 const btnClr    = document.getElementById('btnClear');
-const countEl   = document.getElementById('countEl');
+const statReg   = document.getElementById('statReg');
+const statDis   = document.getElementById('statDis');
+const statRem   = document.getElementById('statRem');
 
 // ═══════════════════════════════════════════════════════════════════
 // STORAGE
@@ -259,18 +311,18 @@ function loadHistory() {
   catch { history = []; }
   try { discarded = JSON.parse(localStorage.getItem(DISCARD_KEY)) || []; }
   catch { discarded = []; }
-  countEl.textContent = history.length;
 }
 
 function savePattern(pat) {
   history.push([...pat]);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
-  countEl.textContent = history.length;
+  updateCounters();
 }
 
 function discardPattern(pat) {
   discarded.push([...pat]);
   localStorage.setItem(DISCARD_KEY, JSON.stringify(discarded));
+  updateCounters();
 }
 
 function patternKey(pat) { return pat.join('-'); }
@@ -604,6 +656,44 @@ function hasInvalidStep(pat) {
   return false;
 }
 
+function countValidPatterns() {
+  let total = 0;
+  function dfs(last, visited, len) {
+    if (len >= MIN_DOTS) total++;
+    if (len === 9) return;
+    for (const next of ADJACENCY[last]) {
+      if (!visited[next]) {
+        visited[next] = true;
+        dfs(next, visited, len + 1);
+        visited[next] = false;
+      }
+    }
+  }
+  for (let s = 0; s < 9; s++) {
+    const v = new Array(9).fill(false);
+    v[s] = true;
+    dfs(s, v, 1);
+  }
+  return total;
+}
+
+function updateCounters() {
+  const rem = Math.max(0, TOTAL_VALID - history.length - discarded.length);
+  statReg.textContent = history.length;
+  statDis.textContent = discarded.length;
+  statRem.textContent = rem.toLocaleString('es');
+  bump(statReg);
+  bump(statDis);
+  bump(statRem);
+}
+
+function bump(el) {
+  el.classList.remove('bump');
+  void el.offsetWidth;
+  el.classList.add('bump');
+  setTimeout(() => el.classList.remove('bump'), 150);
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // SIMILARITY ENGINE
 // ═══════════════════════════════════════════════════════════════════
@@ -743,7 +833,9 @@ canvas.addEventListener('touchend',   onEnd,   { passive: false });
 // ═══════════════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════════════
+const TOTAL_VALID = countValidPatterns();
 loadHistory();
+updateCounters();
 resize();
 new ResizeObserver(resize).observe(wrap);
 window.addEventListener('resize', resize);
