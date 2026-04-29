@@ -20,8 +20,8 @@
     let selectedClpOfferId = null;
     let selectedBobOfferId = null;
     const offerFilters = {
-        buy: { sort: 'price', methods: new Set(), verifiedOnly: true },
-        sell: { sort: 'price', methods: new Set(), verifiedOnly: true }
+        buy: { sort: 'price', minAmount: 0, methods: new Set(), verifiedOnly: true },
+        sell: { sort: 'price', minAmount: 0, methods: new Set(), verifiedOnly: true }
     };
     let countdown = REFRESH_INTERVAL;
     let countdownTimer = null;
@@ -83,6 +83,8 @@
     function setupOfferFilters() {
         $('clp-sort').addEventListener('change', () => updateSort('buy', $('clp-sort').value));
         $('bob-sort').addEventListener('change', () => updateSort('sell', $('bob-sort').value));
+        $('clp-min-amount').addEventListener('input', () => updateMinAmountFilter('buy', $('clp-min-amount').value));
+        $('bob-min-amount').addEventListener('input', () => updateMinAmountFilter('sell', $('bob-min-amount').value));
         $('clp-method-toggle').addEventListener('click', () => toggleMethodMenu('buy'));
         $('bob-method-toggle').addEventListener('click', () => toggleMethodMenu('sell'));
 
@@ -231,6 +233,12 @@
         applyOfferFilters();
     }
 
+    function updateMinAmountFilter(type, value) {
+        offerFilters[type].minAmount = parseFloat(value) || 0;
+        clearSelectedOffer(type);
+        applyOfferFilters();
+    }
+
     function toggleMethodMenu(type) {
         const menu = $(type === 'buy' ? 'clp-method-menu' : 'bob-method-menu');
         const otherMenu = $(type === 'buy' ? 'bob-method-menu' : 'clp-method-menu');
@@ -297,14 +305,18 @@
         const selectedMethods = Array.from(filters.methods);
         return offers
             .filter((offer) => !filters.verifiedOnly || offer.verified)
+            .filter((offer) => !filters.minAmount || amountFitsOffer(filters.minAmount, offer))
             .filter((offer) => selectedMethods.length === 0 || selectedMethods.some((method) => offer.methods.includes(method)))
             .sort((a, b) => compareOffers(a, b, type, filters.sort));
     }
 
     function compareOffers(a, b, type, sortValue) {
-        if (sortValue === 'min-asc') return a.minAmount - b.minAmount;
-        if (sortValue === 'min-desc') return b.minAmount - a.minAmount;
+        if (sortValue === 'orders') return b.completedOrders - a.completedOrders;
         return type === 'buy' ? a.price - b.price : b.price - a.price;
+    }
+
+    function amountFitsOffer(amount, offer) {
+        return amount >= offer.minAmount && amount <= offer.maxAmount;
     }
 
     function ensureSelectedOffer(type) {

@@ -276,13 +276,14 @@ body {
 
 .offer-controls {
     display: grid;
-    grid-template-columns: minmax(130px, 1fr) minmax(150px, 1fr) auto;
+    grid-template-columns: minmax(120px, 0.85fr) minmax(150px, 1fr) minmax(140px, 1fr) auto;
     gap: 8px;
     align-items: end;
     margin-bottom: 12px;
 }
 
 .filter-select span,
+.filter-amount span,
 .verified-toggle span {
     display: block;
     font-size: 10px;
@@ -308,6 +309,35 @@ body {
 
 .filter-select option {
     color: #111;
+}
+
+.filter-amount-input {
+    display: flex;
+    height: 34px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 7px;
+    overflow: hidden;
+}
+
+.filter-amount-input input {
+    min-width: 0;
+    width: 100%;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: #fff;
+    font-size: 12px;
+    padding: 0 9px;
+}
+
+.filter-amount-input b {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 9px;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 11px;
 }
 
 .multi-filter {

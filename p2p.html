@@ -54,9 +54,15 @@
                             <span>Orden</span>
                             <select id="clp-sort">
                                 <option value="price">Mejor precio</option>
-                                <option value="min-asc">Minimo menor primero</option>
-                                <option value="min-desc">Minimo mayor primero</option>
+                                <option value="orders">Mas operaciones</option>
                             </select>
+                        </label>
+                        <label class="filter-amount">
+                            <span>Monto minimo de compra</span>
+                            <div class="filter-amount-input">
+                                <input type="number" id="clp-min-amount" min="0" placeholder="Ej: 100000">
+                                <b>CLP</b>
+                            </div>
                         </label>
                         <div class="multi-filter">
                             <button type="button" id="clp-method-toggle" class="filter-toggle">Bancos: Todos</button>
@@ -83,9 +89,15 @@
                             <span>Orden</span>
                             <select id="bob-sort">
                                 <option value="price">Mejor precio</option>
-                                <option value="min-asc">Minimo menor primero</option>
-                                <option value="min-desc">Minimo mayor primero</option>
+                                <option value="orders">Mas operaciones</option>
                             </select>
+                        </label>
+                        <label class="filter-amount">
+                            <span>Monto minimo de venta</span>
+                            <div class="filter-amount-input">
+                                <input type="number" id="bob-min-amount" min="0" placeholder="Ej: 1000">
+                                <b>BOB</b>
+                            </div>
                         </label>
                         <div class="multi-filter">
                             <button type="button" id="bob-method-toggle" class="filter-toggle">Bancos: Todos</button>
