@@ -247,8 +247,8 @@
     // --- Calculator ---
     function recalculate() {
         const inputClp = parseFloat($('input-clp').value) || 0;
-        const inputRate = parseFloat($('input-rate').value) || 0;
-        const competitionRate = parseFloat($('input-competition').value) || 100;
+        const inputBobPerThousand = parseFloat($('input-rate').value) || 0;
+        const competitionBobPerThousand = parseFloat($('input-competition').value) || 10;
 
         // Best prices
         const bestClpPrice = clpOffers.length > 0
@@ -260,6 +260,9 @@
 
         $('res-best-clp').textContent = bestClpPrice ? formatNumber(bestClpPrice, 2) + ' CLP' : '-';
         $('res-best-bob').textContent = bestBobPrice ? formatNumber(bestBobPrice, 2) + ' BOB' : '-';
+        $('res-market-rate').textContent = bestClpPrice && bestBobPrice
+            ? '1.000 CLP = ' + formatNumber(getBobPerThousand(bestClpPrice, bestBobPrice), 2) + ' BOB'
+            : '-';
 
         if (!bestClpPrice || !bestBobPrice || !inputClp) {
             $('res-usdt').textContent = '-';
@@ -268,7 +271,7 @@
             $('res-profit').textContent = '-';
             $('res-profit-usd').textContent = '-';
             $('res-margin').textContent = '-';
-            updateSuggested(bestClpPrice, bestBobPrice, competitionRate, 0);
+            updateSuggested(bestClpPrice, bestBobPrice, competitionBobPerThousand, 0);
             return;
         }
 
@@ -281,7 +284,7 @@
         $('res-bob-market').textContent = formatNumber(bobMarket, 2) + ' BOB';
 
         // BOB to deliver to client
-        const bobClient = inputRate > 0 ? inputClp / inputRate : 0;
+        const bobClient = inputBobPerThousand > 0 ? (inputClp / 1000) * inputBobPerThousand : 0;
         $('res-bob-client').textContent = bobClient > 0 ? formatNumber(bobClient, 2) + ' BOB' : '-';
 
         // Profit
@@ -301,19 +304,19 @@
             $('res-margin').textContent = '-';
         }
 
-        updateSuggested(bestClpPrice, bestBobPrice, competitionRate, inputClp);
+        updateSuggested(bestClpPrice, bestBobPrice, competitionBobPerThousand, inputClp);
     }
 
-    function updateSuggested(bestClpPrice, bestBobPrice, competitionRate, inputClp) {
-        // 5% better than competition = 5% lower CLP/BOB rate (client gets more BOB per CLP)
-        const suggestedRate = competitionRate * 0.95;
-        $('sug-rate').textContent = formatNumber(suggestedRate, 2) + ' CLP/BOB';
-        $('sug-detail').textContent = '1000 CLP = ' + formatNumber(1000 / suggestedRate, 2) + ' BOB (vs competencia ' + formatNumber(1000 / competitionRate, 2) + ' BOB)';
+    function updateSuggested(bestClpPrice, bestBobPrice, competitionBobPerThousand, inputClp) {
+        // 5% better than competition means the client receives 5% more BOB per 1.000 CLP.
+        const suggestedBobPerThousand = competitionBobPerThousand * 1.05;
+        $('sug-rate').textContent = '1.000 CLP = ' + formatNumber(suggestedBobPerThousand, 2) + ' BOB';
+        $('sug-detail').textContent = 'Competencia: 1.000 CLP = ' + formatNumber(competitionBobPerThousand, 2) + ' BOB';
 
         if (bestClpPrice > 0 && bestBobPrice > 0 && inputClp > 0) {
             const usdt = inputClp / bestClpPrice;
             const bobMarket = usdt * bestBobPrice;
-            const bobClient = inputClp / suggestedRate;
+            const bobClient = (inputClp / 1000) * suggestedBobPerThousand;
             const profitBob = bobMarket - bobClient;
             const marginPct = bobMarket > 0 ? (profitBob / bobMarket) * 100 : 0;
 
@@ -323,6 +326,10 @@
             $('sug-margin').textContent = '-';
             $('sug-margin-detail').textContent = 'Ingresa un monto CLP para calcular';
         }
+    }
+
+    function getBobPerThousand(clpPerUsdt, bobPerUsdt) {
+        return (bobPerUsdt / clpPerUsdt) * 1000;
     }
 
     // --- Utilities ---

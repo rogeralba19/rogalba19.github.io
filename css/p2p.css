@@ -429,10 +429,42 @@ body {
     white-space: nowrap;
 }
 
+.input-with-unit .unit.prefix {
+    color: rgba(255, 255, 255, 0.55);
+    background: rgba(0, 170, 255, 0.08);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .hint {
     display: block;
     font-size: 10px;
     color: rgba(255, 255, 255, 0.25);
+    margin-top: 4px;
+}
+
+.exchange-summary {
+    background: linear-gradient(135deg, rgba(0, 170, 255, 0.12), rgba(0, 255, 170, 0.08));
+    border: 1px solid rgba(0, 170, 255, 0.22);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 12px;
+}
+
+.exchange-label {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 4px;
+}
+
+.exchange-value {
+    color: #00ffcc;
+    font-size: 24px;
+    font-weight: 800;
+}
+
+.exchange-detail {
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 11px;
     margin-top: 4px;
 }
 

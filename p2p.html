@@ -85,12 +85,19 @@
                         </div>
 
                         <div class="calc-input-group">
-                            <label>Tasa ofrecida al cliente (CLP por 1 BOB)</label>
+                            <label>Cambio ofrecido al cliente</label>
                             <div class="input-with-unit">
-                                <input type="number" id="input-rate" placeholder="100" min="0" step="0.01">
-                                <span class="unit">CLP/BOB</span>
+                                <span class="unit prefix">1.000 CLP =</span>
+                                <input type="number" id="input-rate" placeholder="10.50" min="0" step="0.01">
+                                <span class="unit">BOB</span>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="exchange-summary">
+                        <div class="exchange-label">Cambio mercado estimado</div>
+                        <div class="exchange-value" id="res-market-rate">-</div>
+                        <div class="exchange-detail">Calculado con las mejores ofertas P2P disponibles</div>
                     </div>
 
                     <div class="calc-results" id="calc-results">
@@ -138,17 +145,18 @@
                     </div>
 
                     <div class="calc-input-group">
-                        <label>Tasa competencia (CLP por 1 BOB)</label>
+                        <label>Cambio competencia</label>
                         <div class="input-with-unit">
-                            <input type="number" id="input-competition" value="100" min="0" step="0.01">
-                            <span class="unit">CLP/BOB</span>
+                            <span class="unit prefix">1.000 CLP =</span>
+                            <input type="number" id="input-competition" value="10" min="0" step="0.01">
+                            <span class="unit">BOB</span>
                         </div>
-                        <small class="hint">Default: 1000 CLP = 10 BOB (100 CLP/BOB)</small>
+                        <small class="hint">Referencia comun: 1.000 CLP = 10 a 11 BOB segun mercado</small>
                     </div>
 
                     <div class="suggested-results" id="suggested-results">
                         <div class="suggested-card">
-                            <div class="suggested-label">Tasa sugerida (5% mejor)</div>
+                            <div class="suggested-label">Cambio sugerido (5% mejor)</div>
                             <div class="suggested-value" id="sug-rate">-</div>
                             <div class="suggested-detail" id="sug-detail"></div>
                         </div>
