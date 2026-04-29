@@ -261,7 +261,7 @@
         $('res-best-clp').textContent = bestClpPrice ? formatNumber(bestClpPrice, 2) + ' CLP' : '-';
         $('res-best-bob').textContent = bestBobPrice ? formatNumber(bestBobPrice, 2) + ' BOB' : '-';
         $('res-market-rate').textContent = bestClpPrice && bestBobPrice
-            ? '1.000 CLP = ' + formatNumber(getBobPerThousand(bestClpPrice, bestBobPrice), 2) + ' BOB'
+            ? formatNumber(getBobPerThousand(bestClpPrice, bestBobPrice), 2) + ' BOB por cada 1.000 CLP'
             : '-';
 
         if (!bestClpPrice || !bestBobPrice || !inputClp) {
@@ -310,8 +310,8 @@
     function updateSuggested(bestClpPrice, bestBobPrice, competitionBobPerThousand, inputClp) {
         // 5% better than competition means the client receives 5% more BOB per 1.000 CLP.
         const suggestedBobPerThousand = competitionBobPerThousand * 1.05;
-        $('sug-rate').textContent = '1.000 CLP = ' + formatNumber(suggestedBobPerThousand, 2) + ' BOB';
-        $('sug-detail').textContent = 'Competencia: 1.000 CLP = ' + formatNumber(competitionBobPerThousand, 2) + ' BOB';
+        $('sug-rate').textContent = formatNumber(suggestedBobPerThousand, 2) + ' BOB';
+        $('sug-detail').textContent = 'por cada 1.000 CLP. Competencia: ' + formatNumber(competitionBobPerThousand, 2) + ' BOB';
 
         if (bestClpPrice > 0 && bestBobPrice > 0 && inputClp > 0) {
             const usdt = inputClp / bestClpPrice;

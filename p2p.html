@@ -71,7 +71,7 @@
             <div class="calculator-section">
                 <div class="panel">
                     <div class="panel-header">
-                        <h2>Calculadora de Margen</h2>
+                        <h2>Calculadora: BOB por cada 1.000 CLP</h2>
                         <span class="panel-tag calc">CALC</span>
                     </div>
 
@@ -85,7 +85,7 @@
                         </div>
 
                         <div class="calc-input-group">
-                            <label>Cambio ofrecido al cliente</label>
+                            <label>BOB que ofreces por cada 1.000 CLP</label>
                             <div class="input-with-unit">
                                 <span class="unit prefix">1.000 CLP =</span>
                                 <input type="number" id="input-rate" placeholder="10.50" min="0" step="0.01">
@@ -95,14 +95,14 @@
                     </div>
 
                     <div class="exchange-summary">
-                        <div class="exchange-label">Cambio mercado estimado</div>
+                        <div class="exchange-label">BOB de mercado por cada 1.000 CLP</div>
                         <div class="exchange-value" id="res-market-rate">-</div>
                         <div class="exchange-detail">Calculado con las mejores ofertas P2P disponibles</div>
                     </div>
 
                     <div class="calc-results" id="calc-results">
                         <div class="result-row">
-                            <span class="result-label">Mejor precio compra (CLP/USDT)</span>
+                            <span class="result-label">Dato interno: compra USDT en CLP</span>
                             <span class="result-value" id="res-best-clp">-</span>
                         </div>
                         <div class="result-row">
@@ -110,7 +110,7 @@
                             <span class="result-value highlight" id="res-usdt">-</span>
                         </div>
                         <div class="result-row">
-                            <span class="result-label">Mejor precio venta (BOB/USDT)</span>
+                            <span class="result-label">Dato interno: venta USDT en BOB</span>
                             <span class="result-value" id="res-best-bob">-</span>
                         </div>
                         <div class="result-row">
@@ -140,12 +140,12 @@
                 <!-- Suggested Price -->
                 <div class="panel">
                     <div class="panel-header">
-                        <h2>Precio Sugerido</h2>
+                        <h2>BOB sugeridos por cada 1.000 CLP</h2>
                         <span class="panel-tag suggest">SUGERIDO</span>
                     </div>
 
                     <div class="calc-input-group">
-                        <label>Cambio competencia</label>
+                        <label>BOB que da la competencia por cada 1.000 CLP</label>
                         <div class="input-with-unit">
                             <span class="unit prefix">1.000 CLP =</span>
                             <input type="number" id="input-competition" value="10" min="0" step="0.01">
@@ -156,12 +156,12 @@
 
                     <div class="suggested-results" id="suggested-results">
                         <div class="suggested-card">
-                            <div class="suggested-label">Cambio sugerido (5% mejor)</div>
+                            <div class="suggested-label">BOB sugeridos por cada 1.000 CLP</div>
                             <div class="suggested-value" id="sug-rate">-</div>
                             <div class="suggested-detail" id="sug-detail"></div>
                         </div>
                         <div class="suggested-card">
-                            <div class="suggested-label">Margen estimado a tasa sugerida</div>
+                            <div class="suggested-label">Margen estimado con esos BOB</div>
                             <div class="suggested-value" id="sug-margin">-</div>
                             <div class="suggested-detail" id="sug-margin-detail"></div>
                         </div>
