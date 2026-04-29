@@ -15,6 +15,14 @@
     // --- State ---
     let clpOffers = [];
     let bobOffers = [];
+    let filteredClpOffers = [];
+    let filteredBobOffers = [];
+    let selectedClpOfferId = null;
+    let selectedBobOfferId = null;
+    const offerFilters = {
+        buy: { sort: 'price', methods: new Set(), verifiedOnly: true },
+        sell: { sort: 'price', methods: new Set(), verifiedOnly: true }
+    };
     let countdown = REFRESH_INTERVAL;
     let countdownTimer = null;
     let refreshTimer = null;
@@ -65,10 +73,25 @@
         $('input-clp').addEventListener('input', recalculate);
         $('input-rate').addEventListener('input', recalculate);
         $('input-competition').addEventListener('input', recalculate);
+        setupOfferFilters();
 
         // Start
         fetchAll();
         startCountdown();
+    }
+
+    function setupOfferFilters() {
+        $('clp-sort').addEventListener('change', () => updateSort('buy', $('clp-sort').value));
+        $('bob-sort').addEventListener('change', () => updateSort('sell', $('bob-sort').value));
+        $('clp-method-toggle').addEventListener('click', () => toggleMethodMenu('buy'));
+        $('bob-method-toggle').addEventListener('click', () => toggleMethodMenu('sell'));
+
+        document.addEventListener('click', (event) => {
+            if (!event.target.closest('.multi-filter')) {
+                $('clp-method-menu').classList.add('hidden');
+                $('bob-method-menu').classList.add('hidden');
+            }
+        });
     }
 
     function saveProxy() {
@@ -137,18 +160,19 @@
 
         try {
             const [clpResult, bobResult] = await Promise.all([
-                fetchP2P(proxyUrl, 'USDT', 'CLP', 'BUY', 5),
-                fetchP2P(proxyUrl, 'USDT', 'BOB', 'SELL', 5)
+                fetchP2P(proxyUrl, 'USDT', 'CLP', 'BUY', 20),
+                fetchP2P(proxyUrl, 'USDT', 'BOB', 'SELL', 20)
             ]);
 
             clpOffers = clpResult;
             bobOffers = bobResult;
 
-            renderOffers('clp-offers', clpOffers, 'CLP', 'buy');
-            renderOffers('bob-offers', bobOffers, 'BOB', 'sell');
+            renderMethodFilters('buy');
+            renderMethodFilters('sell');
+            applyOfferFilters();
             recalculate();
             updateTimestamp();
-            setStatus('online', 'Conectado - ' + clpOffers.length + ' CLP / ' + bobOffers.length + ' BOB ofertas');
+            setStatus('online', 'Conectado - ' + filteredClpOffers.length + ' CLP / ' + filteredBobOffers.length + ' BOB ofertas filtradas');
             countdown = REFRESH_INTERVAL;
         } catch (err) {
             setStatus('error', 'Error: ' + err.message);
@@ -183,16 +207,165 @@
             throw new Error('Respuesta sin datos');
         }
 
-        return json.data.map((item) => ({
+        return json.data.map((item, index) => ({
+            id: [
+                item.advertiser.userNo || item.advertiser.nickName || 'merchant',
+                item.adv.advNo || index,
+                item.adv.price
+            ].join('-'),
             price: parseFloat(item.adv.price),
             minAmount: parseFloat(item.adv.minSingleTransAmount),
             maxAmount: parseFloat(item.adv.dynamicMaxSingleTransAmount || item.adv.maxSingleTransAmount),
             availableAmount: parseFloat(item.adv.surplusAmount),
             methods: (item.adv.tradeMethods || []).map((m) => m.tradeMethodShortName || m.tradeMethodName || m.identifier),
             merchant: item.advertiser.nickName,
+            verified: isVerifiedMerchant(item.advertiser),
             completedOrders: item.advertiser.monthOrderCount || 0,
             completionRate: item.advertiser.monthFinishRate ? (parseFloat(item.advertiser.monthFinishRate) * 100).toFixed(1) : '0'
         }));
+    }
+
+    // --- Offer Filters ---
+    function updateSort(type, sortValue) {
+        offerFilters[type].sort = sortValue;
+        applyOfferFilters();
+    }
+
+    function toggleMethodMenu(type) {
+        const menu = $(type === 'buy' ? 'clp-method-menu' : 'bob-method-menu');
+        const otherMenu = $(type === 'buy' ? 'bob-method-menu' : 'clp-method-menu');
+        otherMenu.classList.add('hidden');
+        menu.classList.toggle('hidden');
+    }
+
+    function renderMethodFilters(type) {
+        const offers = type === 'buy' ? clpOffers : bobOffers;
+        const menu = $(type === 'buy' ? 'clp-method-menu' : 'bob-method-menu');
+        const selectedMethods = offerFilters[type].methods;
+        const methods = getAvailableMethods(offers);
+
+        selectedMethods.forEach((method) => {
+            if (!methods.includes(method)) selectedMethods.delete(method);
+        });
+
+        if (methods.length === 0) {
+            menu.innerHTML = '<div class="multi-empty">Sin bancos disponibles</div>';
+            updateMethodButton(type);
+            return;
+        }
+
+        menu.innerHTML = methods.map((method) => {
+            const id = (type === 'buy' ? 'clp' : 'bob') + '-method-' + slugify(method);
+            return '<label class="multi-option" for="' + id + '">' +
+                '<input type="checkbox" id="' + id + '" data-method="' + escapeAttr(method) + '"' + (selectedMethods.has(method) ? ' checked' : '') + '>' +
+                '<span>' + escapeHtml(method) + '</span>' +
+            '</label>';
+        }).join('');
+
+        menu.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+            input.addEventListener('change', () => {
+                const method = input.getAttribute('data-method');
+                if (input.checked) selectedMethods.add(method);
+                else selectedMethods.delete(method);
+                clearSelectedOffer(type);
+                updateMethodButton(type);
+                applyOfferFilters();
+            });
+        });
+
+        updateMethodButton(type);
+    }
+
+    function updateMethodButton(type) {
+        const selectedCount = offerFilters[type].methods.size;
+        const button = $(type === 'buy' ? 'clp-method-toggle' : 'bob-method-toggle');
+        button.textContent = selectedCount > 0 ? 'Bancos: ' + selectedCount : 'Bancos: Todos';
+    }
+
+    function applyOfferFilters() {
+        filteredClpOffers = getFilteredOffers(clpOffers, 'buy');
+        filteredBobOffers = getFilteredOffers(bobOffers, 'sell');
+        ensureSelectedOffer('buy');
+        ensureSelectedOffer('sell');
+        renderOffers('clp-offers', filteredClpOffers, 'CLP', 'buy');
+        renderOffers('bob-offers', filteredBobOffers, 'BOB', 'sell');
+        recalculate();
+    }
+
+    function getFilteredOffers(offers, type) {
+        const filters = offerFilters[type];
+        const selectedMethods = Array.from(filters.methods);
+        return offers
+            .filter((offer) => !filters.verifiedOnly || offer.verified)
+            .filter((offer) => selectedMethods.length === 0 || selectedMethods.some((method) => offer.methods.includes(method)))
+            .sort((a, b) => compareOffers(a, b, type, filters.sort));
+    }
+
+    function compareOffers(a, b, type, sortValue) {
+        if (sortValue === 'min-asc') return a.minAmount - b.minAmount;
+        if (sortValue === 'min-desc') return b.minAmount - a.minAmount;
+        return type === 'buy' ? a.price - b.price : b.price - a.price;
+    }
+
+    function ensureSelectedOffer(type) {
+        const offers = type === 'buy' ? filteredClpOffers : filteredBobOffers;
+        const selectedId = type === 'buy' ? selectedClpOfferId : selectedBobOfferId;
+        if (offers.length === 0) {
+            if (type === 'buy') selectedClpOfferId = null;
+            else selectedBobOfferId = null;
+            return;
+        }
+        if (!selectedId || !offers.some((offer) => offer.id === selectedId)) {
+            if (type === 'buy') selectedClpOfferId = getBestOffer(offers, type).id;
+            else selectedBobOfferId = getBestOffer(offers, type).id;
+        }
+    }
+
+    function clearSelectedOffer(type) {
+        if (type === 'buy') selectedClpOfferId = null;
+        else selectedBobOfferId = null;
+    }
+
+    function selectOffer(type, offerId) {
+        if (type === 'buy') selectedClpOfferId = offerId;
+        else selectedBobOfferId = offerId;
+        renderOffers(type === 'buy' ? 'clp-offers' : 'bob-offers', type === 'buy' ? filteredClpOffers : filteredBobOffers, type === 'buy' ? 'CLP' : 'BOB', type);
+        recalculate();
+    }
+
+    function getSelectedOffer(type) {
+        const offers = type === 'buy' ? filteredClpOffers : filteredBobOffers;
+        const selectedId = type === 'buy' ? selectedClpOfferId : selectedBobOfferId;
+        return offers.find((offer) => offer.id === selectedId) || getBestOffer(offers, type);
+    }
+
+    function getBestOffer(offers, type) {
+        if (!offers || offers.length === 0) return null;
+        return offers.reduce((best, offer) => {
+            if (!best) return offer;
+            return compareOffers(offer, best, type, 'price') < 0 ? offer : best;
+        }, null);
+    }
+
+    function getAvailableMethods(offers) {
+        return Array.from(new Set(offers.flatMap((offer) => offer.methods).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+    }
+
+    function isVerifiedMerchant(advertiser) {
+        const values = [
+            advertiser.userType,
+            advertiser.userGrade,
+            advertiser.badge,
+            advertiser.badgeType,
+            advertiser.isMerchant,
+            advertiser.merchant
+        ];
+        return values.some((value) => {
+            if (value === true) return true;
+            if (!Number.isNaN(Number(value)) && Number(value) > 0) return true;
+            const text = String(value || '').toLowerCase();
+            return text.includes('merchant') || text.includes('verified') || text.includes('verificado');
+        });
     }
 
     // --- Render Offers ---
@@ -200,30 +373,25 @@
         const container = $(containerId);
 
         if (!offers || offers.length === 0) {
-            container.innerHTML = '<div class="loading-placeholder">Sin ofertas disponibles</div>';
+            container.innerHTML = '<div class="loading-placeholder">Sin ofertas con esos filtros</div>';
             return;
         }
 
-        // Determine best offer
-        let bestIndex = 0;
-        if (type === 'buy') {
-            // Buying USDT: lowest CLP price is best
-            bestIndex = offers.reduce((best, o, i) => o.price < offers[best].price ? i : best, 0);
-        } else {
-            // Selling USDT: highest BOB price is best
-            bestIndex = offers.reduce((best, o, i) => o.price > offers[best].price ? i : best, 0);
-        }
+        const bestOffer = getBestOffer(offers, type);
+        const selectedId = type === 'buy' ? selectedClpOfferId : selectedBobOfferId;
 
-        container.innerHTML = offers.map((o, i) => {
-            const isBest = i === bestIndex;
+        container.innerHTML = offers.map((o) => {
+            const isBest = bestOffer && o.id === bestOffer.id;
+            const isSelected = o.id === selectedId;
             const formattedPrice = formatNumber(o.price, fiat === 'CLP' ? 2 : 2);
             const methodBadges = o.methods.map((m) => '<span class="method-badge">' + escapeHtml(m) + '</span>').join('');
 
-            return '<div class="offer-card' + (isBest ? ' best' : '') + '">' +
+            return '<div class="offer-card' + (isBest ? ' best' : '') + (isSelected ? ' selected' : '') + '">' +
                 '<div class="offer-top">' +
                     '<div>' +
                         '<span class="offer-price">' + formattedPrice + ' ' + fiat + '</span>' +
                         (isBest ? ' <span class="best-badge">MEJOR</span>' : '') +
+                        (o.verified ? ' <span class="verified-badge">VERIFICADO</span>' : '') +
                     '</div>' +
                     '<div class="offer-merchant">' +
                         '<span>' + escapeHtml(o.merchant) + '</span>' +
@@ -234,10 +402,17 @@
                     '<div class="offer-limits">' +
                         '<span>' + formatNumber(o.minAmount, 0) + ' - ' + formatNumber(o.maxAmount, 0) + ' ' + fiat + '</span>' +
                     '</div>' +
-                    '<div class="offer-methods">' + methodBadges + '</div>' +
+                    '<div class="offer-actions">' +
+                        '<div class="offer-methods">' + methodBadges + '</div>' +
+                        '<button type="button" class="select-offer-btn' + (isSelected ? ' active' : '') + '" data-type="' + type + '" data-offer-id="' + escapeAttr(o.id) + '">' + (isSelected ? 'Usando' : 'Usar') + '</button>' +
+                    '</div>' +
                 '</div>' +
             '</div>';
         }).join('');
+
+        container.querySelectorAll('.select-offer-btn').forEach((button) => {
+            button.addEventListener('click', () => selectOffer(button.getAttribute('data-type'), button.getAttribute('data-offer-id')));
+        });
     }
 
     function renderError(containerId, message) {
@@ -250,13 +425,10 @@
         const inputBobPerThousand = parseFloat($('input-rate').value) || 0;
         const competitionBobPerThousand = parseFloat($('input-competition').value) || 10;
 
-        // Best prices
-        const bestClpPrice = clpOffers.length > 0
-            ? Math.min(...clpOffers.map((o) => o.price))
-            : 0;
-        const bestBobPrice = bobOffers.length > 0
-            ? Math.max(...bobOffers.map((o) => o.price))
-            : 0;
+        const clpReferenceOffer = getSelectedOffer('buy');
+        const bobReferenceOffer = getSelectedOffer('sell');
+        const bestClpPrice = clpReferenceOffer ? clpReferenceOffer.price : 0;
+        const bestBobPrice = bobReferenceOffer ? bobReferenceOffer.price : 0;
 
         $('res-best-clp').textContent = bestClpPrice ? formatNumber(bestClpPrice, 2) + ' CLP' : '-';
         $('res-best-bob').textContent = bestBobPrice ? formatNumber(bestBobPrice, 2) + ' BOB' : '-';
@@ -344,6 +516,20 @@
         var div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
+    }
+
+    function escapeAttr(str) {
+        return String(str).replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        })[char]);
+    }
+
+    function slugify(str) {
+        return String(str).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'metodo';
     }
 
     // --- Start ---
