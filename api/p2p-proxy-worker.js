@@ -52,7 +52,9 @@ export default {
                 tradeType: body.tradeType,
                 page: body.page || 1,
                 rows: Math.min(body.rows || 5, 20), // Cap at 20
-                payTypes: body.payTypes || []
+                payTypes: body.payTypes || [],
+                publisherType: body.publisherType || null,
+                transAmount: body.transAmount || ''
             };
 
             // Only allow expected values

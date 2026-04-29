@@ -23,6 +23,7 @@
         buy: { sort: 'price', minAmount: 0, methods: new Set(), verifiedOnly: true },
         sell: { sort: 'price', minAmount: 0, methods: new Set(), verifiedOnly: true }
     };
+    let filterFetchTimer = null;
     let countdown = REFRESH_INTERVAL;
     let countdownTimer = null;
     let refreshTimer = null;
@@ -148,6 +149,14 @@
     }
 
     // --- Fetch Data ---
+    function scheduleFetchAll() {
+        if (filterFetchTimer) clearTimeout(filterFetchTimer);
+        filterFetchTimer = setTimeout(() => {
+            filterFetchTimer = null;
+            fetchAll();
+        }, 450);
+    }
+
     async function fetchAll() {
         const proxyUrl = getProxyUrl();
         if (!proxyUrl) {
@@ -162,8 +171,8 @@
 
         try {
             const [clpResult, bobResult] = await Promise.all([
-                fetchP2P(proxyUrl, 'USDT', 'CLP', 'BUY', 20),
-                fetchP2P(proxyUrl, 'USDT', 'BOB', 'SELL', 20)
+                fetchP2P(proxyUrl, 'USDT', 'CLP', 'BUY', 6, offerFilters.buy),
+                fetchP2P(proxyUrl, 'USDT', 'BOB', 'SELL', 6, offerFilters.sell)
             ]);
 
             clpOffers = clpResult;
@@ -184,14 +193,16 @@
         }
     }
 
-    async function fetchP2P(proxyUrl, asset, fiat, tradeType, rows) {
+    async function fetchP2P(proxyUrl, asset, fiat, tradeType, rows, filters) {
         const body = {
             asset: asset,
             fiat: fiat,
             tradeType: tradeType,
             page: 1,
             rows: rows,
-            payTypes: []
+            payTypes: Array.from(filters.methods),
+            publisherType: filters.verifiedOnly ? 'merchant' : null,
+            transAmount: filters.minAmount > 0 ? String(filters.minAmount) : ''
         };
 
         const res = await fetch(proxyUrl, {
@@ -219,7 +230,10 @@
             minAmount: parseFloat(item.adv.minSingleTransAmount),
             maxAmount: parseFloat(item.adv.dynamicMaxSingleTransAmount || item.adv.maxSingleTransAmount),
             availableAmount: parseFloat(item.adv.surplusAmount),
-            methods: (item.adv.tradeMethods || []).map((m) => m.tradeMethodShortName || m.tradeMethodName || m.identifier),
+            methods: (item.adv.tradeMethods || []).map((m) => ({
+                id: m.identifier || m.tradeMethodName || m.tradeMethodShortName,
+                label: m.tradeMethodShortName || m.tradeMethodName || m.identifier
+            })).filter((m) => m.id && m.label),
             merchant: item.advertiser.nickName,
             verified: isVerifiedMerchant(item.advertiser),
             completedOrders: item.advertiser.monthOrderCount || 0,
@@ -236,7 +250,7 @@
     function updateMinAmountFilter(type, value) {
         offerFilters[type].minAmount = parseFloat(value) || 0;
         clearSelectedOffer(type);
-        applyOfferFilters();
+        scheduleFetchAll();
     }
 
     function toggleMethodMenu(type) {
@@ -252,10 +266,6 @@
         const selectedMethods = offerFilters[type].methods;
         const methods = getAvailableMethods(offers);
 
-        selectedMethods.forEach((method) => {
-            if (!methods.includes(method)) selectedMethods.delete(method);
-        });
-
         if (methods.length === 0) {
             menu.innerHTML = '<div class="multi-empty">Sin bancos disponibles</div>';
             updateMethodButton(type);
@@ -263,10 +273,10 @@
         }
 
         menu.innerHTML = methods.map((method) => {
-            const id = (type === 'buy' ? 'clp' : 'bob') + '-method-' + slugify(method);
+            const id = (type === 'buy' ? 'clp' : 'bob') + '-method-' + slugify(method.id);
             return '<label class="multi-option" for="' + id + '">' +
-                '<input type="checkbox" id="' + id + '" data-method="' + escapeAttr(method) + '"' + (selectedMethods.has(method) ? ' checked' : '') + '>' +
-                '<span>' + escapeHtml(method) + '</span>' +
+                '<input type="checkbox" id="' + id + '" data-method="' + escapeAttr(method.id) + '"' + (selectedMethods.has(method.id) ? ' checked' : '') + '>' +
+                '<span>' + escapeHtml(method.label) + '</span>' +
             '</label>';
         }).join('');
 
@@ -277,7 +287,7 @@
                 else selectedMethods.delete(method);
                 clearSelectedOffer(type);
                 updateMethodButton(type);
-                applyOfferFilters();
+                scheduleFetchAll();
             });
         });
 
@@ -306,7 +316,7 @@
         return offers
             .filter((offer) => !filters.verifiedOnly || offer.verified)
             .filter((offer) => !filters.minAmount || amountFitsOffer(filters.minAmount, offer))
-            .filter((offer) => selectedMethods.length === 0 || selectedMethods.some((method) => offer.methods.includes(method)))
+            .filter((offer) => selectedMethods.length === 0 || selectedMethods.some((method) => offer.methods.some((offerMethod) => offerMethod.id === method)))
             .sort((a, b) => compareOffers(a, b, type, filters.sort));
     }
 
@@ -360,7 +370,11 @@
     }
 
     function getAvailableMethods(offers) {
-        return Array.from(new Set(offers.flatMap((offer) => offer.methods).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+        const byId = new Map();
+        offers.flatMap((offer) => offer.methods).forEach((method) => {
+            if (method.id && !byId.has(method.id)) byId.set(method.id, method);
+        });
+        return Array.from(byId.values()).sort((a, b) => a.label.localeCompare(b.label));
     }
 
     function isVerifiedMerchant(advertiser) {
@@ -396,7 +410,7 @@
             const isBest = bestOffer && o.id === bestOffer.id;
             const isSelected = o.id === selectedId;
             const formattedPrice = formatNumber(o.price, fiat === 'CLP' ? 2 : 2);
-            const methodBadges = o.methods.map((m) => '<span class="method-badge">' + escapeHtml(m) + '</span>').join('');
+            const methodBadges = o.methods.map((m) => '<span class="method-badge">' + escapeHtml(m.label) + '</span>').join('');
 
             return '<div class="offer-card' + (isBest ? ' best' : '') + (isSelected ? ' selected' : '') + '">' +
                 '<div class="offer-top">' +
