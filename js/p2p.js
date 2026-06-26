@@ -74,6 +74,8 @@
         $('input-clp').addEventListener('input', recalculate);
         $('input-rate').addEventListener('input', recalculate);
         $('input-competition').addEventListener('input', recalculate);
+        $('input-manual-clp').addEventListener('input', recalculate);
+        $('input-manual-bob').addEventListener('input', recalculate);
         setupOfferFilters();
 
         // Start
@@ -460,10 +462,12 @@
         const inputBobPerThousand = parseFloat($('input-rate').value) || 0;
         const competitionBobPerThousand = parseFloat($('input-competition').value) || 10;
 
+        const manualClpPrice = parseFloat($('input-manual-clp').value) || 0;
+        const manualBobPrice = parseFloat($('input-manual-bob').value) || 0;
         const clpReferenceOffer = getSelectedOffer('buy');
         const bobReferenceOffer = getSelectedOffer('sell');
-        const bestClpPrice = clpReferenceOffer ? clpReferenceOffer.price : 0;
-        const bestBobPrice = bobReferenceOffer ? bobReferenceOffer.price : 0;
+        const bestClpPrice = manualClpPrice > 0 ? manualClpPrice : (clpReferenceOffer ? clpReferenceOffer.price : 0);
+        const bestBobPrice = manualBobPrice > 0 ? manualBobPrice : (bobReferenceOffer ? bobReferenceOffer.price : 0);
 
         $('res-best-clp').textContent = bestClpPrice ? formatNumber(bestClpPrice, 2) + ' CLP' : '-';
         $('res-best-bob').textContent = bestBobPrice ? formatNumber(bestBobPrice, 2) + ' BOB' : '-';
