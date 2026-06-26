@@ -212,7 +212,14 @@
         });
 
         if (!res.ok) {
-            throw new Error('Proxy respondio con ' + res.status);
+            let detail = '';
+            try {
+                const errJson = await res.json();
+                detail = errJson.error || JSON.stringify(errJson);
+            } catch (_) {
+                detail = await res.text().catch(() => '');
+            }
+            throw new Error('Proxy respondio con ' + res.status + (detail ? ' - ' + detail : ''));
         }
 
         const json = await res.json();
