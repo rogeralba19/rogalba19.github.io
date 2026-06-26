@@ -75,7 +75,26 @@ export default {
                 body: JSON.stringify(allowed)
             });
 
-            const data = await binanceRes.json();
+            const rawText = await binanceRes.text();
+            let data;
+            try {
+                data = JSON.parse(rawText);
+            } catch (parseErr) {
+                // Binance returned non-JSON (block page, captcha, etc.)
+                return jsonResponse({
+                    error: 'Binance respondio con un formato inesperado',
+                    binanceStatus: binanceRes.status,
+                    bodyPreview: rawText.slice(0, 300)
+                }, 502, origin);
+            }
+
+            if (!binanceRes.ok) {
+                return jsonResponse({
+                    error: 'Binance respondio con error',
+                    binanceStatus: binanceRes.status,
+                    binanceBody: data
+                }, 502, origin);
+            }
 
             return jsonResponse(data, 200, origin);
         } catch (err) {
