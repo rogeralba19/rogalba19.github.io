@@ -70,7 +70,11 @@ export default {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                    'Accept': '*/*',
+                    'Origin': 'https://p2p.binance.com',
+                    'Referer': 'https://p2p.binance.com/' + (allowed.tradeType === 'BUY' ? 'trade/sell/' : 'trade/buy/') + allowed.asset,
+                    'clienttype': 'web'
                 },
                 body: JSON.stringify(allowed)
             });

@@ -216,6 +216,8 @@
             try {
                 const errJson = await res.json();
                 detail = errJson.error || JSON.stringify(errJson);
+                if (errJson.bodyPreview) detail += ' :: ' + errJson.bodyPreview;
+                else if (errJson.binanceBody) detail += ' :: ' + JSON.stringify(errJson.binanceBody);
             } catch (_) {
                 detail = await res.text().catch(() => '');
             }
