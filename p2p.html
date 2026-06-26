@@ -49,6 +49,14 @@
                         <span class="panel-tag buy">COMPRAR</span>
                     </div>
                     <div class="panel-subtitle">Mejores ofertas para comprar USDT en Chile</div>
+                    <div class="manual-price-box">
+                        <label>Precio manual (editar o agregar)</label>
+                        <div class="input-with-unit">
+                            <input type="number" id="input-manual-clp" placeholder="Ej: 950" min="0" step="0.01">
+                            <span class="unit">CLP</span>
+                        </div>
+                        <small class="hint">Si lo llenas, se usa en la calculadora en vez de las ofertas automaticas. Dejalo vacio para usar el automatico.</small>
+                    </div>
                     <div class="offer-controls" data-market="buy">
                         <label class="filter-select">
                             <span>Orden</span>
@@ -84,6 +92,14 @@
                         <span class="panel-tag sell">VENDER</span>
                     </div>
                     <div class="panel-subtitle">Mejores ofertas para vender USDT en Bolivia</div>
+                    <div class="manual-price-box">
+                        <label>Precio manual (editar o agregar)</label>
+                        <div class="input-with-unit">
+                            <input type="number" id="input-manual-bob" placeholder="Ej: 14.50" min="0" step="0.01">
+                            <span class="unit">BOB</span>
+                        </div>
+                        <small class="hint">Si lo llenas, se usa en la calculadora en vez de las ofertas automaticas. Dejalo vacio para usar el automatico.</small>
+                    </div>
                     <div class="offer-controls" data-market="sell">
                         <label class="filter-select">
                             <span>Orden</span>
@@ -120,29 +136,6 @@
                         <h2>Calculadora: BOB por cada 1.000 CLP</h2>
                         <span class="panel-tag calc">CALC</span>
                     </div>
-
-                    <details class="config-section manual-prices">
-                        <summary>Precios manuales (usar si el proxy falla)</summary>
-                        <div class="config-content">
-                            <div class="calc-grid">
-                                <div class="calc-input-group">
-                                    <label>Precio USDT en CLP (compra)</label>
-                                    <div class="input-with-unit">
-                                        <input type="number" id="input-manual-clp" placeholder="Ej: 950" min="0" step="0.01">
-                                        <span class="unit">CLP</span>
-                                    </div>
-                                </div>
-                                <div class="calc-input-group">
-                                    <label>Precio USDT en BOB (venta)</label>
-                                    <div class="input-with-unit">
-                                        <input type="number" id="input-manual-bob" placeholder="Ej: 14.50" min="0" step="0.01">
-                                        <span class="unit">BOB</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <small class="hint">Si llenas estos campos, se usan en la calculadora en vez de las ofertas automaticas. Dejalos vacios para volver al modo automatico.</small>
-                        </div>
-                    </details>
 
                     <div class="calc-grid">
                         <div class="calc-input-group">
