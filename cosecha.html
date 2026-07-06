@@ -28,7 +28,7 @@
         <h1><span>🍎</span> Registro de Cosecha</h1>
         <div class="header-actions">
             <a href="index.html" class="back-btn" aria-label="Volver al inicio">← Volver</a>
-            <button class="action-btn" onclick="openAddFruitModal()" aria-label="Agregar nueva fruta">+ Fruta</button>
+            <button class="action-btn" onclick="openJobModal()" aria-label="Agregar nuevo trabajo">+ Trabajo</button>
             <button class="action-btn primary" onclick="openEntryModal()" aria-label="Agregar nuevo registro">+ Registro</button>
             <div class="user-menu-container" id="userMenuContainer" style="display: none;">
                 <button class="user-avatar-btn" id="userAvatarBtn" onclick="toggleUserDropdown()" aria-label="Menú de usuario">
@@ -179,7 +179,7 @@
             <div class="filters-bar">
                 <div class="filter-group">
                     <select id="filterFruit" onchange="renderEntries()">
-                        <option value="">Todas las frutas</option>
+                        <option value="">Todos los trabajos</option>
                     </select>
                 </div>
                 <div class="filter-buttons">
@@ -245,19 +245,14 @@
                 <input type="hidden" id="jobId">
 
                 <div class="form-group">
-                    <label>Producto</label>
-                    <select id="jobProduct">
-                        <option value="">Seleccionar fruta</option>
-                        <option value="Fresa">Fresa</option>
-                        <option value="Frambuesa">Frambuesa</option>
-                        <option value="Arandano">Arandano</option>
-                        <option value="Mora">Mora</option>
-                        <option value="Cereza">Cereza</option>
-                        <option value="Ciruela">Ciruela</option>
-                        <option value="Manzana">Manzana</option>
-                        <option value="Pera">Pera</option>
-                        <option value="Uva">Uva</option>
-                    </select>
+                    <label>Categoría</label>
+                    <select id="jobCategory" onchange="onJobCategoryChange()"></select>
+                </div>
+
+                <div class="form-group">
+                    <label>Producto / Tarea</label>
+                    <select id="jobTask" onchange="onJobTaskChange()"></select>
+                    <input type="text" id="jobTaskCustom" placeholder="Escribe el nombre de la tarea..." style="display: none; margin-top: 8px;">
                 </div>
 
                 <div class="form-group">
@@ -285,6 +280,11 @@
                             <option value="bandeja">Bandeja</option>
                             <option value="bins">Bins (grupo)</option>
                             <option value="gamela">Gamela</option>
+                            <option value="caja">Caja</option>
+                            <option value="planta">Planta</option>
+                            <option value="hilera">Hilera</option>
+                            <option value="metro">Metro</option>
+                            <option value="hectarea">Hectárea</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -325,10 +325,15 @@
 
                 <div class="form-group">
                     <label>Trabajo</label>
-                    <div id="entryJobSelectWrapper">
-                        <select id="entryJob" onchange="onJobSelect()">
+                    <div id="entryJobSelectWrapper" class="job-picker">
+                        <select id="entryJob" onchange="onJobSelect()" class="job-picker-hidden-select" aria-hidden="true" tabindex="-1">
                             <option value="">Seleccionar trabajo</option>
                         </select>
+                        <button type="button" class="job-picker-trigger" id="jobPickerTrigger" onclick="toggleJobPicker(event)" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="job-picker-label">Seleccionar trabajo</span>
+                            <span class="job-picker-caret">▾</span>
+                        </button>
+                        <div class="job-picker-panel" id="jobPickerPanel"></div>
                     </div>
                     <div id="entryJobDisplay" class="job-selected-display" style="display: none;">
                         <span id="entryJobName" class="job-selected-name"></span>
@@ -358,6 +363,11 @@
                                 <option value="bandeja">Bandeja</option>
                                 <option value="bins">Bins</option>
                                 <option value="gamela">Gamela</option>
+                                <option value="caja">Caja</option>
+                                <option value="planta">Planta</option>
+                                <option value="hilera">Hilera</option>
+                                <option value="metro">Metro</option>
+                                <option value="hectarea">Hectárea</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -558,26 +568,6 @@
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
-    <!-- Add Fruit Modal -->
-    <div class="modal-overlay" id="addFruitModal" role="dialog" aria-modal="true">
-        <div class="modal" style="max-width: 400px;">
-            <div class="modal-header">
-                <h2>Agregar Nueva Fruta</h2>
-                <button class="modal-close" onclick="closeAddFruitModal()" aria-label="Cerrar">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Nombre de la Fruta</label>
-                    <input type="text" id="newFruitName" placeholder="Ej: Durazno, Kiwi, etc.">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeAddFruitModal()">Cancelar</button>
-                <button class="btn btn-primary" onclick="saveNewFruit()">Agregar</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Worker Modal (Boss Mode) -->
     <div class="modal-overlay" id="workerModal" role="dialog" aria-modal="true" aria-labelledby="workerModalTitle">
         <div class="modal">
@@ -714,6 +704,11 @@
                             <option value="bandeja">Bandeja</option>
                             <option value="bins">Bins (grupo)</option>
                             <option value="gamela">Gamela</option>
+                            <option value="caja">Caja</option>
+                            <option value="planta">Planta</option>
+                            <option value="hilera">Hilera</option>
+                            <option value="metro">Metro</option>
+                            <option value="hectarea">Hectárea</option>
                         </select>
                     </div>
                     <div class="form-group">

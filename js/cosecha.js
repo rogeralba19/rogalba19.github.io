@@ -71,7 +71,28 @@ const unitNames = {
     'kilo': 'Kilos',
     'bandeja': 'Bandejas',
     'bins': 'Bins',
-    'gamela': 'Gamela'
+    'gamela': 'Gamela',
+    'caja': 'Cajas',
+    'planta': 'Plantas',
+    'hilera': 'Hileras',
+    'metro': 'Metros',
+    'hectarea': 'Hectáreas'
+};
+
+// Etiquetas en minúscula para "Cantidad (...)"
+const unitQuantityLabels = {
+    'totens': 'totens',
+    'capacho_grande': 'capachos grandes',
+    'capacho_pequeno': 'capachos pequeños',
+    'kilo': 'kilos',
+    'bandeja': 'bandejas',
+    'bins': 'bins',
+    'gamela': 'gamelas',
+    'caja': 'cajas',
+    'planta': 'plantas',
+    'hilera': 'hileras',
+    'metro': 'metros',
+    'hectarea': 'hectáreas'
 };
 
 // Helper: crear snapshot del trabajo para guardar en el registro
@@ -79,6 +100,7 @@ function createJobSnapshot(job) {
     if (!job) return null;
     return {
         product: job.product || '',
+        category: job.category || 'cosecha',
         type: job.type || 'trato',
         unit: job.unit || null,
         price: job.price || null,
@@ -93,31 +115,155 @@ function getEntryJobData(entry) {
     // Fallback para registros antiguos sin snapshot (solo lectura, para mostrar en lista)
     const job = jobs.find(j => j.id === entry.jobId);
     if (job) return createJobSnapshot(job);
-    return { product: 'Trabajo eliminado', type: 'trato', unit: null, price: 0, dailyRate: 0, employer: '' };
+    return { product: 'Trabajo eliminado', category: 'cosecha', type: 'trato', unit: null, price: 0, dailyRate: 0, employer: '' };
 }
 
 // Helper: nombre para mostrar desde datos de trabajo (snapshot o job)
 function getDisplayName(jobData) {
     const parts = [];
-    if (jobData.product) parts.push(jobData.product);
+    if (jobData.product) parts.push(getTaskEmoji(jobData.product, jobData.category) + ' ' + jobData.product);
     if (jobData.unit && unitNames[jobData.unit]) parts.push(unitNames[jobData.unit]);
     if (jobData.price) parts.push('$' + jobData.price);
     if (jobData.employer) parts.push(jobData.employer);
     return parts.length > 0 ? parts.join(' - ') : 'Sin configurar';
 }
 
-// Lista de frutas disponibles
-const availableFruits = [
-    'Fresa',
-    'Frambuesa',
-    'Arandano',
-    'Mora',
-    'Cereza',
-    'Ciruela',
-    'Manzana',
-    'Pera',
-    'Uva'
+// ============================================
+// CATÁLOGO DE FAENAS AGRÍCOLAS
+// ============================================
+
+// Frutas / productos de cosecha con su emoji
+const FRUITS = [
+    { name: 'Arandano', emoji: '🫐' },
+    { name: 'Cereza', emoji: '🍒' },
+    { name: 'Guinda', emoji: '🍒' },
+    { name: 'Uva', emoji: '🍇' },
+    { name: 'Fresa', emoji: '🍓' },
+    { name: 'Frambuesa', emoji: '🍓' },
+    { name: 'Mora', emoji: '🫐' },
+    { name: 'Ciruela', emoji: '🍑' },
+    { name: 'Durazno', emoji: '🍑' },
+    { name: 'Nectarina', emoji: '🍑' },
+    { name: 'Damasco', emoji: '🍑' },
+    { name: 'Manzana', emoji: '🍎' },
+    { name: 'Pera', emoji: '🍐' },
+    { name: 'Membrillo', emoji: '🍏' },
+    { name: 'Kiwi', emoji: '🥝' },
+    { name: 'Naranja', emoji: '🍊' },
+    { name: 'Mandarina', emoji: '🍊' },
+    { name: 'Limón', emoji: '🍋' },
+    { name: 'Palta', emoji: '🥑' },
+    { name: 'Aceituna', emoji: '🫒' },
+    { name: 'Nuez', emoji: '🌰' },
+    { name: 'Almendra', emoji: '🌰' },
+    { name: 'Avellana', emoji: '🌰' },
+    { name: 'Castaña', emoji: '🌰' },
+    { name: 'Sandía', emoji: '🍉' },
+    { name: 'Melón', emoji: '🍈' },
+    { name: 'Tomate', emoji: '🍅' },
+    { name: 'Pimentón', emoji: '🫑' },
+    { name: 'Choclo', emoji: '🌽' },
+    { name: 'Espárrago', emoji: '🎋' }
 ];
+
+// Categorías de trabajo de campo. Cada tarea tiene emoji propio.
+const WORK_CATEGORIES = [
+    { id: 'cosecha', name: 'Cosecha', emoji: '🧺', defaultType: 'trato', defaultUnit: 'totens', tasks: FRUITS },
+    {
+        id: 'poda', name: 'Poda', emoji: '✂️', defaultType: 'trato', defaultUnit: 'planta', tasks: [
+            { name: 'Poda de invierno', emoji: '✂️' },
+            { name: 'Poda en verde', emoji: '🌿' },
+            { name: 'Poda de formación', emoji: '🌳' },
+            { name: 'Repaso de poda', emoji: '🪚' },
+            { name: 'Recolección de sarmientos', emoji: '🪵' }
+        ]
+    },
+    {
+        id: 'raleo', name: 'Raleo', emoji: '🌸', defaultType: 'trato', defaultUnit: 'planta', tasks: [
+            { name: 'Raleo chino', emoji: '🌸' },
+            { name: 'Raleo de flores', emoji: '💮' },
+            { name: 'Raleo de frutos', emoji: '🍏' },
+            { name: 'Raleo de yemas', emoji: '🌱' },
+            { name: 'Ajuste de carga', emoji: '⚖️' }
+        ]
+    },
+    {
+        id: 'desyeme', name: 'Desyeme y Desbrote', emoji: '🌿', defaultType: 'trato', defaultUnit: 'planta', tasks: [
+            { name: 'Desyeme', emoji: '🌿' },
+            { name: 'Desbrote', emoji: '🍃' },
+            { name: 'Deshoje', emoji: '🍂' },
+            { name: 'Despunte', emoji: '✂️' },
+            { name: 'Chapoda', emoji: '🪒' }
+        ]
+    },
+    {
+        id: 'amarra', name: 'Amarra y Conducción', emoji: '🪢', defaultType: 'trato', defaultUnit: 'planta', tasks: [
+            { name: 'Amarra', emoji: '🪢' },
+            { name: 'Conducción', emoji: '🧵' },
+            { name: 'Descuelgue', emoji: '🪜' },
+            { name: 'Colocación de mallas', emoji: '🥅' },
+            { name: 'Embolsado de racimos', emoji: '🛍️' }
+        ]
+    },
+    {
+        id: 'plantacion', name: 'Plantación', emoji: '🌱', defaultType: 'trato', defaultUnit: 'planta', tasks: [
+            { name: 'Plantación', emoji: '🌱' },
+            { name: 'Trasplante', emoji: '🪴' },
+            { name: 'Tutoreo', emoji: '🎋' },
+            { name: 'Injertación', emoji: '🧬' },
+            { name: 'Siembra', emoji: '🌾' }
+        ]
+    },
+    {
+        id: 'packing', name: 'Packing', emoji: '📦', defaultType: 'dia', tasks: [
+            { name: 'Embalaje', emoji: '📦' },
+            { name: 'Selección y clasificación', emoji: '🔍' },
+            { name: 'Paletizaje', emoji: '🏗️' },
+            { name: 'Control de calidad', emoji: '✅' },
+            { name: 'Etiquetado', emoji: '🏷️' }
+        ]
+    },
+    {
+        id: 'dia', name: 'Trabajos al Día', emoji: '🚜', defaultType: 'dia', tasks: [
+            { name: 'Jornada general', emoji: '🚜' },
+            { name: 'Riego', emoji: '💧' },
+            { name: 'Aplicación de productos', emoji: '🧪' },
+            { name: 'Limpieza de campo', emoji: '🧹' },
+            { name: 'Carga y descarga', emoji: '🏋️' },
+            { name: 'Bodega', emoji: '🧰' }
+        ]
+    }
+];
+
+// Lista plana de frutas (compatibilidad con módulos que la usan)
+const availableFruits = FRUITS.map(f => f.name);
+
+// Índice normalizado nombre → emoji para búsqueda rápida
+function normalizeName(str) {
+    return (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+}
+
+const TASK_EMOJI_MAP = {};
+WORK_CATEGORIES.forEach(cat => {
+    cat.tasks.forEach(t => { TASK_EMOJI_MAP[normalizeName(t.name)] = t.emoji; });
+});
+
+function getCategoryById(id) {
+    return WORK_CATEGORIES.find(c => c.id === id) || null;
+}
+
+function getJobCategory(job) {
+    // Trabajos antiguos sin categoría son de cosecha
+    return (job && job.category) || 'cosecha';
+}
+
+// Emoji para un producto/tarea: catálogo → emoji de la categoría → canasto
+function getTaskEmoji(product, categoryId) {
+    const fromCatalog = TASK_EMOJI_MAP[normalizeName(product)];
+    if (fromCatalog) return fromCatalog;
+    const cat = getCategoryById(categoryId || 'cosecha');
+    return (cat && cat.emoji) || '🧺';
+}
 
 // User profile data from Firebase
 let userProfile = null;
@@ -196,12 +342,8 @@ function checkDataReady() {
 }
 
 // Load data from Firebase
-let fruitsChecked = false;
-
 function loadData() {
     if (!currentUser) return;
-
-    fruitsChecked = false;
 
     // Load jobs
     db.ref(`jobs/${currentUser.uid}`).on('value', (snapshot) => {
@@ -209,12 +351,6 @@ function loadData() {
         snapshot.forEach((child) => {
             jobs.push({ id: child.key, ...child.val() });
         });
-
-        // Solo verificar frutas faltantes una vez por sesión de carga
-        if (!fruitsChecked) {
-            fruitsChecked = true;
-            checkAndAddMissingFruits();
-        }
         jobsLoaded = true;
         renderJobs();
         updateJobSelect();
@@ -400,62 +536,6 @@ function switchTab(tab) {
 // JOBS
 // ============================================
 
-// Verificar y agregar frutas faltantes
-async function checkAndAddMissingFruits() {
-    if (!currentUser) return;
-
-    const existingProducts = jobs.map(j => j.product);
-    const missingFruits = availableFruits.filter(f => !existingProducts.includes(f));
-
-    if (missingFruits.length === 0) return;
-
-    const batch = {};
-    missingFruits.forEach((fruit, idx) => {
-        const key = db.ref(`jobs/${currentUser.uid}`).push().key;
-        batch[key] = {
-            product: fruit,
-            type: 'trato',
-            unit: 'totens',
-            price: 0,
-            employer: '',
-            active: true,
-            createdAt: Date.now() + idx
-        };
-    });
-
-    try {
-        await db.ref(`jobs/${currentUser.uid}`).update(batch);
-    } catch (error) {
-        console.error('Error agregando frutas faltantes:', error);
-    }
-}
-
-// Agregar nueva fruta personalizada
-async function addCustomFruit(fruitName) {
-    if (!currentUser || !fruitName) return;
-
-    // Verificar que no exista
-    if (jobs.some(j => j.product.toLowerCase() === fruitName.toLowerCase())) {
-        showToast('Esta fruta ya existe', 'error');
-        return;
-    }
-
-    try {
-        await db.ref(`jobs/${currentUser.uid}`).push({
-            product: fruitName,
-            type: 'trato',
-            unit: 'totens',
-            price: 0,
-            employer: '',
-            active: true,
-            createdAt: Date.now()
-        });
-        showToast('Fruta agregada');
-    } catch (error) {
-        showToast('Error al agregar', 'error');
-    }
-}
-
 function renderJobs() {
     const grid = document.getElementById('jobsGrid');
 
@@ -464,7 +544,7 @@ function renderJobs() {
             <div class="empty-state" style="grid-column: 1/-1;">
                 <div class="icon">💼</div>
                 <h3>No hay trabajos</h3>
-                <p>Crea un trabajo para empezar a registrar tu cosecha</p>
+                <p>Crea un trabajo con "+ Trabajo" o elige uno del catálogo al agregar un registro</p>
             </div>
         `;
         return;
@@ -478,42 +558,24 @@ function renderJobs() {
         }
     });
 
-    // Separar trabajos configurados y no configurados
-    const configured = [];
-    const unconfigured = [];
-
+    // Agrupar por categoría (en el orden del catálogo)
+    const byCategory = {};
     jobs.forEach(job => {
-        const isConfigured = job.price > 0 || job.dailyRate > 0;
-        if (isConfigured) {
-            configured.push({ ...job, lastUsed: lastUsed[job.id] || null });
-        } else {
-            unconfigured.push(job);
-        }
+        const cat = getJobCategory(job);
+        if (!byCategory[cat]) byCategory[cat] = [];
+        byCategory[cat].push({ ...job, lastUsed: lastUsed[job.id] || null });
     });
 
-    // Ordenar no configurados alfabeticamente
-    unconfigured.sort((a, b) => (a.product || '').localeCompare(b.product || ''));
-
-    // Ordenar configurados por ultimo uso (mas reciente primero)
-    configured.sort((a, b) => {
-        if (!a.lastUsed && !b.lastUsed) return 0;
-        if (!a.lastUsed) return 1;
-        if (!b.lastUsed) return -1;
-        return new Date(b.lastUsed) - new Date(a.lastUsed);
-    });
-
-    // Combinar: primero usados, luego no configurados
-    const sortedJobs = [...configured, ...unconfigured];
-
-    grid.innerHTML = sortedJobs.map(job => {
+    function jobCard(job) {
         const isConfigured = job.price > 0 || job.dailyRate > 0;
+        const emoji = getTaskEmoji(job.product, getJobCategory(job));
         const safeProduct = escapeHtml(job.product);
         const safeEmployer = escapeHtml(job.employer);
 
         return `
             <div class="job-card ${isConfigured ? 'active' : ''}" onclick="editJob('${job.id}')">
                 <div class="job-header">
-                    <span class="job-title">${safeProduct}</span>
+                    <span class="job-title">${emoji} ${safeProduct}</span>
                     <span class="job-status ${!isConfigured ? 'inactive' : ''}">${isConfigured ? 'Configurado' : 'Sin configurar'}</span>
                 </div>
                 <div class="job-details">
@@ -523,7 +585,45 @@ function renderJobs() {
                 </div>
             </div>
         `;
-    }).join('');
+    }
+
+    let html = '';
+    const knownCatIds = WORK_CATEGORIES.map(c => c.id);
+    const orderedCats = [...knownCatIds, ...Object.keys(byCategory).filter(c => !knownCatIds.includes(c))];
+
+    orderedCats.forEach(catId => {
+        const catJobs = byCategory[catId];
+        if (!catJobs || catJobs.length === 0) return;
+
+        // Configurados por último uso, luego sin configurar alfabéticamente
+        catJobs.sort((a, b) => {
+            const aConf = a.price > 0 || a.dailyRate > 0;
+            const bConf = b.price > 0 || b.dailyRate > 0;
+            if (aConf !== bConf) return aConf ? -1 : 1;
+            if (aConf) {
+                if (!a.lastUsed && !b.lastUsed) return 0;
+                if (!a.lastUsed) return 1;
+                if (!b.lastUsed) return -1;
+                return new Date(b.lastUsed) - new Date(a.lastUsed);
+            }
+            return (a.product || '').localeCompare(b.product || '');
+        });
+
+        const cat = getCategoryById(catId);
+        const catName = cat ? cat.name : catId;
+        const catEmoji = cat ? cat.emoji : '🧺';
+
+        html += `
+            <div class="category-separator">
+                <span class="category-separator-title">${catEmoji} ${escapeHtml(catName)}</span>
+                <span class="category-separator-line"></span>
+                <span class="category-separator-count">${catJobs.length}</span>
+            </div>
+        `;
+        html += catJobs.map(jobCard).join('');
+    });
+
+    grid.innerHTML = html;
 }
 
 function selectJobForQuickAdd(jobId) {
@@ -578,9 +678,71 @@ async function quickAddEntry() {
 // ============================================
 // JOB MODAL
 // ============================================
+// Poblar el select de categorías del modal de trabajo
+function populateJobCategorySelect() {
+    const select = document.getElementById('jobCategory');
+    select.innerHTML = WORK_CATEGORIES
+        .map(c => `<option value="${c.id}">${c.emoji} ${escapeHtml(c.name)}</option>`)
+        .join('');
+}
+
+// Poblar el select de tareas según la categoría elegida
+function populateJobTaskSelect(categoryId, selectedTask) {
+    const select = document.getElementById('jobTask');
+    const cat = getCategoryById(categoryId) || WORK_CATEGORIES[0];
+
+    let options = cat.tasks
+        .map(t => `<option value="${escapeHtml(t.name)}">${t.emoji} ${escapeHtml(t.name)}</option>`)
+        .join('');
+    options += '<option value="__custom__">✏️ Otro (escribir)</option>';
+    select.innerHTML = options;
+
+    const customInput = document.getElementById('jobTaskCustom');
+    if (selectedTask) {
+        const inCatalog = cat.tasks.some(t => normalizeName(t.name) === normalizeName(selectedTask));
+        if (inCatalog) {
+            const match = cat.tasks.find(t => normalizeName(t.name) === normalizeName(selectedTask));
+            select.value = match.name;
+            customInput.style.display = 'none';
+            customInput.value = '';
+        } else {
+            select.value = '__custom__';
+            customInput.style.display = 'block';
+            customInput.value = selectedTask;
+        }
+    } else {
+        customInput.style.display = 'none';
+        customInput.value = '';
+    }
+}
+
+// Cambio de categoría en el modal de trabajo
+function onJobCategoryChange() {
+    const categoryId = document.getElementById('jobCategory').value;
+    populateJobTaskSelect(categoryId, null);
+
+    // Sugerir tipo de trabajo y unidad según la categoría (solo al crear)
+    const cat = getCategoryById(categoryId);
+    if (cat && !document.getElementById('jobId').value) {
+        jobType = cat.defaultType || 'trato';
+        updateJobTypeUI();
+        document.getElementById('jobUnit').value = cat.defaultUnit || 'totens';
+    }
+}
+
+// Cambio de tarea: mostrar input libre si eligió "Otro"
+function onJobTaskChange() {
+    const isCustom = document.getElementById('jobTask').value === '__custom__';
+    const customInput = document.getElementById('jobTaskCustom');
+    customInput.style.display = isCustom ? 'block' : 'none';
+    if (isCustom) customInput.focus();
+}
+
 function openJobModal(jobId = null) {
     document.getElementById('jobId').value = '';
-    document.getElementById('jobProduct').value = '';
+    populateJobCategorySelect();
+    document.getElementById('jobCategory').value = 'cosecha';
+    populateJobTaskSelect('cosecha', null);
     document.getElementById('jobUnit').value = 'totens';
     document.getElementById('jobPrice').value = '';
     document.getElementById('jobDailyRate').value = '';
@@ -593,8 +755,10 @@ function openJobModal(jobId = null) {
     if (jobId) {
         const job = jobs.find(j => j.id === jobId);
         if (job) {
+            const category = getJobCategory(job);
             document.getElementById('jobId').value = job.id;
-            document.getElementById('jobProduct').value = job.product || '';
+            document.getElementById('jobCategory').value = category;
+            populateJobTaskSelect(category, job.product || '');
             document.getElementById('jobUnit').value = job.unit || 'totens';
             document.getElementById('jobPrice').value = job.price || '';
             document.getElementById('jobDailyRate').value = job.dailyRate || '';
@@ -633,8 +797,14 @@ async function saveJob() {
     if (!currentUser) return;
 
     const id = document.getElementById('jobId').value;
+    const taskSelect = document.getElementById('jobTask').value;
+    const product = taskSelect === '__custom__'
+        ? document.getElementById('jobTaskCustom').value.trim()
+        : taskSelect;
+
     const data = {
-        product: document.getElementById('jobProduct').value,
+        product: product,
+        category: document.getElementById('jobCategory').value || 'cosecha',
         type: jobType,
         employer: document.getElementById('jobEmployer').value,
         active: true,
@@ -654,7 +824,7 @@ async function saveJob() {
     }
 
     if (!data.product) {
-        showToast('Selecciona un producto', 'error');
+        showToast('Selecciona o escribe una tarea', 'error');
         return;
     }
 
@@ -755,10 +925,190 @@ function updateJobSelect() {
     if (currentVal) select.value = currentVal;
 }
 
-// Generate job display name: fruta + recipiente + precio + ubicacion
+// ============================================
+// JOB PICKER (acordeón por categorías)
+// ============================================
+let jobPickerOpenCategory = 'cosecha';
+
+function toggleJobPicker(event) {
+    if (event) event.stopPropagation();
+    const panel = document.getElementById('jobPickerPanel');
+    const trigger = document.getElementById('jobPickerTrigger');
+    const isOpen = panel.classList.toggle('open');
+    trigger.setAttribute('aria-expanded', String(isOpen));
+    if (isOpen) {
+        // Abrir la categoría del trabajo seleccionado, o la última usada
+        const jobId = document.getElementById('entryJob').value;
+        if (jobId) {
+            const job = jobs.find(j => j.id === jobId);
+            if (job) jobPickerOpenCategory = getJobCategory(job);
+        }
+        renderJobPicker();
+    }
+}
+
+function closeJobPicker() {
+    const panel = document.getElementById('jobPickerPanel');
+    const trigger = document.getElementById('jobPickerTrigger');
+    if (panel) panel.classList.remove('open');
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+}
+
+function toggleJobPickerCategory(event, catId) {
+    // Evitar que el listener global de "click fuera" cierre el panel:
+    // el re-render desmonta el nodo clickeado y contains() daría false
+    if (event) event.stopPropagation();
+    jobPickerOpenCategory = jobPickerOpenCategory === catId ? null : catId;
+    renderJobPicker();
+}
+
+function renderJobPicker() {
+    const panel = document.getElementById('jobPickerPanel');
+    if (!panel) return;
+
+    let html = '';
+
+    WORK_CATEGORIES.forEach(cat => {
+        // Trabajos existentes de esta categoría
+        const catJobs = jobs.filter(j => getJobCategory(j) === cat.id);
+
+        // Tareas del catálogo que aún no tienen trabajo creado
+        const newTasks = cat.tasks.filter(t =>
+            !catJobs.some(j => normalizeName(j.product) === normalizeName(t.name))
+        );
+
+        const isOpen = jobPickerOpenCategory === cat.id;
+        const count = catJobs.length;
+
+        html += `
+            <div class="jp-cat ${isOpen ? 'open' : ''}">
+                <button type="button" class="jp-cat-header" onclick="toggleJobPickerCategory(event, '${cat.id}')" aria-expanded="${isOpen}">
+                    <span class="jp-cat-emoji">${cat.emoji}</span>
+                    <span class="jp-cat-name">${escapeHtml(cat.name)}</span>
+                    ${count > 0 ? `<span class="jp-cat-count">${count}</span>` : ''}
+                    <span class="jp-cat-caret">▾</span>
+                </button>
+                <div class="jp-cat-body">
+        `;
+
+        // Primero los trabajos ya creados (configurados arriba)
+        catJobs
+            .slice()
+            .sort((a, b) => {
+                const aConf = a.price > 0 || a.dailyRate > 0;
+                const bConf = b.price > 0 || b.dailyRate > 0;
+                if (aConf !== bConf) return aConf ? -1 : 1;
+                return (a.product || '').localeCompare(b.product || '');
+            })
+            .forEach(job => {
+                const emoji = getTaskEmoji(job.product, cat.id);
+                const isConfigured = job.price > 0 || job.dailyRate > 0;
+                const detailParts = [];
+                if (job.type === 'dia') {
+                    if (job.dailyRate > 0) detailParts.push('$' + job.dailyRate + '/día');
+                } else {
+                    if (job.unit && unitNames[job.unit]) detailParts.push(unitNames[job.unit]);
+                    if (job.price > 0) detailParts.push('$' + job.price);
+                }
+                if (job.employer) detailParts.push(job.employer);
+                const detail = detailParts.join(' · ');
+
+                html += `
+                    <button type="button" class="jp-item ${isConfigured ? 'configured' : ''}" onclick="selectJobFromPicker('${job.id}')">
+                        <span class="jp-item-emoji">${emoji}</span>
+                        <span class="jp-item-info">
+                            <span class="jp-item-name">${escapeHtml(job.product)}</span>
+                            ${detail ? `<span class="jp-item-detail">${escapeHtml(detail)}</span>` : '<span class="jp-item-detail">Sin configurar</span>'}
+                        </span>
+                    </button>
+                `;
+            });
+
+        // Luego las tareas del catálogo disponibles para crear
+        newTasks.forEach(t => {
+            html += `
+                <button type="button" class="jp-item jp-new" onclick="createJobFromCatalog('${cat.id}', '${escapeHtml(t.name)}')">
+                    <span class="jp-item-emoji">${t.emoji}</span>
+                    <span class="jp-item-info">
+                        <span class="jp-item-name">${escapeHtml(t.name)}</span>
+                    </span>
+                    <span class="jp-new-badge">nuevo</span>
+                </button>
+            `;
+        });
+
+        // Opción para crear tarea personalizada en la categoría
+        html += `
+                    <button type="button" class="jp-item jp-custom" onclick="createCustomJobFromPicker('${cat.id}')">
+                        <span class="jp-item-emoji">✏️</span>
+                        <span class="jp-item-info"><span class="jp-item-name">Otra tarea de ${escapeHtml(cat.name.toLowerCase())}...</span></span>
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+
+    panel.innerHTML = html;
+}
+
+function selectJobFromPicker(jobId) {
+    document.getElementById('entryJob').value = jobId;
+    closeJobPicker();
+    onJobSelect();
+}
+
+// Crear un trabajo desde el catálogo y seleccionarlo de inmediato
+async function createJobFromCatalog(categoryId, taskName) {
+    if (!currentUser) return;
+
+    const cat = getCategoryById(categoryId);
+    const type = (cat && cat.defaultType) || 'trato';
+    const data = {
+        product: taskName,
+        category: categoryId,
+        type: type,
+        unit: type === 'trato' ? ((cat && cat.defaultUnit) || 'totens') : null,
+        price: type === 'trato' ? 0 : null,
+        dailyRate: type === 'dia' ? 0 : null,
+        employer: '',
+        active: true,
+        createdAt: Date.now()
+    };
+
+    try {
+        const ref = db.ref(`jobs/${currentUser.uid}`).push();
+        // Insertar de forma optimista para que onJobSelect lo encuentre ya
+        jobs.push({ id: ref.key, ...data });
+        updateJobSelect();
+        document.getElementById('entryJob').value = ref.key;
+        closeJobPicker();
+        onJobSelect();
+        await ref.set(data);
+    } catch (error) {
+        showToast('Error al crear el trabajo', 'error');
+    }
+}
+
+// Crear tarea personalizada: abre el modal de trabajo con la categoría preseleccionada
+function createCustomJobFromPicker(categoryId) {
+    closeJobPicker();
+    closeEntryModal();
+    openJobModal();
+    document.getElementById('jobCategory').value = categoryId;
+    populateJobTaskSelect(categoryId, null);
+    document.getElementById('jobTask').value = '__custom__';
+    onJobTaskChange();
+    const cat = getCategoryById(categoryId);
+    if (cat) {
+        jobType = cat.defaultType || 'trato';
+        updateJobTypeUI();
+    }
+}
+
+// Generate job display name: emoji + tarea + recipiente + precio + ubicacion
 function getJobDisplayName(job) {
     const parts = [];
-    if (job.product) parts.push(job.product);
+    if (job.product) parts.push(getTaskEmoji(job.product, getJobCategory(job)) + ' ' + job.product);
     if (job.unit && unitNames[job.unit]) parts.push(unitNames[job.unit]);
     if (job.price) parts.push('$' + job.price);
     if (job.employer) parts.push(job.employer);
@@ -798,12 +1148,6 @@ function onJobSelect() {
         document.getElementById('entryPeople').value = '1';
     }
 
-    const unitLabels = {
-        'totens': 'totens', 'capacho_grande': 'capachos grandes',
-        'capacho_pequeno': 'capachos pequeños', 'kilo': 'kilos',
-        'bandeja': 'bandejas', 'bins': 'bins'
-    };
-
     // Si estamos editando un registro existente con el mismo trabajo, usar snapshot
     if (editingEntry && editingEntry.jobId === jobId && editingEntry.snapshot) {
         const snap = editingEntry.snapshot;
@@ -815,7 +1159,7 @@ function onJobSelect() {
             document.getElementById('entryTotal').textContent = '$' + (snap.dailyRate || 0).toFixed(2);
         } else {
             document.getElementById('entryTratoFields').classList.add('visible');
-            document.getElementById('entryUnitLabel').textContent = `(${unitLabels[snap.unit] || 'unidades'})`;
+            document.getElementById('entryUnitLabel').textContent = `(${unitQuantityLabels[snap.unit] || 'unidades'})`;
             if (snap.unit === 'bins') {
                 binsFields.classList.add('visible');
             }
@@ -850,7 +1194,7 @@ function onJobSelect() {
             document.getElementById('entryTotal').textContent = '$' + (job.dailyRate || 0).toFixed(2);
         } else {
             document.getElementById('entryTratoFields').classList.add('visible');
-            document.getElementById('entryUnitLabel').textContent = `(${unitLabels[job.unit] || 'unidades'})`;
+            document.getElementById('entryUnitLabel').textContent = `(${unitQuantityLabels[job.unit] || 'unidades'})`;
             if (job.unit === 'bins') {
                 binsFields.classList.add('visible');
             }
@@ -1831,7 +2175,9 @@ function renderEntries() {
             const date = new Date(e.date + 'T12:00:00');
             const dayName = dayNames[date.getDay()];
             const dateStr = `${date.getDate()} ${monthNames[date.getMonth()].substring(0, 3)}`;
-            const fruta = escapeHtml(jobData.product || 'Sin trabajo');
+            const fruta = jobData.product
+                ? getTaskEmoji(jobData.product, jobData.category) + ' ' + escapeHtml(jobData.product)
+                : 'Sin trabajo';
             const safeEmployer = escapeHtml(jobData.employer || '');
             const precio = '$' + (e.total || 0).toFixed(2);
             const isSelected = selectedEntries.has(e.id);
@@ -1956,10 +2302,10 @@ function updateFruitFilter() {
         });
     }
 
-    let options = '<option value="">Todas las frutas</option>';
+    let options = '<option value="">Todos los trabajos</option>';
     Array.from(fruitsInEntries).sort().forEach(fruit => {
         const safeFruit = escapeHtml(fruit);
-        options += `<option value="${safeFruit}">${safeFruit}</option>`;
+        options += `<option value="${safeFruit}">${getTaskEmoji(fruit)} ${safeFruit}</option>`;
     });
 
     select.innerHTML = options;
@@ -1999,28 +2345,6 @@ function showToast(message, type = 'success') {
             toastTimeout = null;
         }, 3000);
     });
-}
-
-// ============================================
-// ADD FRUIT MODAL
-// ============================================
-function openAddFruitModal() {
-    document.getElementById('newFruitName').value = '';
-    openModal('addFruitModal');
-}
-
-function closeAddFruitModal() {
-    closeModal('addFruitModal');
-}
-
-async function saveNewFruit() {
-    const fruitName = document.getElementById('newFruitName').value.trim();
-    if (!fruitName) {
-        showToast('Ingresa un nombre', 'error');
-        return;
-    }
-    await addCustomFruit(fruitName);
-    closeAddFruitModal();
 }
 
 // ============================================
@@ -2375,6 +2699,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (container && !container.contains(e.target)) {
             closeUserDropdown();
         }
+
+        // Cerrar el selector de trabajos al hacer click fuera
+        const pickerWrapper = document.getElementById('entryJobSelectWrapper');
+        if (pickerWrapper && !pickerWrapper.contains(e.target)) {
+            closeJobPicker();
+        }
     });
 
     // Cerrar modales con Escape
@@ -2386,8 +2716,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 closeUserDropdown();
                 return;
             }
+
+            // Luego el selector de trabajos si está desplegado
+            const pickerPanel = document.getElementById('jobPickerPanel');
+            if (pickerPanel && pickerPanel.classList.contains('open')) {
+                closeJobPicker();
+                return;
+            }
             const modals = [
-                { id: 'addFruitModal', close: closeAddFruitModal },
                 { id: 'confirmModal', close: () => closeConfirmModal(false) },
                 { id: 'dayModal', close: closeDayModal },
                 { id: 'entryModal', close: closeEntryModal },
