@@ -6,6 +6,20 @@
     <meta name="description" content="Aplicación de registro de cosecha para trabajadores agrícolas - ALBA STUDIO">
     <title>Registro de Cosecha | ALBA STUDIO</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍎</text></svg>">
+    <meta name="theme-color" content="#0c110d" id="metaThemeColor">
+    <script>
+        // Aplicar tema guardado antes de pintar (evita flash de tema incorrecto)
+        (function () {
+            try {
+                if (localStorage.getItem('cosecha-theme') === 'light') {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                }
+            } catch (e) { /* localStorage no disponible */ }
+        })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/cosecha.css">
     <link rel="stylesheet" href="css/auth.css">
 </head>
@@ -40,6 +54,16 @@
                     </div>
                     <div id="notifListContainer" class="notif-list-container">
                         <div class="notif-empty">Sin notificaciones</div>
+                    </div>
+                    <div class="user-dropdown-divider"></div>
+                    <div class="user-dropdown-item theme-toggle-item" onclick="toggleTheme(event)" role="switch" aria-checked="false" aria-label="Cambiar entre modo claro y oscuro" id="themeToggleItem">
+                        <span class="dropdown-item-icon" id="themeToggleIcon">☀️</span>
+                        <span class="dropdown-item-label" id="themeToggleLabel">Modo claro</span>
+                        <div class="theme-toggle" id="themeToggle">
+                            <div class="theme-toggle-track">
+                                <div class="theme-toggle-thumb"></div>
+                            </div>
+                        </div>
                     </div>
                     <div class="user-dropdown-divider"></div>
                     <div class="user-dropdown-item boss-mode-item" onclick="toggleBossMode(event)">
@@ -113,17 +137,17 @@
                     <span class="ac-title" id="acTitle">Actividad 2024</span>
                     <div class="ac-legend">
                         <span class="ac-legend-label">Menos</span>
-                        <span class="ac-legend-box" style="background:rgba(255,255,255,0.06)"></span>
-                        <span class="ac-legend-box" style="background:rgba(0,255,136,0.15)"></span>
-                        <span class="ac-legend-box" style="background:rgba(0,255,136,0.35)"></span>
-                        <span class="ac-legend-box" style="background:rgba(0,255,136,0.55)"></span>
-                        <span class="ac-legend-box" style="background:rgba(0,255,136,0.75)"></span>
-                        <span class="ac-legend-box" style="background:rgba(0,255,136,1)"></span>
+                        <span class="ac-legend-box"></span>
+                        <span class="ac-legend-box" style="background:rgba(var(--ac-paid-rgb),0.15)"></span>
+                        <span class="ac-legend-box" style="background:rgba(var(--ac-paid-rgb),0.35)"></span>
+                        <span class="ac-legend-box" style="background:rgba(var(--ac-paid-rgb),0.55)"></span>
+                        <span class="ac-legend-box" style="background:rgba(var(--ac-paid-rgb),0.75)"></span>
+                        <span class="ac-legend-box" style="background:rgba(var(--ac-paid-rgb),1)"></span>
                         <span class="ac-legend-label">Más</span>
                         <span class="ac-legend-sep"></span>
-                        <span class="ac-legend-box" style="background:rgba(0,255,136,0.5)"></span>
+                        <span class="ac-legend-box" style="background:rgba(var(--ac-paid-rgb),0.6)"></span>
                         <span class="ac-legend-label">Pagado</span>
-                        <span class="ac-legend-box" style="background:rgba(255,90,30,0.5)"></span>
+                        <span class="ac-legend-box" style="background:rgba(var(--ac-pending-rgb),0.6)"></span>
                         <span class="ac-legend-label">Pendiente</span>
                     </div>
                 </div>
@@ -588,7 +612,7 @@
                 <!-- Manual entry -->
                 <div id="workerManualSection" style="display: none;">
                     <div class="form-group">
-                        <label>Nombre completo <span style="color:#ff4466">*</span></label>
+                        <label>Nombre completo <span class="req">*</span></label>
                         <input type="text" id="workerManualName" placeholder="Nombre del trabajador">
                     </div>
                     <div class="form-group">
@@ -614,7 +638,7 @@
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label>Nombre de la cuadrilla <span style="color:#ff4466">*</span></label>
+                    <label>Nombre de la cuadrilla <span class="req">*</span></label>
                     <input type="text" id="squadName" placeholder="Ej: Cuadrilla Norte">
                 </div>
 
@@ -776,7 +800,7 @@
                 <button class="modal-close" onclick="closePublicLinkModal()" aria-label="Cerrar">&times;</button>
             </div>
             <div class="modal-body">
-                <p style="color: rgba(255,255,255,0.6); margin-bottom: 12px; font-size: 13px;">Este link permite consultar los registros sin necesidad de cuenta. Expira en 7 días.</p>
+                <p class="modal-hint">Este link permite consultar los registros sin necesidad de cuenta. Expira en 7 días.</p>
                 <div class="form-group">
                     <label>Link para compartir</label>
                     <div class="public-link-row">

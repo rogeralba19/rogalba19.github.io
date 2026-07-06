@@ -79,10 +79,16 @@ function unloadCuadrillaData() {
 
 function switchCuadrillaTab(tab) {
     currentCuadrillaTab = tab;
-    document.querySelectorAll('.subtab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.subtab').forEach(t => {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+    });
     document.querySelectorAll('.subsection').forEach(s => s.classList.remove('active'));
     const targetTab = document.querySelector(`.subtab[data-subtab="${tab}"]`);
-    if (targetTab) targetTab.classList.add('active');
+    if (targetTab) {
+        targetTab.classList.add('active');
+        targetTab.setAttribute('aria-selected', 'true');
+    }
     const targetSection = document.getElementById(tab + 'Subsection');
     if (targetSection) targetSection.classList.add('active');
 }

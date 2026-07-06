@@ -635,7 +635,7 @@ function getBossRecordActions(wr) {
 
         const list = document.getElementById('bossDayEntriesList');
         if (dayEntries.length === 0) {
-            list.innerHTML = '<p style="text-align: center; color: rgba(255,255,255,0.5); padding: 20px;">No hay registros para este día</p>';
+            list.innerHTML = '<p class="modal-empty-text">No hay registros para este día</p>';
         } else {
             list.innerHTML = dayEntries.map(entry => {
                 let totalPaid = 0;
