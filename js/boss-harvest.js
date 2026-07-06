@@ -325,14 +325,34 @@ function openBossEntryModal() {
     document.getElementById('bossSquadMembersGroup').style.display = 'none';
     document.getElementById('bossSquadMembersList').innerHTML = '';
 
-    // Populate product select (use availableFruits + custom from jobs)
+    // Populate product select: catálogo por categorías + personalizados de los trabajos
     const productSelect = document.getElementById('bossProduct');
-    const allProducts = new Set(availableFruits);
-    jobs.forEach(j => { if (j.product) allProducts.add(j.product); });
-    let pOpts = '<option value="">Seleccionar fruta</option>';
-    Array.from(allProducts).sort().forEach(p => {
-        pOpts += `<option value="${p}">${escapeHtml(p)}</option>`;
+    let pOpts = '<option value="">Seleccionar producto o tarea</option>';
+    const catalogNames = new Set();
+
+    WORK_CATEGORIES.forEach(cat => {
+        pOpts += `<optgroup label="${cat.emoji} ${escapeHtml(cat.name)}">`;
+        cat.tasks.forEach(t => {
+            catalogNames.add(normalizeName(t.name));
+            pOpts += `<option value="${escapeHtml(t.name)}">${t.emoji} ${escapeHtml(t.name)}</option>`;
+        });
+        pOpts += '</optgroup>';
     });
+
+    // Tareas personalizadas creadas por el usuario
+    const customProducts = [];
+    jobs.forEach(j => {
+        if (j.product && !catalogNames.has(normalizeName(j.product))) {
+            customProducts.push(j.product);
+        }
+    });
+    if (customProducts.length > 0) {
+        pOpts += '<optgroup label="✏️ Personalizados">';
+        customProducts.sort().forEach(p => {
+            pOpts += `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`;
+        });
+        pOpts += '</optgroup>';
+    }
     productSelect.innerHTML = pOpts;
 
     // Reset step 2
@@ -512,12 +532,7 @@ function prepareStep3() {
         document.getElementById('bossAmountsSection').style.display = '';
         document.getElementById('bossBinsSection').style.display = 'none';
 
-        const unitLabels = {
-            'totens': 'totens', 'capacho_grande': 'capachos grandes',
-            'capacho_pequeno': 'capachos pequeños', 'kilo': 'kilos',
-            'bandeja': 'bandejas'
-        };
-        document.getElementById('bossAmountUnitLabel').textContent = `(${unitLabels[unit] || 'unidades'})`;
+        document.getElementById('bossAmountUnitLabel').textContent = `(${unitQuantityLabels[unit] || 'unidades'})`;
 
         renderBossMemberAmounts();
     }

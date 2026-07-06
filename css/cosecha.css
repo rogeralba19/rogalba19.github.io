@@ -1010,6 +1010,273 @@ body {
 }
 
 /* ==========================================
+   JOB PICKER (acordeón por categorías)
+   ========================================== */
+.job-picker {
+    position: relative;
+}
+
+.job-picker-hidden-select {
+    display: none;
+}
+
+.job-picker-trigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px;
+    background: var(--surface-3);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-sm);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 14px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    text-align: left;
+}
+
+.job-picker-trigger:hover,
+.job-picker-trigger[aria-expanded="true"] {
+    border-color: var(--green);
+}
+
+.job-picker-label {
+    flex: 1;
+    color: var(--text-3);
+}
+
+.job-picker-caret {
+    color: var(--text-3);
+    font-size: 12px;
+    transition: transform 0.2s;
+}
+
+.job-picker-trigger[aria-expanded="true"] .job-picker-caret {
+    transform: rotate(180deg);
+}
+
+.job-picker-panel {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    max-height: 340px;
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-2);
+    z-index: 20;
+    padding: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+}
+
+.job-picker-panel.open {
+    display: block;
+    animation: pickerIn 0.18s ease;
+}
+
+@keyframes pickerIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: none; }
+}
+
+.jp-cat + .jp-cat {
+    margin-top: 2px;
+}
+
+.jp-cat-header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    text-align: left;
+}
+
+.jp-cat-header:hover {
+    border-color: var(--green-line);
+}
+
+.jp-cat.open .jp-cat-header {
+    border-color: var(--green-line);
+    background: var(--green-soft);
+}
+
+.jp-cat-emoji {
+    font-size: 16px;
+}
+
+.jp-cat-name {
+    flex: 1;
+}
+
+.jp-cat-count {
+    font-size: 10px;
+    font-weight: 700;
+    min-width: 20px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: var(--green-soft);
+    color: var(--green);
+    text-align: center;
+}
+
+.jp-cat-caret {
+    font-size: 11px;
+    color: var(--text-3);
+    transition: transform 0.25s;
+}
+
+.jp-cat.open .jp-cat-caret {
+    transform: rotate(180deg);
+}
+
+.jp-cat-body {
+    display: none;
+    padding: 4px 0 6px 10px;
+}
+
+.jp-cat.open .jp-cat-body {
+    display: block;
+    animation: pickerIn 0.18s ease;
+}
+
+.jp-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    margin-top: 2px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    text-align: left;
+}
+
+.jp-item:hover {
+    background: var(--green-soft);
+    border-color: var(--green-line);
+}
+
+.jp-item-emoji {
+    font-size: 16px;
+    width: 22px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.jp-item-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.jp-item-name {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.jp-item-detail {
+    font-size: 11px;
+    color: var(--text-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.jp-item.configured .jp-item-detail {
+    color: var(--green);
+}
+
+.jp-new-badge {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: var(--amber-soft);
+    color: var(--amber);
+    flex-shrink: 0;
+}
+
+.jp-item.jp-custom {
+    color: var(--text-2);
+    border-style: dashed;
+    border-color: var(--border);
+}
+
+.jp-item.jp-custom:hover {
+    border-color: var(--green-line);
+    color: var(--text);
+}
+
+/* ==========================================
+   CATEGORY SEPARATOR (grilla de trabajos)
+   ========================================== */
+.category-separator {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.category-separator:first-child {
+    margin-top: 0;
+}
+
+.category-separator-title {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--text-2);
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    white-space: nowrap;
+}
+
+.category-separator-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--border-strong), transparent);
+}
+
+.category-separator-count {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: var(--green-soft);
+    color: var(--green);
+}
+
+/* ==========================================
    MONTH SEPARATOR
    ========================================== */
 .month-separator {
