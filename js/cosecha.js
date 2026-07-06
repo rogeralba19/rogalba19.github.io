@@ -273,6 +273,12 @@ let totalGeneralTimeout = null;
 let isShowingGeneral = false;
 
 function toggleTotalGeneral() {
+    // Si ya se muestra el total general, el click vuelve a la vista del mes
+    if (isShowingGeneral) {
+        restoreMonthStats();
+        return;
+    }
+
     const cards = document.querySelectorAll('.stat-card');
     const totalEl = document.getElementById('totalEarnings');
     const pendingEl = document.getElementById('pendingAmount');
@@ -329,12 +335,14 @@ function restoreMonthStats() {
     cards.forEach(card => card.classList.add('animating'));
 
     setTimeout(() => {
-        // Restaurar datos del mes
-        updateStats();
-
-        // Restaurar labels
-        document.getElementById('pendingLabel').textContent = 'Pendiente';
-        document.getElementById('daysLabel').textContent = 'Días';
+        // Restaurar datos: selección activa o mes actual
+        if (selectedDays.size > 0 || selectedEntries.size > 0) {
+            updateSelectionStats();
+        } else {
+            updateStats();
+            document.getElementById('pendingLabel').textContent = 'Pendiente';
+            document.getElementById('daysLabel').textContent = 'Días';
+        }
 
         // Quitar clase showing-general
         cards.forEach(card => card.classList.remove('showing-general'));
@@ -348,12 +356,33 @@ function restoreMonthStats() {
     isShowingGeneral = false;
 }
 
+// Salir de la vista "total general" sin animación (al navegar de mes)
+function cancelGeneralView() {
+    if (!isShowingGeneral) return;
+    if (totalGeneralTimeout) {
+        clearTimeout(totalGeneralTimeout);
+        totalGeneralTimeout = null;
+    }
+    isShowingGeneral = false;
+    document.querySelectorAll('.stat-card').forEach(card => {
+        card.classList.remove('showing-general', 'animating');
+    });
+    document.getElementById('pendingLabel').textContent = 'Pendiente';
+    document.getElementById('daysLabel').textContent = 'Días';
+}
+
 // Tab switching - mantener selección al cambiar de pestaña
 function switchTab(tab) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+    });
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     const targetTab = document.querySelector(`.tab[data-tab="${tab}"]`);
-    if (targetTab) targetTab.classList.add('active');
+    if (targetTab) {
+        targetTab.classList.add('active');
+        targetTab.setAttribute('aria-selected', 'true');
+    }
     document.getElementById(tab + 'Section').classList.add('active');
 
     // Si hay días seleccionados y vamos a registros, sincronizar
@@ -718,7 +747,7 @@ function updateJobSelect() {
     let options = '<option value="">Seleccionar trabajo</option>';
 
     jobs.forEach(j => {
-        const jobName = getJobDisplayName(j);
+        const jobName = escapeHtml(getJobDisplayName(j));
         options += `<option value="${j.id}">${jobName}</option>`;
     });
 
@@ -1119,8 +1148,10 @@ async function deleteEntry() {
 // ============================================
 // ACTIVITY CALENDAR (GitHub-style)
 // ============================================
-const AC_PAID_COLOR = '0,255,136';      // green neon
-const AC_PENDING_COLOR = '255,90,30';   // orange-red
+// Colores definidos como variables CSS (--ac-paid-rgb / --ac-pending-rgb)
+// para que el heatmap responda al tema claro/oscuro.
+const AC_PAID_VAR = 'var(--ac-paid-rgb)';
+const AC_PENDING_VAR = 'var(--ac-pending-rgb)';
 const AC_OPACITIES = [0, 0.15, 0.3, 0.45, 0.65, 0.8, 1.0];
 const AC_MONTH_NAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
@@ -1192,8 +1223,8 @@ function renderActivityCalendar() {
 
     const numWeeks = gridData.length;
     const cellSize = 13, gap = 2, weekWidth = cellSize + gap;
-    const curBorder = '1.5px solid rgba(0,170,255,0.55)';
-    const sepBorder = '1px solid rgba(255,255,255,0.13)';
+    const curBorder = '1.5px solid var(--ac-outline)';
+    const sepBorder = '1px solid var(--ac-sep)';
 
     // Helper: get month of neighbor cell
     function neighborMonth(col, row) {
@@ -1242,7 +1273,7 @@ function renderActivityCalendar() {
             // Color: opacity-based on single base color
             if (cell.info) {
                 const lvl = getLevel(cell.info.total);
-                const base = cell.info.allPaid ? AC_PAID_COLOR : AC_PENDING_COLOR;
+                const base = cell.info.allPaid ? AC_PAID_VAR : AC_PENDING_VAR;
                 el.style.background = `rgba(${base},${AC_OPACITIES[lvl]})`;
             }
 
@@ -1305,11 +1336,11 @@ function showAcTooltip(ev, dateStr, info) {
     if (info && info.total > 0) {
         let html = `<span class="ac-tooltip-amount">$${info.total.toFixed(0)}</span>`;
         if (info.pending > 0) html += ` <span class="ac-tooltip-pending">(pend: $${info.pending.toFixed(0)})</span>`;
-        if (info.allPaid) html += ' <span style="color:#00ff88">&#10003;</span>';
+        if (info.allPaid) html += ' <span class="ac-tooltip-paid">&#10003;</span>';
         html += `<div class="ac-tooltip-date">${dateLabel}</div>`;
         tip.innerHTML = html;
     } else {
-        tip.innerHTML = `<span style="color:rgba(255,255,255,0.4)">Sin actividad</span><div class="ac-tooltip-date">${dateLabel}</div>`;
+        tip.innerHTML = `<span class="ac-tooltip-empty">Sin actividad</span><div class="ac-tooltip-date">${dateLabel}</div>`;
     }
 
     tip.classList.add('visible');
@@ -1324,6 +1355,7 @@ function hideAcTooltip() {
 
 function navigateToMonth(year, month) {
     currentDate = new Date(year, month, 1);
+    cancelGeneralView();
     renderCalendar();
     updateStats();
     const container = document.getElementById('monthlyCalendarContainer');
@@ -1617,7 +1649,7 @@ function confirmMarkAsPaid() {
 
     let fruitLines = '';
     Object.keys(byFruit).forEach(fruit => {
-        fruitLines += `<div class="confirm-fruit-line"><span>${fruit}: ${byFruit[fruit].count} reg</span><span>$${byFruit[fruit].total.toFixed(2)}</span></div>`;
+        fruitLines += `<div class="confirm-fruit-line"><span>${escapeHtml(fruit)}: ${byFruit[fruit].count} reg</span><span>$${byFruit[fruit].total.toFixed(2)}</span></div>`;
     });
 
     const messageHtml = `
@@ -1663,6 +1695,7 @@ async function markSelectionAs(paid) {
 
 function changeMonth(delta) {
     currentDate.setMonth(currentDate.getMonth() + delta);
+    cancelGeneralView();
     renderCalendar();
     if (selectedDays.size > 0) {
         updateSelectionStats();
@@ -1682,7 +1715,7 @@ function openDayModal(dateStr, dayEntries) {
 
     const list = document.getElementById('dayEntriesList');
     if (dayEntries.length === 0) {
-        list.innerHTML = '<p style="text-align: center; color: rgba(255,255,255,0.5); padding: 20px;">No hay registros para este día</p>';
+        list.innerHTML = '<p class="modal-empty-text">No hay registros para este día</p>';
     } else {
         list.innerHTML = dayEntries.map(e => {
             const jobData = getEntryJobData(e);
@@ -1925,7 +1958,8 @@ function updateFruitFilter() {
 
     let options = '<option value="">Todas las frutas</option>';
     Array.from(fruitsInEntries).sort().forEach(fruit => {
-        options += `<option value="${fruit}">${fruit}</option>`;
+        const safeFruit = escapeHtml(fruit);
+        options += `<option value="${safeFruit}">${safeFruit}</option>`;
     });
 
     select.innerHTML = options;
@@ -1987,6 +2021,54 @@ async function saveNewFruit() {
     }
     await addCustomFruit(fruitName);
     closeAddFruitModal();
+}
+
+// ============================================
+// THEME (cambiar vista: claro / oscuro)
+// ============================================
+const THEME_KEY = 'cosecha-theme';
+const THEME_META_COLORS = { dark: '#0c110d', light: '#f2f5ee' };
+
+function getSavedTheme() {
+    try {
+        return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark';
+    } catch (e) {
+        return 'dark';
+    }
+}
+
+function applyTheme(theme) {
+    if (theme === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+    }
+
+    const meta = document.getElementById('metaThemeColor');
+    if (meta) meta.setAttribute('content', THEME_META_COLORS[theme] || THEME_META_COLORS.dark);
+
+    updateThemeToggleUI(theme);
+}
+
+function updateThemeToggleUI(theme) {
+    const isLight = theme === 'light';
+    const toggle = document.getElementById('themeToggle');
+    const icon = document.getElementById('themeToggleIcon');
+    const label = document.getElementById('themeToggleLabel');
+    const item = document.getElementById('themeToggleItem');
+    if (toggle) toggle.classList.toggle('active', isLight);
+    if (icon) icon.textContent = isLight ? '🌙' : '☀️';
+    if (label) label.textContent = isLight ? 'Modo oscuro' : 'Modo claro';
+    if (item) item.setAttribute('aria-checked', String(isLight));
+}
+
+function toggleTheme(event) {
+    if (event) event.stopPropagation();
+    const next = getSavedTheme() === 'light' ? 'dark' : 'light';
+    try {
+        localStorage.setItem(THEME_KEY, next);
+    } catch (e) { /* localStorage no disponible */ }
+    applyTheme(next);
 }
 
 // ============================================
@@ -2282,6 +2364,9 @@ function skipWelcomeModal() {
 // INIT
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
+    // Sincronizar UI del toggle de tema con el tema aplicado en <head>
+    applyTheme(getSavedTheme());
+
     renderCalendar();
 
     // Cerrar dropdown de usuario al hacer click fuera
@@ -2295,6 +2380,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Cerrar modales con Escape
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
+            // Primero cerrar el dropdown de usuario si está abierto
+            const dropdown = document.getElementById('userDropdown');
+            if (dropdown && dropdown.classList.contains('visible')) {
+                closeUserDropdown();
+                return;
+            }
             const modals = [
                 { id: 'addFruitModal', close: closeAddFruitModal },
                 { id: 'confirmModal', close: () => closeConfirmModal(false) },
@@ -2304,7 +2395,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 { id: 'workerModal', close: closeWorkerModal },
                 { id: 'squadModal', close: closeSquadModal },
                 { id: 'bossEntryModal', close: typeof closeBossEntryModal === 'function' ? closeBossEntryModal : () => {} },
-                { id: 'bossDayModal', close: typeof closeBossDayModal === 'function' ? closeBossDayModal : () => {} }
+                { id: 'bossDayModal', close: typeof closeBossDayModal === 'function' ? closeBossDayModal : () => {} },
+                { id: 'differenceModal', close: typeof closeDifferenceModal === 'function' ? closeDifferenceModal : () => {} },
+                { id: 'publicLinkModal', close: typeof closePublicLinkModal === 'function' ? closePublicLinkModal : () => {} }
             ];
             for (const modal of modals) {
                 const el = document.getElementById(modal.id);
