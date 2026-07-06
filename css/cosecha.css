@@ -1081,6 +1081,57 @@ body {
     animation: pickerIn 0.18s ease;
 }
 
+/* Buscador integrado */
+.jp-search-wrap {
+    position: sticky;
+    top: -6px;
+    margin: -6px -6px 6px;
+    padding: 8px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    z-index: 2;
+}
+
+.jp-search {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--surface-3);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-sm);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 14px;
+}
+
+.jp-search:focus {
+    outline: none;
+    border-color: var(--green);
+}
+
+.jp-search::placeholder {
+    color: var(--text-3);
+}
+
+.jp-empty {
+    padding: 18px 12px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-3);
+}
+
+/* Etiqueta de categoría en resultados de búsqueda */
+.jp-cat-tag {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-3);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 2px 8px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
 @keyframes pickerIn {
     from { opacity: 0; transform: translateY(-4px); }
     to { opacity: 1; transform: none; }
@@ -1209,8 +1260,25 @@ body {
     text-overflow: ellipsis;
 }
 
+/* Configurado: destacado en negrita con su precio en verde */
+.jp-item.configured .jp-item-name {
+    font-weight: 700;
+}
+
 .jp-item.configured .jp-item-detail {
     color: var(--green);
+    font-weight: 600;
+}
+
+/* Sin configurar y del catálogo: atenuados */
+.jp-item.unconfigured,
+.jp-item.jp-new {
+    opacity: 0.55;
+}
+
+.jp-item.unconfigured:hover,
+.jp-item.jp-new:hover {
+    opacity: 1;
 }
 
 .jp-new-badge {

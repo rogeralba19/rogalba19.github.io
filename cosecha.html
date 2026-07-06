@@ -333,7 +333,12 @@
                             <span class="job-picker-label">Seleccionar trabajo</span>
                             <span class="job-picker-caret">▾</span>
                         </button>
-                        <div class="job-picker-panel" id="jobPickerPanel"></div>
+                        <div class="job-picker-panel" id="jobPickerPanel">
+                            <div class="jp-search-wrap">
+                                <input type="text" id="jpSearchInput" class="jp-search" placeholder="🔎 Buscar trabajo..." oninput="onJobPickerSearch()" autocomplete="off" spellcheck="false">
+                            </div>
+                            <div id="jpListContainer"></div>
+                        </div>
                     </div>
                     <div id="entryJobDisplay" class="job-selected-display" style="display: none;">
                         <span id="entryJobName" class="job-selected-name"></span>
@@ -690,8 +695,8 @@
                 <div class="boss-step" id="bossStep2">
                     <div class="form-group">
                         <label>Producto</label>
-                        <select id="bossProduct">
-                            <option value="">Seleccionar fruta</option>
+                        <select id="bossProduct" onchange="onBossProductChange()">
+                            <option value="">Seleccionar producto o tarea</option>
                         </select>
                     </div>
                     <div class="form-group">

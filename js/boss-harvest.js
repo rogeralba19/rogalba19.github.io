@@ -355,8 +355,8 @@ function openBossEntryModal() {
     }
     productSelect.innerHTML = pOpts;
 
-    // Reset step 2
-    document.getElementById('bossUnit').value = 'totens';
+    // Reset step 2 (unidades según categoría del producto)
+    populateUnitSelect('bossUnit', 'cosecha', 'totens');
     document.getElementById('bossPrice').value = '';
     document.getElementById('bossEmployer').value = '';
 
@@ -372,6 +372,15 @@ function openBossEntryModal() {
 
 function closeBossEntryModal() {
     closeModal('bossEntryModal');
+}
+
+// Al cambiar el producto, ajustar las unidades disponibles a su categoría
+function onBossProductChange() {
+    const product = document.getElementById('bossProduct').value;
+    if (!product) return;
+    const catId = inferJobCategory({ product });
+    const cat = getCategoryById(catId);
+    populateUnitSelect('bossUnit', catId, (cat && cat.defaultUnit) || null);
 }
 
 function updateBossStepUI() {
