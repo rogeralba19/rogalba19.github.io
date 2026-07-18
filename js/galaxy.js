@@ -462,130 +462,71 @@ import * as THREE from './vendor/three.module.min.js';
     // ============================================
     // GEOMETRÍA GPU
     // ============================================
-    const nodeGeo = new THREE.BufferGeometry();
-    const nPos = new Float32Array(MAXN * 3);
-    const nSize = new Float32Array(MAXN);
-    const nSeed = new Float32Array(MAXN);
-    const nGlow = new Float32Array(MAXN);
-    const nDim = new Float32Array(MAXN);
-    const nBirth = new Float32Array(MAXN);
-    const nSun = new Float32Array(MAXN);
-    nodeGeo.setAttribute('position', new THREE.BufferAttribute(nPos, 3).setUsage(THREE.DynamicDrawUsage));
-    nodeGeo.setAttribute('aSize', new THREE.BufferAttribute(nSize, 1).setUsage(THREE.DynamicDrawUsage));
-    nodeGeo.setAttribute('aSeed', new THREE.BufferAttribute(nSeed, 1).setUsage(THREE.DynamicDrawUsage));
-    nodeGeo.setAttribute('aGlow', new THREE.BufferAttribute(nGlow, 1).setUsage(THREE.DynamicDrawUsage));
-    nodeGeo.setAttribute('aDim', new THREE.BufferAttribute(nDim, 1).setUsage(THREE.DynamicDrawUsage));
-    nodeGeo.setAttribute('aBirth', new THREE.BufferAttribute(nBirth, 1).setUsage(THREE.DynamicDrawUsage));
-    nodeGeo.setAttribute('aSun', new THREE.BufferAttribute(nSun, 1).setUsage(THREE.DynamicDrawUsage));
-
-    const nodeMat = new THREE.ShaderMaterial({
-        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-        uniforms: {
-            uTime: { value: 0 }, uPix: { value: 1 },
-            uFogNear: { value: 30 }, uFogFar: { value: 120 }
-        },
-        vertexShader: `
-            attribute float aSize;
-            attribute float aSeed;
-            attribute float aGlow;
-            attribute float aDim;
-            attribute float aBirth;
-            attribute float aSun;
-            uniform float uTime;
-            uniform float uPix;
-            uniform float uFogNear;
-            uniform float uFogFar;
-            varying float vGlow;
-            varying float vDim;
-            varying float vBirth;
-            varying float vSun;
-            varying float vSeed;
-            varying float vFog;
-            void main() {
-                vec3 p = position;
-                float g = 1.0 - aBirth;
-                if (g > 0.002) {
-                    // glitch de digitalización mientras se materializa / desvanece
-                    float n1 = fract(sin(dot(p.xy, vec2(12.9898, 78.233)) + floor(uTime * 30.0)) * 43758.5453);
-                    p += (vec3(n1, fract(n1 * 7.31), fract(n1 * 3.17)) - 0.5) * g * 1.6;
-                }
-                vec4 mv = modelViewMatrix * vec4(p, 1.0);
-                float dist = max(-mv.z, 1.0);
-                float breathe = 1.0 + 0.06 * sin(uTime * 1.4 + aSeed * 6.283);
-                // niebla de profundidad: gradiente continuo cerca -> lejos
-                vFog = clamp((uFogFar - dist) / max(uFogFar - uFogNear, 1.0), 0.0, 1.0);
-                gl_PointSize = aSize * breathe * uPix * (500.0 / dist) * (0.6 + 0.4 * aBirth) * (0.75 + 0.45 * vFog);
-                gl_Position = projectionMatrix * mv;
-                vGlow = aGlow; vDim = aDim; vBirth = aBirth; vSun = aSun; vSeed = aSeed;
-            }`,
-        fragmentShader: `
-            precision highp float;
-            uniform float uTime;
-            varying float vGlow;
-            varying float vDim;
-            varying float vBirth;
-            varying float vSun;
-            varying float vSeed;
-            varying float vFog;
-            void main() {
-                vec2 c = gl_PointCoord - 0.5;
-                float d = length(c);
-                if (d > 0.5) discard;
-                float core = 1.0 - smoothstep(0.0, 0.17, d);
-                float halo = 1.0 - smoothstep(0.05, 0.5, d);
-                vec3 cyan  = vec3(0.05, 0.62, 1.0);   // #00aaff holográfico
-                vec3 green = vec3(0.0, 1.0, 0.533);   // #00ff88
-                vec3 base = mix(cyan, green, vSun * 0.8);
-                float flick = 1.0;
-                if (vBirth < 1.0) {
-                    flick = 0.35 + 0.65 * step(0.3, fract(sin(floor(uTime * 24.0) + vSeed * 99.0) * 437.585));
-                }
-                float energy = 1.0 + vSun * 0.5 + vGlow * 1.5;
-                vec3 col = base * (core * 2.6 + halo * 1.05) * energy;
-                col += vec3(1.0) * core * vGlow * 0.7;
-                // lo cercano brilla; lo lejano se hunde en la niebla
-                float fogFade = 0.14 + 0.86 * vFog;
-                col *= 0.5 + 0.5 * vFog;
-                float alpha = (core + halo * 0.65) * vDim * vBirth * flick * fogFade;
-                gl_FragColor = vec4(col * flick, alpha);
-            }`
+    // Poliedros holográficos: UNA geometría compartida (icosaedro wireframe)
+    // instanciada para todos los nodos — geometría real en cámara de
+    // perspectiva, así el tamaño aparente escala solo con la distancia.
+    const nodeShape = new THREE.IcosahedronGeometry(1, 0);
+    const nodeMat = new THREE.MeshBasicMaterial({
+        wireframe: true, transparent: true,
+        blending: THREE.AdditiveBlending, depthWrite: false
     });
-    const nodePoints = new THREE.Points(nodeGeo, nodeMat);
-    nodePoints.frustumCulled = false;
-    scene.add(nodePoints);
+    const nodeMesh = new THREE.InstancedMesh(nodeShape, nodeMat, MAXN);
+    nodeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    nodeMesh.frustumCulled = false;
+    const _colInit = new THREE.Color();
+    for (let i = 0; i < MAXN; i++) nodeMesh.setColorAt(i, _colInit);
+    scene.add(nodeMesh);
+    const _dummy = new THREE.Object3D();
+    const _col = new THREE.Color();
+    const COL_CYAN = new THREE.Color(0.05, 0.62, 1.0);   // #00aaff holográfico
+    const COL_GREEN = new THREE.Color(0.0, 1.0, 0.533);  // #00ff88
 
-    const edgeGeo = new THREE.BufferGeometry();
-    const ePos = new Float32Array(MAXE * 6);
-    const eT = new Float32Array(MAXE * 2);
-    const eProg = new Float32Array(MAXE * 2);
-    const eGlow = new Float32Array(MAXE * 2);
-    const eDim = new Float32Array(MAXE * 2);
-    const ePulse = new Float32Array(MAXE * 2);
-    const ePStr = new Float32Array(MAXE * 2);
-    edgeGeo.setAttribute('position', new THREE.BufferAttribute(ePos, 3).setUsage(THREE.DynamicDrawUsage));
-    edgeGeo.setAttribute('aT', new THREE.BufferAttribute(eT, 1).setUsage(THREE.DynamicDrawUsage));
-    edgeGeo.setAttribute('aProg', new THREE.BufferAttribute(eProg, 1).setUsage(THREE.DynamicDrawUsage));
-    edgeGeo.setAttribute('aGlow', new THREE.BufferAttribute(eGlow, 1).setUsage(THREE.DynamicDrawUsage));
-    edgeGeo.setAttribute('aDim', new THREE.BufferAttribute(eDim, 1).setUsage(THREE.DynamicDrawUsage));
-    edgeGeo.setAttribute('aPulse', new THREE.BufferAttribute(ePulse, 1).setUsage(THREE.DynamicDrawUsage));
-    edgeGeo.setAttribute('aPStr', new THREE.BufferAttribute(ePStr, 1).setUsage(THREE.DynamicDrawUsage));
+    // Aristas con grosor real en perspectiva. El linewidth clásico de WebGL
+    // no funciona multiplataforma, así que cada arista es una cinta (quad
+    // instanciado) extruida en clip space con anchura en unidades de mundo:
+    // al dividir por w, una arista cercana queda claramente más gruesa.
+    const edgeGeo = new THREE.InstancedBufferGeometry();
+    edgeGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+        0, -1, 0, 1, -1, 0, 0, 1, 0, 1, 1, 0
+    ]), 3));
+    edgeGeo.setIndex([0, 1, 2, 2, 1, 3]);
+    const eStart = new THREE.InstancedBufferAttribute(new Float32Array(MAXE * 3), 3).setUsage(THREE.DynamicDrawUsage);
+    const eEnd = new THREE.InstancedBufferAttribute(new Float32Array(MAXE * 3), 3).setUsage(THREE.DynamicDrawUsage);
+    const eProg = new THREE.InstancedBufferAttribute(new Float32Array(MAXE), 1).setUsage(THREE.DynamicDrawUsage);
+    const eGlow = new THREE.InstancedBufferAttribute(new Float32Array(MAXE), 1).setUsage(THREE.DynamicDrawUsage);
+    const eDim = new THREE.InstancedBufferAttribute(new Float32Array(MAXE), 1).setUsage(THREE.DynamicDrawUsage);
+    const ePulse = new THREE.InstancedBufferAttribute(new Float32Array(MAXE), 1).setUsage(THREE.DynamicDrawUsage);
+    const ePStr = new THREE.InstancedBufferAttribute(new Float32Array(MAXE), 1).setUsage(THREE.DynamicDrawUsage);
+    edgeGeo.setAttribute('iStart', eStart);
+    edgeGeo.setAttribute('iEnd', eEnd);
+    edgeGeo.setAttribute('iProg', eProg);
+    edgeGeo.setAttribute('iGlow', eGlow);
+    edgeGeo.setAttribute('iDim', eDim);
+    edgeGeo.setAttribute('iPulse', ePulse);
+    edgeGeo.setAttribute('iPStr', ePStr);
 
     const edgeMat = new THREE.ShaderMaterial({
         transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
         uniforms: {
-            uTime: { value: 0 },
-            uFogNear: { value: 30 }, uFogFar: { value: 120 }
+            uFogNear: { value: 30 }, uFogFar: { value: 120 },
+            uAspect: { value: 1 }, uP11: { value: 1 }, uWidth: { value: 0.12 }
         },
         vertexShader: `
-            attribute float aT;
-            attribute float aProg;
-            attribute float aGlow;
-            attribute float aDim;
-            attribute float aPulse;
-            attribute float aPStr;
+            attribute vec3 iStart;
+            attribute vec3 iEnd;
+            attribute float iProg;
+            attribute float iGlow;
+            attribute float iDim;
+            attribute float iPulse;
+            attribute float iPStr;
             uniform float uFogNear;
             uniform float uFogFar;
+            uniform float uAspect;
+            uniform float uP11;
+            uniform float uWidth;
             varying float vT;
+            varying float vSide;
             varying float vProg;
             varying float vGlow;
             varying float vDim;
@@ -593,15 +534,32 @@ import * as THREE from './vendor/three.module.min.js';
             varying float vPStr;
             varying float vFog;
             void main() {
-                vec4 mv = modelViewMatrix * vec4(position, 1.0);
-                float dist = max(-mv.z, 1.0);
+                vec4 v0 = viewMatrix * vec4(iStart, 1.0);
+                vec4 v1 = viewMatrix * vec4(iEnd, 1.0);
+                vec4 vp = mix(v0, v1, position.x);
+                float dist = max(-vp.z, 1.0);
                 vFog = clamp((uFogFar - dist) / max(uFogFar - uFogNear, 1.0), 0.0, 1.0);
-                gl_Position = projectionMatrix * mv;
-                vT = aT; vProg = aProg; vGlow = aGlow; vDim = aDim; vPulse = aPulse; vPStr = aPStr;
+                vec4 c0 = projectionMatrix * v0;
+                vec4 c1 = projectionMatrix * v1;
+                vec2 s0 = c0.xy / max(abs(c0.w), 0.001);
+                vec2 s1 = c1.xy / max(abs(c1.w), 0.001);
+                vec2 dir = (s1 - s0) * vec2(uAspect, 1.0);
+                float len = length(dir);
+                dir = len > 0.0001 ? dir / len : vec2(1.0, 0.0);
+                vec2 nrm = vec2(-dir.y, dir.x);
+                vec4 c = projectionMatrix * vp;
+                float w = uWidth * (1.0 + iGlow * 0.9 + iPStr * 0.5);
+                vec2 off = nrm * (w * uP11) * position.y;
+                off.x /= uAspect;
+                c.xy += off; // sin multiplicar por w: el grosor cae con la distancia
+                gl_Position = c;
+                vT = position.x; vSide = position.y;
+                vProg = iProg; vGlow = iGlow; vDim = iDim; vPulse = iPulse; vPStr = iPStr;
             }`,
         fragmentShader: `
             precision highp float;
             varying float vT;
+            varying float vSide;
             varying float vProg;
             varying float vGlow;
             varying float vDim;
@@ -610,6 +568,8 @@ import * as THREE from './vendor/three.module.min.js';
             varying float vFog;
             void main() {
                 if (vT > vProg) discard;  // trazado progresivo
+                float across = 1.0 - abs(vSide);
+                float shape = across * across; // perfil suave de la cinta
                 float pulse = 0.0;
                 if (vPulse >= 0.0) {
                     pulse = exp(-pow((vT - vPulse) * 9.0, 2.0)) * vPStr;
@@ -617,18 +577,18 @@ import * as THREE from './vendor/three.module.min.js';
                 // punta brillante mientras la arista se está trazando
                 float tip = (vProg < 0.999) ? exp(-pow((vT - vProg) * 26.0, 2.0)) * 0.9 : 0.0;
                 // glow tenue permanente: la trama de la red siempre se insinúa
-                float base = 0.26 + vGlow * 0.4;
+                float base = 0.3 + vGlow * 0.4;
                 vec3 cold = vec3(0.0, 0.55, 1.0);
                 vec3 hot  = vec3(0.45, 1.0, 0.85);
                 vec3 col = mix(cold, hot, clamp(pulse + tip + vGlow * 0.35, 0.0, 1.0));
-                float fogFade = 0.1 + 0.9 * vFog;
-                float a = (base + pulse * 1.5 + tip) * vDim * fogFade;
-                gl_FragColor = vec4(col * (0.9 + (pulse + tip) * 1.8 + vGlow * 0.5) * (0.55 + 0.45 * vFog), a);
+                float fogFade = 0.08 + 0.92 * vFog;
+                float a = (base + pulse * 1.5 + tip) * vDim * fogFade * shape * 1.5;
+                gl_FragColor = vec4(col * (1.15 + (pulse + tip) * 1.8 + vGlow * 0.5) * (0.55 + 0.45 * vFog), a);
             }`
     });
-    const edgeLines = new THREE.LineSegments(edgeGeo, edgeMat);
-    edgeLines.frustumCulled = false;
-    scene.add(edgeLines);
+    const edgeMesh = new THREE.Mesh(edgeGeo, edgeMat);
+    edgeMesh.frustumCulled = false;
+    scene.add(edgeMesh);
 
     // Estrellas de fondo — profundidad de galaxia, estáticas y baratas
     const starGeo = new THREE.BufferGeometry();
@@ -676,7 +636,7 @@ import * as THREE from './vendor/three.module.min.js';
             const far = n.isSun ? farSun : farSat;
             let a = 1 - THREE.MathUtils.smoothstep(s.dist, near, far);
             const depth = THREE.MathUtils.clamp((fogFar - s.dist) / Math.max(fogFar - fogNear, 1), 0, 1);
-            a *= 0.3 + 0.7 * depth; // etiqueta lejana más desvanecida (continuo)
+            a *= 0.22 + 0.78 * depth; // etiqueta lejana más desvanecida (continuo)
             const focused = inFocus && inFocus.has(n);
             if (inFocus) a = focused ? Math.max(a, 0.95) : a * (1 - focusAmt * 0.55);
             a *= Math.min(1, (n.birth - 0.55) / 0.45) * n.dim;
@@ -691,22 +651,27 @@ import * as THREE from './vendor/three.module.min.js';
         for (let i = 0; i < cands.length && drawn < maxLabels; i++) {
             const { s, a, depth } = cands[i];
             const n = s.n;
-            let x = s.x, y = s.y - 8;
-            const w = n.label.length * (n.isSun ? 7.3 : 6.1) + 6;
+            // escala de perspectiva real: la fuente crece/encoge con 1/distancia
+            // (clamp 0.5..2.1 → relación ~x4 entre lo más cercano y lo más lejano)
+            const persp = THREE.MathUtils.clamp(camR / s.dist, 0.5, 2.1);
+            const fs = Math.max(7, Math.round((n.isSun ? 11 : 9) * persp));
+            // etiqueta por encima del poliedro: radio proyectado en píxeles
+            const rPx = (n.rScale || 0.6) * camera.projectionMatrix.elements[5] * height / (2 * s.dist);
+            let x = s.x, y = s.y - rPx - 4;
+            const w = n.label.length * fs * 0.63 + 6;
             x = Math.max(w * 0.5 + 4, Math.min(width - w * 0.5 - 4, x));
+            if (y < 30) y = s.y + rPx + 4 + fs; // no invadir el HUD: debajo del nodo
             let clash = false;
             for (const b of boxes) {
-                if (Math.abs(x - b.x) < (w + b.w) * 0.5 && Math.abs(y - b.y) < 13) { clash = true; break; }
+                if (Math.abs(x - b.x) < (w + b.w) * 0.5 && Math.abs(y - b.y) < (fs + b.h) * 0.6 + 3) { clash = true; break; }
             }
             if (clash) continue;
-            boxes.push({ x, y, w });
+            boxes.push({ x, y, w, h: fs });
             drawn++;
             if (n.birth < 1) { // micro-glitch de la etiqueta al nacer
                 x += (Math.random() - 0.5) * 5;
                 if (Math.random() < 0.25) continue;
             }
-            // lo cercano se lee más grande y nítido
-            const fs = Math.round((n.isSun ? 12 : 10) * (0.8 + 0.4 * depth));
             if (n.isSun) {
                 ctx.font = `bold ${fs}px "Courier New", monospace`;
                 ctx.fillStyle = `rgba(0, 255, 136, ${(0.85 * a).toFixed(3)})`;
@@ -816,26 +781,34 @@ import * as THREE from './vendor/three.module.min.js';
     let camAngle = 0.6;
     let camR = 68;
     let fogNear = 30, fogFar = 120;
-    let camSpin = null; // giro suave para traer el nodo seleccionado al frente
+    let camSpin = null;   // giro suave para traer el nodo seleccionado al frente
+    let hoverLock = null; // tras el giro, exige mover el puntero para re-armar hover
 
     function updateCamera(dt) {
         const spread = R * Math.max(anchorScale.x, anchorScale.y) + 14;
-        const targetR = portrait ? spread * 1.7 : spread * 1.35;
+        // cámara cerca del volumen: la relación de distancias nodo cercano /
+        // lejano supera x4, que es lo que hace legible la perspectiva
+        const targetR = portrait ? spread * 1.5 : spread * 1.15;
         camR += (targetR - camR) * Math.min(1, dt * 1.2);
 
         // niebla de profundidad centrada en el volumen de la galaxia
-        fogNear = Math.max(6, camR - spread * 0.6);
-        fogFar = camR + spread * 1.05;
-        nodeMat.uniforms.uFogNear.value = fogNear;
-        nodeMat.uniforms.uFogFar.value = fogFar;
+        fogNear = Math.max(5, camR - spread * 0.8);
+        fogFar = camR + spread * 0.85;
         edgeMat.uniforms.uFogNear.value = fogNear;
         edgeMat.uniforms.uFogFar.value = fogFar;
+        edgeMat.uniforms.uAspect.value = aspect;
+        edgeMat.uniforms.uP11.value = camera.projectionMatrix.elements[5];
 
         if (camSpin) {
             const u = Math.min(1, (time - camSpin.t0) / camSpin.dur);
             const e = u * u * (3 - 2 * u); // easing suave
             camAngle = camSpin.from + (camSpin.to - camSpin.from) * e;
-            if (u >= 1) camSpin = null;
+            if (u >= 1) {
+                camSpin = null;
+                // el hover queda bloqueado hasta que el puntero se mueva unos
+                // píxeles: un nodo bajo el cursor estático no se auto-selecciona
+                hoverLock = { x: mouse.x, y: mouse.y };
+            }
         } else {
             const orbit = booted ? (hoverNode ? 0 : 0.032) : 0.008;
             camAngle += dt * orbit;
@@ -914,6 +887,14 @@ import * as THREE from './vendor/three.module.min.js';
     }
 
     function pickHover() {
+        // BUG rotación infinita: sin detección de hover mientras la cámara gira;
+        // el nodo ya seleccionado mantiene su estado activo durante el viaje
+        if (camSpin) return;
+        if (hoverLock) {
+            const dx = mouse.x - hoverLock.x, dy = mouse.y - hoverLock.y;
+            if (dx * dx + dy * dy < 81) return; // umbral ~9 px
+            hoverLock = null;
+        }
         if (!mouse.active || mouse.x < 0) { hoverNode = null; return; }
         let best = null, bestD = (isMobile ? 34 : 26);
         for (const s of screenPos) {
@@ -1005,37 +986,57 @@ import * as THREE from './vendor/three.module.min.js';
         const n = nodes.length;
         for (let i = 0; i < n; i++) {
             const nd = nodes[i];
-            nPos[i * 3] = nd.pos.x; nPos[i * 3 + 1] = nd.pos.y; nPos[i * 3 + 2] = nd.pos.z;
-            nSize[i] = nd.size * (1 + Math.min(degree(nd), 10) * 0.02);
-            nSeed[i] = nd.seed;
-            nGlow[i] = nd.glow;
-            nDim[i] = nd.dim;
-            nBirth[i] = nd.bornVisible ? Math.max(0, nd.birth) : 0;
-            nSun[i] = nd.isSun ? 1 : 0;
+            const birth = nd.bornVisible ? Math.max(0, nd.birth) : 0;
+            const g = 1 - birth;
+            let jx = 0, jy = 0, jz = 0, flick = 1;
+            if (g > 0.002) {
+                // glitch de digitalización al nacer / morir
+                jx = (Math.random() - 0.5) * 1.6 * g;
+                jy = (Math.random() - 0.5) * 1.6 * g;
+                jz = (Math.random() - 0.5) * 1.6 * g;
+                flick = Math.random() < 0.72 ? 1 : 0.25;
+            }
+            _dummy.position.set(nd.pos.x + jx, nd.pos.y + jy, nd.pos.z + jz);
+            // rotación lenta propia, desincronizada entre nodos
+            const sp = 0.22 + nd.seed * 0.34;
+            _dummy.rotation.set(time * sp, time * sp * 0.71 + nd.seed * 6.283, time * 0.13 * (nd.seed - 0.5));
+            const scl = Math.max(0.001,
+                nd.size * 0.58 * (1 + Math.min(degree(nd), 10) * 0.02) * (0.5 + 0.5 * birth));
+            nd.rScale = scl; // radio en mundo, para colocar la etiqueta encima
+            _dummy.scale.setScalar(scl);
+            _dummy.updateMatrix();
+            nodeMesh.setMatrixAt(i, _dummy.matrix);
+
+            // brillo: jerarquía + pulso + niebla de profundidad (continua)
+            const dist = camera.position.distanceTo(nd.pos);
+            const fog = THREE.MathUtils.clamp((fogFar - dist) / Math.max(fogFar - fogNear, 1), 0, 1);
+            const inten = (0.5 + (nd.isSun ? 0.55 : 0) + nd.glow * 1.2) *
+                nd.dim * birth * (0.12 + 0.88 * fog) * flick;
+            _col.copy(nd.isSun ? COL_GREEN : COL_CYAN).multiplyScalar(inten);
+            const lift = nd.glow * 0.3 * nd.dim * birth;
+            _col.r += lift; _col.g += lift; _col.b += lift;
+            nodeMesh.setColorAt(i, _col);
         }
-        nodeGeo.setDrawRange(0, n);
-        for (const key of ['position', 'aSize', 'aSeed', 'aGlow', 'aDim', 'aBirth', 'aSun']) {
-            nodeGeo.attributes[key].needsUpdate = true;
-        }
+        nodeMesh.count = n;
+        nodeMesh.instanceMatrix.needsUpdate = true;
+        if (nodeMesh.instanceColor) nodeMesh.instanceColor.needsUpdate = true;
 
         const m = edges.length;
         for (let i = 0; i < m; i++) {
             const e = edges[i];
-            const i6 = i * 6, i2 = i * 2;
-            ePos[i6] = e.a.pos.x; ePos[i6 + 1] = e.a.pos.y; ePos[i6 + 2] = e.a.pos.z;
-            ePos[i6 + 3] = e.b.pos.x; ePos[i6 + 4] = e.b.pos.y; ePos[i6 + 5] = e.b.pos.z;
-            eT[i2] = 0; eT[i2 + 1] = 1;
-            eProg[i2] = eProg[i2 + 1] = e.progress;
-            eGlow[i2] = eGlow[i2 + 1] = e.glow;
-            const dimA = e.dim * Math.max(0, e.a.birth) * Math.max(0, e.b.birth);
-            eDim[i2] = eDim[i2 + 1] = dimA;
-            ePulse[i2] = ePulse[i2 + 1] = e.pulsePos;
-            ePStr[i2] = ePStr[i2 + 1] = e.pulseStr;
+            const i3 = i * 3;
+            eStart.array[i3] = e.a.pos.x; eStart.array[i3 + 1] = e.a.pos.y; eStart.array[i3 + 2] = e.a.pos.z;
+            eEnd.array[i3] = e.b.pos.x; eEnd.array[i3 + 1] = e.b.pos.y; eEnd.array[i3 + 2] = e.b.pos.z;
+            eProg.array[i] = e.progress;
+            eGlow.array[i] = e.glow;
+            eDim.array[i] = e.dim * Math.max(0, e.a.birth) * Math.max(0, e.b.birth);
+            ePulse.array[i] = e.pulsePos;
+            ePStr.array[i] = e.pulseStr;
         }
-        edgeGeo.setDrawRange(0, m * 2);
-        for (const key of ['position', 'aT', 'aProg', 'aGlow', 'aDim', 'aPulse', 'aPStr']) {
-            edgeGeo.attributes[key].needsUpdate = true;
-        }
+        edgeGeo.instanceCount = m;
+        eStart.needsUpdate = true; eEnd.needsUpdate = true;
+        eProg.needsUpdate = true; eGlow.needsUpdate = true;
+        eDim.needsUpdate = true; ePulse.needsUpdate = true; ePStr.needsUpdate = true;
     }
 
     // ============================================
@@ -1076,7 +1077,6 @@ import * as THREE from './vendor/three.module.min.js';
         overlayCanvas.height = height;
         camera.aspect = aspect;
         camera.updateProjectionMatrix();
-        nodeMat.uniforms.uPix.value = pixelRatio * Math.min(1, height / 900) + 0.45;
         // La galaxia se acomoda a la orientación: ancha en horizontal, alta en vertical
         if (portrait) anchorTarget.set(0.62, 1.28, 0.9);
         else anchorTarget.set(1.22, 0.78, 1);
@@ -1091,7 +1091,7 @@ import * as THREE from './vendor/three.module.min.js';
         mouse.ny = -((e.clientY / height) * 2 - 1);
         mouse.active = true;
     });
-    window.addEventListener('mouseleave', () => { mouse.active = false; hoverNode = null; });
+    window.addEventListener('mouseleave', () => { mouse.active = false; hoverNode = null; hoverLock = null; });
     window.addEventListener('touchmove', (e) => {
         if (e.touches.length) {
             mouse.x = e.touches[0].clientX; mouse.y = e.touches[0].clientY;
@@ -1100,7 +1100,7 @@ import * as THREE from './vendor/three.module.min.js';
             mouse.active = true;
         }
     }, { passive: true });
-    window.addEventListener('touchend', () => { mouse.active = false; hoverNode = null; });
+    window.addEventListener('touchend', () => { mouse.active = false; hoverNode = null; hoverLock = null; });
 
     // Click / tap: dispara un pensamiento en el nodo más cercano
     window.addEventListener('pointerdown', (e) => {
@@ -1155,7 +1155,6 @@ import * as THREE from './vendor/three.module.min.js';
         updatePulses(dt);
         maintenanceSweep(dt);
 
-        nodeMat.uniforms.uTime.value = time;
         writeBuffers();
         renderer.render(scene, camera);
 
