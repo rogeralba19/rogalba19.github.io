@@ -639,9 +639,9 @@ import * as THREE from './vendor/three.module.min.js';
                 vec3 cold = vec3(0.0, 0.55, 1.0);
                 vec3 hot  = vec3(0.45, 1.0, 0.85);
                 vec3 col = mix(cold, hot, clamp(pulse + tip + vGlow * 0.35, 0.0, 1.0));
-                float fogFade = 0.08 + 0.92 * vFog;
+                float fogFade = 0.5 + 0.5 * vFog; // se funde al fondo, mínimo ~50%
                 float a = (base + pulse * 1.5 + tip) * vDim * fogFade * shape * 1.5;
-                gl_FragColor = vec4(col * (1.15 + (pulse + tip) * 1.8 + vGlow * 0.5) * (0.55 + 0.45 * vFog), a);
+                gl_FragColor = vec4(col * (1.15 + (pulse + tip) * 1.8 + vGlow * 0.5) * (0.6 + 0.4 * vFog), a);
             }`
     });
     const edgeMesh = new THREE.Mesh(edgeGeo, edgeMat);
@@ -812,7 +812,7 @@ import * as THREE from './vendor/three.module.min.js';
             const far = n.isSun ? farSun : farSat;
             let a = 1 - THREE.MathUtils.smoothstep(s.dist, near, far);
             const depth = THREE.MathUtils.clamp((fogFar - s.dist) / Math.max(fogFar - fogNear, 1), 0, 1);
-            a *= 0.22 + 0.78 * depth; // etiqueta lejana más desvanecida (continuo)
+            a *= 0.5 + 0.5 * depth; // etiqueta lejana desvanecida (continuo, mín ~50%)
             const focused = inFocus && inFocus.has(n);
             if (inFocus) a = focused ? Math.max(a, 0.95) : a * (1 - focusAmt * 0.55);
             a *= Math.min(1, (n.birth - 0.55) / 0.45) * n.dim;
@@ -962,14 +962,15 @@ import * as THREE from './vendor/three.module.min.js';
 
     function updateCamera(dt) {
         const spread = R * Math.max(anchorScale.x, anchorScale.y) + 14;
-        // cámara cerca del volumen: la relación de distancias nodo cercano /
-        // lejano supera x4, que es lo que hace legible la perspectiva
-        const targetR = portrait ? spread * 1.5 : spread * 1.15;
+        // cámara pegada al volumen estirado en z: el nodo más cercano queda a
+        // ~1/3 de la distancia del más lejano y la perspectiva hace el resto —
+        // nodos grandes casi en primer plano, pequeños fundiéndose al fondo
+        const targetR = portrait ? spread * 1.42 : spread * 1.06;
         camR += (targetR - camR) * Math.min(1, dt * 1.2);
 
         // niebla de profundidad centrada en el volumen de la galaxia
-        fogNear = Math.max(5, camR - spread * 0.8);
-        fogFar = camR + spread * 0.85;
+        fogNear = Math.max(5, camR - spread * 0.85);
+        fogFar = camR + spread * 0.9;
         edgeMat.uniforms.uFogNear.value = fogNear;
         edgeMat.uniforms.uFogFar.value = fogFar;
         edgeMat.uniforms.uAspect.value = aspect;
@@ -1186,8 +1187,9 @@ import * as THREE from './vendor/three.module.min.js';
             // brillo: jerarquía + pulso + niebla de profundidad (continua)
             const dist = camera.position.distanceTo(nd.pos);
             const fog = THREE.MathUtils.clamp((fogFar - dist) / Math.max(fogFar - fogNear, 1), 0, 1);
+            // lo lejano pierde contraste pero nunca baja del ~50%
             const inten = (0.5 + (nd.isSun ? 0.55 : 0) + nd.glow * 1.2) *
-                nd.dim * birth * (0.12 + 0.88 * fog) * flick;
+                nd.dim * birth * (0.5 + 0.5 * fog) * flick;
             _col.copy(nd.isSun ? COL_GREEN : COL_CYAN).multiplyScalar(inten);
             const lift = nd.glow * 0.3 * nd.dim * birth;
             _col.r += lift; _col.g += lift; _col.b += lift;
@@ -1257,9 +1259,10 @@ import * as THREE from './vendor/three.module.min.js';
         overlayCanvas.height = height;
         camera.aspect = aspect;
         camera.updateProjectionMatrix();
-        // La galaxia se acomoda a la orientación: ancha en horizontal, alta en vertical
-        if (portrait) anchorTarget.set(0.62, 1.28, 0.9);
-        else anchorTarget.set(1.22, 0.78, 1);
+        // La galaxia se acomoda a la orientación: ancha en horizontal, alta en
+        // vertical — y SIEMPRE estirada en profundidad hacia la cámara
+        if (portrait) anchorTarget.set(0.66, 1.2, 1.1);
+        else anchorTarget.set(1.15, 0.78, 1.18);
     }
 
     window.addEventListener('resize', resize);
