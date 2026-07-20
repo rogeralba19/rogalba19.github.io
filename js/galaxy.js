@@ -1102,12 +1102,12 @@ import * as THREE from './vendor/three.module.min.js';
         if (best !== hoverNode) {
             hoverNode = best;
             hoverBeat = time; // primer latido inmediato
-            if (best) bringToFront(best);
+            // el hover SOLO ilumina: jamás mueve la cámara ni rota el grafo
         }
     }
 
-    // Si el nodo seleccionado está en la parte trasera, gira la cámara
-    // hasta traerlo al frente. Al soltar, la cámara se queda donde quedó.
+    // SOLO con click: si el nodo está en la parte trasera, gira la cámara
+    // hasta traerlo al frente. Al terminar, la cámara se queda donde quedó.
     function bringToFront(n) {
         const na = Math.atan2(n.pos.x, n.pos.z);
         let delta = na - ((camAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
@@ -1316,7 +1316,15 @@ import * as THREE from './vendor/three.module.min.js';
             const d = Math.sqrt(dx * dx + dy * dy);
             if (d < bestD) { bestD = d; best = s.n; }
         }
-        if (best) { emitFrom(best, 2, 1.1, 3); thoughtLabel = best.label; }
+        if (best) {
+            emitFrom(best, 2, 1.1, 3);
+            thoughtLabel = best.label;
+            // click = seleccionar: se ilumina, mantiene su estado durante el
+            // viaje, y si está atrás la cámara gira para traerlo al frente
+            hoverNode = best;
+            hoverBeat = time + 1.2;
+            bringToFront(best);
+        }
     });
 
     // Giroscopio (parallax móvil); iOS pedirá permiso solo si el SO lo permite sin gesto
