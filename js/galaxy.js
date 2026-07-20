@@ -800,14 +800,16 @@ import * as THREE from './vendor/three.module.min.js';
         }
     }
 
-    function drawLabels(camR) {
+    function drawLabels(camR, dt) {
         const inFocus = hoverSet();
         const nearSat = camR * 0.8, farSat = camR * 1.02;
         const nearSun = camR * 1.05, farSun = camR * 1.45;
+        const onScreen = new Set();
         const cands = [];
         for (const s of screenPos) {
             const n = s.n;
-            if (n.birth < 0.55) continue;
+            onScreen.add(n);
+            if (n.birth < 0.55) { n.labelT = 0; continue; }
             const near = n.isSun ? nearSun : nearSat;
             const far = n.isSun ? farSun : farSat;
             let a = 1 - THREE.MathUtils.smoothstep(s.dist, near, far);
@@ -816,44 +818,58 @@ import * as THREE from './vendor/three.module.min.js';
             const focused = inFocus && inFocus.has(n);
             if (inFocus) a = focused ? Math.max(a, 0.95) : a * (1 - focusAmt * 0.55);
             a *= Math.min(1, (n.birth - 0.55) / 0.45) * n.dim;
-            if (a < 0.04) continue;
-            cands.push({ s, a, depth, pri: (focused ? 2 : 0) + (n.isSun ? 1 : 0) });
+            n.labelT = 0; // por defecto se desvanece; los elegidos lo sobreescriben
+            if (a < 0.03) continue;
+            cands.push({ s, a, pri: (focused ? 2 : 0) + (n.isSun ? 1 : 0) });
         }
         cands.sort((p, q) => (q.pri - p.pri) || (p.s.dist - q.s.dist));
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        const boxes = []; // anti-colisión: no superponer etiquetas
-        let drawn = 0;
-        for (let i = 0; i < cands.length && drawn < maxLabels; i++) {
-            const { s, a, depth } = cands[i];
+
+        // selección con anti-colisión: los elegidos fijan su alpha objetivo;
+        // el resto decae — nada aparece ni desaparece de golpe
+        const boxes = [];
+        let picked = 0;
+        for (let i = 0; i < cands.length && picked < maxLabels; i++) {
+            const { s, a } = cands[i];
             const n = s.n;
-            // escala de perspectiva real: la fuente crece/encoge con 1/distancia
-            // (clamp 0.5..2.1 → relación ~x4 entre lo más cercano y lo más lejano)
             const persp = THREE.MathUtils.clamp(camR / s.dist, 0.5, 2.1);
-            const fs = Math.max(7, Math.round((n.isSun ? 11 : 9) * persp));
-            // etiqueta por encima del poliedro: radio proyectado en píxeles
+            const fs = (n.isSun ? 11 : 9) * persp;
             const rPx = (n.rScale || 0.6) * camera.projectionMatrix.elements[5] * height / (2 * s.dist);
             let x = s.x, y = s.y - rPx - 4;
             const w = n.label.length * fs * 0.63 + 6;
             x = Math.max(w * 0.5 + 4, Math.min(width - w * 0.5 - 4, x));
-            if (y < 30) y = s.y + rPx + 4 + fs; // no invadir el HUD: debajo del nodo
+            if (y < 30) y = s.y + rPx + 4 + fs;
             let clash = false;
             for (const b of boxes) {
                 if (Math.abs(x - b.x) < (w + b.w) * 0.5 && Math.abs(y - b.y) < (fs + b.h) * 0.6 + 3) { clash = true; break; }
             }
             if (clash) continue;
             boxes.push({ x, y, w, h: fs });
-            drawn++;
+            n.labelT = a;
+            n.labelX = x; n.labelY = y; n.labelFs = fs;
+            picked++;
+        }
+
+        // interpolación continua del alpha de cada etiqueta + dibujado
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        const k = Math.min(1, dt * 7);
+        for (const n of nodes) {
+            const target = onScreen.has(n) ? (n.labelT || 0) : 0;
+            n.labelA = (n.labelA || 0) + (target - (n.labelA || 0)) * k;
+            if (n.labelA < 0.02 || n.labelX === undefined) continue;
+            let x = n.labelX, y = n.labelY;
             if (n.birth < 1) { // micro-glitch de la etiqueta al nacer
                 x += (Math.random() - 0.5) * 5;
                 if (Math.random() < 0.25) continue;
             }
+            const alpha = n.labelA;
+            const fs = n.labelFs;
             if (n.isSun) {
-                ctx.font = `bold ${fs}px "Courier New", monospace`;
-                ctx.fillStyle = `rgba(0, 255, 136, ${(0.85 * a).toFixed(3)})`;
+                ctx.font = `bold ${fs.toFixed(2)}px "Courier New", monospace`;
+                ctx.fillStyle = `rgba(0, 255, 136, ${(0.85 * alpha).toFixed(3)})`;
             } else {
-                ctx.font = `${fs}px "Courier New", monospace`;
-                ctx.fillStyle = `rgba(175, 220, 255, ${(0.8 * a).toFixed(3)})`;
+                ctx.font = `${fs.toFixed(2)}px "Courier New", monospace`;
+                ctx.fillStyle = `rgba(175, 220, 255, ${(0.8 * alpha).toFixed(3)})`;
             }
             if (n.glow > 0.4) {
                 ctx.shadowColor = 'rgba(0, 220, 255, 0.9)';
@@ -959,6 +975,7 @@ import * as THREE from './vendor/three.module.min.js';
     let fogNear = 30, fogFar = 120;
     let camSpin = null;   // giro suave para traer el nodo seleccionado al frente
     let hoverLock = null; // tras el giro, exige mover el puntero para re-armar hover
+    let orbitSpeed = 0.008;
 
     function updateCamera(dt) {
         const spread = R * Math.max(anchorScale.x, anchorScale.y) + 14;
@@ -987,8 +1004,10 @@ import * as THREE from './vendor/three.module.min.js';
                 hoverLock = { x: mouse.x, y: mouse.y };
             }
         } else {
-            const orbit = booted ? (hoverNode ? 0 : 0.032) : 0.008;
-            camAngle += dt * orbit;
+            // velocidad de órbita interpolada: sin frenazos ni arranques secos
+            const orbitTarget = booted ? (hoverNode ? 0 : 0.032) : 0.008;
+            orbitSpeed += (orbitTarget - orbitSpeed) * Math.min(1, dt * 2);
+            camAngle += dt * orbitSpeed;
         }
 
         const px = mouse.active ? mouse.nx : gyro.x;
@@ -1159,10 +1178,13 @@ import * as THREE from './vendor/three.module.min.js';
     // ============================================
     // BUFFERS → GPU
     // ============================================
-    function writeBuffers() {
+    function writeBuffers(dt) {
         const n = nodes.length;
+        const degK = Math.min(1, dt * 2.5);
         for (let i = 0; i < n; i++) {
             const nd = nodes[i];
+            // el grado entra suavizado: nada de saltos de escala al ganar aristas
+            nd.degS = (nd.degS === undefined) ? degree(nd) : nd.degS + (degree(nd) - nd.degS) * degK;
             const birth = nd.bornVisible ? Math.max(0, nd.birth) : 0;
             const g = 1 - birth;
             let jx = 0, jy = 0, jz = 0, flick = 1;
@@ -1178,7 +1200,7 @@ import * as THREE from './vendor/three.module.min.js';
             const sp = 0.22 + nd.seed * 0.34;
             _dummy.rotation.set(time * sp, time * sp * 0.71 + nd.seed * 6.283, time * 0.13 * (nd.seed - 0.5));
             const scl = Math.max(0.001,
-                nd.size * 0.58 * (1 + Math.min(degree(nd), 10) * 0.02) * (0.5 + 0.5 * birth));
+                nd.size * 0.58 * (1 + Math.min(nd.degS, 10) * 0.02) * (0.5 + 0.5 * birth));
             nd.rScale = scl; // radio en mundo, para colocar la etiqueta encima
             _dummy.scale.setScalar(scl);
             _dummy.updateMatrix();
@@ -1338,7 +1360,7 @@ import * as THREE from './vendor/three.module.min.js';
         updatePulses(dt);
         maintenanceSweep(dt);
 
-        writeBuffers();
+        writeBuffers(dt);
         if (bloomOn) renderWithBloom();
         else { renderer.setRenderTarget(null); renderer.render(scene, camera); }
 
@@ -1347,7 +1369,7 @@ import * as THREE from './vendor/three.module.min.js';
         const gridA = time < 2 ? 1 : Math.max(0, 1 - (time - 2) / 1.5);
         drawGrid(gridA);
         drawSweep();
-        drawLabels(camR);
+        drawLabels(camR, dt);
 
         updateHUD();
         govern(ts);
