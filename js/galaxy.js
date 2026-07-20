@@ -519,12 +519,12 @@ import * as THREE from './vendor/three.module.min.js';
                 vec3 w = fwidth(vBary) * 1.7;
                 vec3 sm = smoothstep(vec3(0.0), w, vBary);
                 float edge = 1.0 - min(min(sm.x, sm.y), sm.z);
-                // cuerpo de cristal + filo
-                float backFade = gl_FrontFacing ? 1.0 : 0.35;
-                vec3 body = vTint * (0.24 * lam + 0.5 * fres);
-                vec3 rim  = vTint * edge * (1.1 + fres * 1.2);
+                // cuerpo de cristal (caras con materia visible) + filo de luz
+                float backFade = gl_FrontFacing ? 1.0 : 0.3;
+                vec3 body = vTint * (0.55 * lam + 0.6 * fres);
+                vec3 rim  = vTint * edge * (1.15 + fres * 1.2);
                 vec3 col = (body + rim) * backFade + vec3(1.0) * edge * fres * 0.3;
-                float alpha = (0.3 * lam + 0.42 * fres + 0.85 * edge) * backFade;
+                float alpha = (0.55 * lam + 0.45 * fres + 0.8 * edge) * backFade;
                 gl_FragColor = vec4(col, min(alpha, 1.0));
             }`
     });
