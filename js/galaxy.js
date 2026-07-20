@@ -648,21 +648,29 @@ import * as THREE from './vendor/three.module.min.js';
     edgeMesh.frustumCulled = false;
     scene.add(edgeMesh);
 
-    // Estrellas de fondo — profundidad de galaxia, estáticas y baratas
-    const starGeo = new THREE.BufferGeometry();
-    const STARS = isMobile ? 140 : 260;
-    const sPos = new Float32Array(STARS * 3);
-    for (let i = 0; i < STARS; i++) {
-        const v = new THREE.Vector3().randomDirection().multiplyScalar(90 + Math.random() * 140);
-        sPos[i * 3] = v.x; sPos[i * 3 + 1] = v.y; sPos[i * 3 + 2] = v.z;
+    // Fondo estelar — INTOCABLE. Dos capas de estrellas tenues detrás de la
+    // galaxia, integradas con la niebla de profundidad: dan la escala cósmica
+    // sin competir con los nodos.
+    function makeStars(count, minR, maxR, size, opacity, color) {
+        const g = new THREE.BufferGeometry();
+        const arr = new Float32Array(count * 3);
+        for (let i = 0; i < count; i++) {
+            const v = new THREE.Vector3().randomDirection()
+                .multiplyScalar(minR + Math.random() * (maxR - minR));
+            arr[i * 3] = v.x; arr[i * 3 + 1] = v.y; arr[i * 3 + 2] = v.z;
+        }
+        g.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+        const m = new THREE.PointsMaterial({
+            color, size, sizeAttenuation: false,
+            transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false
+        });
+        const pts = new THREE.Points(g, m);
+        pts.frustumCulled = false;
+        scene.add(pts);
+        return pts;
     }
-    starGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
-    const starMat = new THREE.PointsMaterial({
-        color: 0x3a6a8a, size: 1.2, sizeAttenuation: false,
-        transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false
-    });
-    const stars = new THREE.Points(starGeo, starMat);
-    scene.add(stars);
+    makeStars(isMobile ? 160 : 300, 110, 260, 1.4, 0.42, 0x35608a); // lejanas, se funden
+    makeStars(isMobile ? 60 : 120, 85, 150, 2.1, 0.5, 0x4a7fa8);    // capa media, algo más vivas
 
     // ============================================
     // BLOOM — post-procesado holográfico
