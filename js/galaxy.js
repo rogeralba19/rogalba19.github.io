@@ -665,6 +665,124 @@ import * as THREE from './vendor/three.module.min.js';
     scene.add(stars);
 
     // ============================================
+    // BLOOM — post-procesado holográfico
+    // Pipeline propio (equivalente a UnrealBloomPass, sin dependencias):
+    // escena -> render target, bright-pass con umbral, blur gaussiano
+    // ping-pong a 1/4 de resolución, y composición final aditiva.
+    // ============================================
+    let bloomOn = true;
+    let bloomStrength = isMobile ? 0.75 : 1.05; // halo elegante, no neón quemado
+    const bloomDiv = isMobile ? 6 : 4;          // reducción de resolución del blur
+
+    const rtOpts = { depthBuffer: false, stencilBuffer: false };
+    const rtScene = new THREE.WebGLRenderTarget(2, 2, { depthBuffer: true, stencilBuffer: false });
+    const rtA = new THREE.WebGLRenderTarget(2, 2, rtOpts);
+    const rtB = new THREE.WebGLRenderTarget(2, 2, rtOpts);
+
+    const postScene = new THREE.Scene();
+    const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const postQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), null);
+    postQuad.frustumCulled = false;
+    postScene.add(postQuad);
+
+    const POST_VS = `
+        varying vec2 vUv;
+        void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
+
+    const brightMat = new THREE.ShaderMaterial({
+        uniforms: { tSrc: { value: null }, uThresh: { value: 0.22 } },
+        vertexShader: POST_VS,
+        fragmentShader: `
+            precision highp float;
+            varying vec2 vUv;
+            uniform sampler2D tSrc;
+            uniform float uThresh;
+            void main() {
+                vec3 c = texture2D(tSrc, vUv).rgb;
+                float lum = max(max(c.r, c.g), c.b);
+                float k = smoothstep(uThresh, uThresh + 0.35, lum);
+                gl_FragColor = vec4(c * k, 1.0);
+            }`
+    });
+
+    const blurMat = new THREE.ShaderMaterial({
+        uniforms: { tSrc: { value: null }, uDir: { value: new THREE.Vector2(1, 0) }, uTexel: { value: new THREE.Vector2() } },
+        vertexShader: POST_VS,
+        fragmentShader: `
+            precision highp float;
+            varying vec2 vUv;
+            uniform sampler2D tSrc;
+            uniform vec2 uDir;
+            uniform vec2 uTexel;
+            void main() {
+                vec2 o = uDir * uTexel;
+                vec3 c = texture2D(tSrc, vUv).rgb * 0.227027;
+                c += (texture2D(tSrc, vUv + o * 1.3846).rgb + texture2D(tSrc, vUv - o * 1.3846).rgb) * 0.3162162;
+                c += (texture2D(tSrc, vUv + o * 3.2308).rgb + texture2D(tSrc, vUv - o * 3.2308).rgb) * 0.0702703;
+                gl_FragColor = vec4(c, 1.0);
+            }`
+    });
+
+    const compositeMat = new THREE.ShaderMaterial({
+        transparent: true,
+        uniforms: { tScene: { value: null }, tBloom: { value: null }, uStrength: { value: 1 } },
+        vertexShader: POST_VS,
+        fragmentShader: `
+            precision highp float;
+            varying vec2 vUv;
+            uniform sampler2D tScene;
+            uniform sampler2D tBloom;
+            uniform float uStrength;
+            void main() {
+                vec4 s = texture2D(tScene, vUv);
+                vec3 b = texture2D(tBloom, vUv).rgb;
+                vec3 c = s.rgb + b * uStrength;
+                // alpha desde el brillo: la futura capa de foto sigue viéndose detrás
+                float a = clamp(max(max(c.r, c.g), c.b) * 1.5, 0.0, 1.0);
+                gl_FragColor = vec4(c, max(s.a, a));
+            }`
+    });
+
+    function renderWithBloom() {
+        renderer.setRenderTarget(rtScene);
+        renderer.clear();
+        renderer.render(scene, camera);
+        // bright-pass a baja resolución
+        postQuad.material = brightMat;
+        brightMat.uniforms.tSrc.value = rtScene.texture;
+        renderer.setRenderTarget(rtA);
+        renderer.render(postScene, postCam);
+        // blur gaussiano ping-pong (2 iteraciones H+V)
+        postQuad.material = blurMat;
+        blurMat.uniforms.uTexel.value.set(1 / rtA.width, 1 / rtA.height);
+        for (let i = 0; i < 2; i++) {
+            blurMat.uniforms.tSrc.value = rtA.texture;
+            blurMat.uniforms.uDir.value.set(1, 0);
+            renderer.setRenderTarget(rtB);
+            renderer.render(postScene, postCam);
+            blurMat.uniforms.tSrc.value = rtB.texture;
+            blurMat.uniforms.uDir.value.set(0, 1);
+            renderer.setRenderTarget(rtA);
+            renderer.render(postScene, postCam);
+        }
+        // composición final en pantalla
+        postQuad.material = compositeMat;
+        compositeMat.uniforms.tScene.value = rtScene.texture;
+        compositeMat.uniforms.tBloom.value = rtA.texture;
+        compositeMat.uniforms.uStrength.value = bloomStrength;
+        renderer.setRenderTarget(null);
+        renderer.render(postScene, postCam);
+    }
+
+    function resizeBloom() {
+        const w = Math.max(2, Math.floor(width * pixelRatio));
+        const h = Math.max(2, Math.floor(height * pixelRatio));
+        rtScene.setSize(w, h);
+        rtA.setSize(Math.max(2, (w / bloomDiv) | 0), Math.max(2, (h / bloomDiv) | 0));
+        rtB.setSize(Math.max(2, (w / bloomDiv) | 0), Math.max(2, (h / bloomDiv) | 0));
+    }
+
+    // ============================================
     // PROYECCIÓN / ETIQUETAS (LOD) — overlay 2D
     // ============================================
     const _proj = new THREE.Vector3();
@@ -1110,14 +1228,17 @@ import * as THREE from './vendor/three.module.min.js';
         }
         if (time > nextGovern) {
             nextGovern = time + 3;
+            // la fluidez manda: primero degrada el bloom, luego nodos/etiquetas
+            if (fpsEMA < 45) bloomStrength = Math.max(0.5, bloomStrength * 0.9);
             if (fpsEMA < 40 && nodeCap > 70) {
                 nodeCap = Math.max(70, Math.floor(nodeCap * 0.85));
                 maxLabels = Math.max(18, maxLabels - 6);
                 nextRecycle = Math.min(nextRecycle, time + 0.5);
             }
+            if (fpsEMA < 32) bloomOn = false;
             if (fpsEMA < 27) {
                 sweepEnabled = false;
-                if (pixelRatio > 1) { pixelRatio = 1; renderer.setPixelRatio(1); }
+                if (pixelRatio > 1) { pixelRatio = 1; renderer.setPixelRatio(1); resizeBloom(); }
             }
         }
     }
@@ -1131,6 +1252,7 @@ import * as THREE from './vendor/three.module.min.js';
         aspect = width / height;
         portrait = height > width;
         renderer.setSize(width, height, false);
+        resizeBloom();
         overlayCanvas.width = width;
         overlayCanvas.height = height;
         camera.aspect = aspect;
@@ -1214,7 +1336,8 @@ import * as THREE from './vendor/three.module.min.js';
         maintenanceSweep(dt);
 
         writeBuffers();
-        renderer.render(scene, camera);
+        if (bloomOn) renderWithBloom();
+        else { renderer.setRenderTarget(null); renderer.render(scene, camera); }
 
         // Overlay 2D: retícula (boot), barrido y etiquetas
         ctx.clearRect(0, 0, width, height);
