@@ -462,13 +462,71 @@ import * as THREE from './vendor/three.module.min.js';
     // ============================================
     // GEOMETRÍA GPU
     // ============================================
-    // Poliedros holográficos: UNA geometría compartida (icosaedro wireframe)
-    // instanciada para todos los nodos — geometría real en cámara de
-    // perspectiva, así el tamaño aparente escala solo con la distancia.
-    const nodeShape = new THREE.IcosahedronGeometry(1, 0);
-    const nodeMat = new THREE.MeshBasicMaterial({
-        wireframe: true, transparent: true,
-        blending: THREE.AdditiveBlending, depthWrite: false
+    // Poliedros de cristal energético: UNA geometría compartida (icosaedro
+    // SÓLIDO) instanciada para todos los nodos. Cuerpo semi-transparente con
+    // luz propia + filo luminoso: fresnel en los bordes respecto a la cámara
+    // y aristas reales de la geometría resaltadas vía baricéntricas.
+    let nodeShape = new THREE.IcosahedronGeometry(1, 0);
+    if (nodeShape.index) nodeShape = nodeShape.toNonIndexed();
+    {
+        const triCount = nodeShape.attributes.position.count / 3;
+        const bary = new Float32Array(triCount * 9);
+        for (let i = 0; i < triCount; i++) bary.set([1, 0, 0, 0, 1, 0, 0, 0, 1], i * 9);
+        nodeShape.setAttribute('aBary', new THREE.BufferAttribute(bary, 3));
+    }
+    const nodeMat = new THREE.ShaderMaterial({
+        transparent: true, depthWrite: false,
+        blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+        vertexShader: `
+            attribute vec3 aBary;
+            varying vec3 vBary;
+            varying vec3 vNormal;
+            varying vec3 vView;
+            varying vec3 vTint;
+            void main() {
+                vBary = aBary;
+                vec3 p = position;
+                vec3 n = normal;
+                #ifdef USE_INSTANCING
+                    p = (instanceMatrix * vec4(position, 1.0)).xyz;
+                    n = mat3(instanceMatrix) * normal;
+                #endif
+                #ifdef USE_INSTANCING_COLOR
+                    vTint = instanceColor;
+                #else
+                    vTint = vec3(1.0);
+                #endif
+                vec4 mv = modelViewMatrix * vec4(p, 1.0);
+                vNormal = normalize(normalMatrix * n);
+                vView = normalize(-mv.xyz);
+                gl_Position = projectionMatrix * mv;
+            }`,
+        fragmentShader: `
+            precision highp float;
+            varying vec3 vBary;
+            varying vec3 vNormal;
+            varying vec3 vView;
+            varying vec3 vTint;
+            void main() {
+                vec3 nrm = normalize(vNormal);
+                if (!gl_FrontFacing) nrm = -nrm;
+                float ndv = clamp(abs(dot(nrm, normalize(vView))), 0.0, 1.0);
+                // fresnel: los bordes del cuerpo respecto a la cámara brillan más
+                float fres = pow(1.0 - ndv, 2.2);
+                // sombreado sutil por cara: el cristal se lee como volumen
+                float lam = 0.5 + 0.5 * max(dot(nrm, normalize(vec3(0.4, 0.7, 0.6))), 0.0);
+                // filo de luz: distancia al borde del triángulo (aristas reales)
+                vec3 w = fwidth(vBary) * 1.7;
+                vec3 sm = smoothstep(vec3(0.0), w, vBary);
+                float edge = 1.0 - min(min(sm.x, sm.y), sm.z);
+                // cuerpo de cristal + filo
+                float backFade = gl_FrontFacing ? 1.0 : 0.35;
+                vec3 body = vTint * (0.24 * lam + 0.5 * fres);
+                vec3 rim  = vTint * edge * (1.1 + fres * 1.2);
+                vec3 col = (body + rim) * backFade + vec3(1.0) * edge * fres * 0.3;
+                float alpha = (0.3 * lam + 0.42 * fres + 0.85 * edge) * backFade;
+                gl_FragColor = vec4(col, min(alpha, 1.0));
+            }`
     });
     const nodeMesh = new THREE.InstancedMesh(nodeShape, nodeMat, MAXN);
     nodeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
