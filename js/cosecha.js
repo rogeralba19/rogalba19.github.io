@@ -46,6 +46,9 @@ let entryDeductionMode = 'amount';
 let retentions = [];
 let retentionByDate = {}; // { 'YYYY-MM-DD': { held, lost } }
 
+// Días de pago: lo que recibiste ese día y lo que deberías haber recibido
+let paydays = {}; // { 'YYYY-MM-DD': { received, expected, note } }
+
 // Helper: get local date as YYYY-MM-DD
 function getLocalDateString(date) {
     if (!date) date = new Date();
@@ -507,6 +510,16 @@ function loadData() {
         console.warn('Retenciones no disponibles:', error && error.message);
     });
 
+    // Días de pago
+    db.ref(`paydays/${currentUser.uid}`).on('value', (snapshot) => {
+        paydays = snapshot.val() || {};
+        if (entriesLoaded) {
+            renderCalendar();
+        }
+    }, (error) => {
+        console.warn('Días de pago no disponibles:', error && error.message);
+    });
+
     // Monto de descuento recordado para los próximos registros
     db.ref(`users/${currentUser.uid}/deductionDefault`).on('value', (snapshot) => {
         const saved = snapshot.val();
@@ -871,6 +884,148 @@ function releaseRetention() {
 
 function voidRetention() {
     setRetentionStatus('anulada', 'Retención anulada');
+}
+
+// ============================================
+// DÍA DE PAGO
+// ============================================
+
+// Propuesta automática: todo lo que quedó pendiente desde el día de pago
+// anterior hasta esta fecha, ya en líquido. Se calcula solo al crear el día de
+// pago; después se guarda el número, para que marcar registros como pagados
+// más tarde no cambie lo que ya anotaste.
+function computeExpectedForPayday(dateStr) {
+    const previous = Object.keys(paydays)
+        .filter(d => d < dateStr)
+        .sort()
+        .pop();
+
+    const covered = entries.filter(e =>
+        e.date <= dateStr && !e.paid && (!previous || e.date > previous)
+    );
+
+    const gross = covered.reduce((sum, e) => sum + (e.total || 0), 0);
+    const expected = gross - getDeductionForEntries(covered) - getWithheldForEntries(covered);
+
+    return { expected: Math.max(0, expected), previous, days: new Set(covered.map(e => e.date)).size };
+}
+
+function openPaydayForDay() {
+    const date = selectedDayDate;
+    closeDayModal();
+    openPaydayModal(date);
+}
+
+function openPaydayModal(dateStr) {
+    if (!dateStr) return;
+
+    const existing = paydays[dateStr];
+    const dateLabel = new Date(dateStr + 'T12:00:00')
+        .toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    document.getElementById('paydayDate').value = dateStr;
+    document.getElementById('paydayDateLabel').textContent = dateLabel;
+
+    if (existing) {
+        document.getElementById('paydayReceived').value = existing.received || '';
+        document.getElementById('paydayExpected').value = existing.expected || '';
+        document.getElementById('paydayNote').value = existing.note || '';
+        document.getElementById('paydayModalTitle').textContent = 'Editar Día de Pago';
+        document.getElementById('deletePaydayBtn').style.display = 'block';
+        document.getElementById('paydayExpectedHint').textContent = 'Guardado tal como lo anotaste ese día.';
+    } else {
+        const auto = computeExpectedForPayday(dateStr);
+        document.getElementById('paydayReceived').value = '';
+        document.getElementById('paydayExpected').value = auto.expected ? auto.expected.toFixed(2) : '';
+        document.getElementById('paydayNote').value = '';
+        document.getElementById('paydayModalTitle').textContent = 'Día de Pago';
+        document.getElementById('deletePaydayBtn').style.display = 'none';
+
+        const desde = auto.previous
+            ? 'desde el día de pago anterior'
+            : 'de todo lo pendiente hasta esta fecha';
+        const dias = auto.days === 1 ? '1 día' : `${auto.days} días`;
+        document.getElementById('paydayExpectedHint').textContent =
+            `Calculado ${desde}: ${dias} pendientes, ya con descuentos restados y sin lo retenido. Puedes corregirlo.`;
+    }
+
+    updatePaydayDiff();
+    openModal('paydayModal');
+}
+
+function closePaydayModal() {
+    closeModal('paydayModal');
+    selectedDayDate = null;
+}
+
+function updatePaydayDiff() {
+    const received = parseFloat(document.getElementById('paydayReceived').value);
+    const expected = parseFloat(document.getElementById('paydayExpected').value);
+    const box = document.getElementById('paydayDiff');
+
+    if (isNaN(received) || isNaN(expected) || expected <= 0) {
+        box.className = 'payday-diff';
+        box.textContent = '';
+        return;
+    }
+
+    const diff = received - expected;
+    box.classList.add('visible');
+
+    if (Math.abs(diff) < 0.01) {
+        box.className = 'payday-diff visible ok';
+        box.textContent = '✓ Cuadra con lo que deberías recibir';
+    } else if (diff < 0) {
+        box.className = 'payday-diff visible short';
+        box.textContent = `Te faltaron $${Math.abs(diff).toFixed(2)}`;
+    } else {
+        box.className = 'payday-diff visible over';
+        box.textContent = `Te pagaron $${diff.toFixed(2)} de más`;
+    }
+}
+
+async function savePayday() {
+    if (!currentUser) return;
+
+    const date = document.getElementById('paydayDate').value;
+    const received = parseFloat(document.getElementById('paydayReceived').value);
+
+    if (!date) return;
+    if (isNaN(received) || received < 0) {
+        showToast('Anota cuánto recibiste', 'error');
+        return;
+    }
+
+    const data = {
+        received,
+        expected: Math.max(0, parseFloat(document.getElementById('paydayExpected').value) || 0),
+        note: document.getElementById('paydayNote').value.trim(),
+        updatedAt: Date.now()
+    };
+    if (!paydays[date]) data.createdAt = Date.now();
+
+    try {
+        await db.ref(`paydays/${currentUser.uid}/${date}`).update(data);
+        showToast('Día de pago guardado');
+        closePaydayModal();
+    } catch (error) {
+        showToast('No se pudo guardar el día de pago', 'error');
+    }
+}
+
+async function deletePayday() {
+    const date = document.getElementById('paydayDate').value;
+    if (!date || !currentUser) return;
+
+    showConfirmModal('Quitar día de pago', '¿Quitar la marca de día de pago? Los registros no se tocan.', 'Quitar', async () => {
+        try {
+            await db.ref(`paydays/${currentUser.uid}/${date}`).remove();
+            showToast('Día de pago quitado');
+            closePaydayModal();
+        } catch (error) {
+            showToast('No se pudo quitar', 'error');
+        }
+    });
 }
 
 async function deleteRetention() {
@@ -2667,11 +2822,23 @@ function renderCalendar() {
         const dayNotes = dayEntries.filter(e => e.notes).map(e => e.notes).join(' | ');
         const truncatedNotes = dayNotes.length > 30 ? dayNotes.substring(0, 30) + '...' : dayNotes;
 
+        // Día de pago: puede caer en un día sin trabajo, por eso va aparte
+        const payday = paydays[dateStr];
+        if (payday) day.classList.add('is-payday');
+
+        const paydayHtml = payday
+            ? `<span class="day-payday">💰 $${(payday.received || 0).toFixed(0)}</span>`
+              + (Math.abs((payday.received || 0) - (payday.expected || 0)) >= 1
+                  ? `<span class="day-payday-expected">de $${(payday.expected || 0).toFixed(0)}</span>`
+                  : '')
+            : '';
+
         day.innerHTML = `
             <span class="day-number">${i}</span>
             ${dayEntries.length > 0 ? `<span class="day-entries-count">${dayEntries.length} reg</span>` : ''}
             ${dayTotal > 0 ? `<span class="day-amount">$${dayTotal.toFixed(0)}</span>` : ''}
             ${truncatedNotes ? `<span class="day-notes">${escapeHtml(truncatedNotes)}</span>` : ''}
+            ${paydayHtml}
         `;
 
         // Click normal abre modal, con Ctrl/Cmd selecciona
@@ -2969,6 +3136,8 @@ function openDayModal(dateStr, dayEntries) {
     }
 
     renderDayBreakdown(dateStr, dayEntries);
+    document.getElementById('dayPaydayBtn').textContent =
+        paydays[dateStr] ? '💰 Editar pago' : '💰 Día de pago';
     openModal('dayModal');
 }
 
@@ -3653,6 +3822,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 { id: 'confirmModal', close: () => closeConfirmModal(false) },
                 { id: 'dayModal', close: closeDayModal },
                 { id: 'entryModal', close: closeEntryModal },
+                { id: 'retentionModal', close: closeRetentionModal },
+                { id: 'paydayModal', close: closePaydayModal },
                 { id: 'jobModal', close: closeJobModal },
                 { id: 'workerModal', close: closeWorkerModal },
                 { id: 'squadModal', close: closeSquadModal },

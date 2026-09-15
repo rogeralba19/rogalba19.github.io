@@ -478,8 +478,9 @@
                 <div id="dayEntriesList"></div>
                 <div id="dayBreakdown"></div>
                 <div class="day-actions">
-                    <button class="btn btn-primary" onclick="addEntryForDay()">+ Agregar registro</button>
+                    <button class="btn btn-primary" onclick="addEntryForDay()">+ Registro</button>
                     <button class="btn btn-hold" onclick="openRetentionForDay()">🔒 Retención</button>
+                    <button class="btn btn-payday" id="dayPaydayBtn" onclick="openPaydayForDay()">💰 Día de pago</button>
                 </div>
             </div>
         </div>
@@ -539,6 +540,44 @@
                 <button class="btn btn-danger" id="deleteRetentionBtn" style="display: none;" onclick="deleteRetention()">Eliminar</button>
                 <button class="btn btn-secondary" onclick="closeRetentionModal()">Cancelar</button>
                 <button class="btn btn-primary" onclick="saveRetention()">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payday Modal -->
+    <div class="modal-overlay" id="paydayModal" role="dialog" aria-modal="true" aria-labelledby="paydayModalTitle">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="paydayModalTitle">Día de Pago</h2>
+                <button class="modal-close" onclick="closePaydayModal()" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="paydayDate">
+
+                <div class="payday-date" id="paydayDateLabel"></div>
+
+                <div class="form-group">
+                    <label>Monto recibido</label>
+                    <input type="number" id="paydayReceived" step="0.01" min="0" placeholder="0" oninput="updatePaydayDiff()">
+                </div>
+
+                <div class="form-group">
+                    <label>Deberías recibir</label>
+                    <input type="number" id="paydayExpected" step="0.01" min="0" placeholder="0" oninput="updatePaydayDiff()">
+                    <div class="field-hint" id="paydayExpectedHint"></div>
+                </div>
+
+                <div class="payday-diff" id="paydayDiff"></div>
+
+                <div class="form-group">
+                    <label>Nota (opcional)</label>
+                    <input type="text" id="paydayNote" placeholder="Ej: quincena, pago semanal..." maxlength="80">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" id="deletePaydayBtn" style="display: none;" onclick="deletePayday()">Quitar</button>
+                <button class="btn btn-secondary" onclick="closePaydayModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="savePayday()">Guardar</button>
             </div>
         </div>
     </div>
