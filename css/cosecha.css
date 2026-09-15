@@ -60,6 +60,20 @@
     --violet-soft: rgba(183, 138, 240, 0.14);
     --violet-line: rgba(183, 138, 240, 0.45);
 
+    /* Arcilla: descuento diario (AFP + comida) */
+    --deduct: #d98e5f;
+    --deduct-soft: rgba(217, 142, 95, 0.14);
+    --deduct-line: rgba(217, 142, 95, 0.55);
+
+    /* Teal: retención (plata congelada, aún no definitiva) */
+    --hold: #46cfbe;
+    --hold-soft: rgba(70, 207, 190, 0.12);
+    --hold-line: rgba(70, 207, 190, 0.60);
+
+    /* Día de pago: máximo contraste, sin competir con ningún matiz */
+    --payday-ring: #f4fbf4;
+    --payday-glow: rgba(244, 251, 244, 0.30);
+
     /* Botón primario */
     --btn-primary-bg: linear-gradient(120deg, #2cbd63, #74c93e);
     --btn-primary-text: #07180c;
@@ -128,6 +142,17 @@
     --violet: #7c4fc4;
     --violet-soft: rgba(124, 79, 196, 0.10);
     --violet-line: rgba(124, 79, 196, 0.38);
+
+    --deduct: #a85a25;
+    --deduct-soft: rgba(168, 90, 37, 0.10);
+    --deduct-line: rgba(168, 90, 37, 0.55);
+
+    --hold: #0f7f74;
+    --hold-soft: rgba(15, 127, 116, 0.10);
+    --hold-line: rgba(15, 127, 116, 0.60);
+
+    --payday-ring: #1c271f;
+    --payday-glow: rgba(28, 39, 31, 0.22);
 
     --btn-primary-bg: linear-gradient(120deg, #157c40, #3d8a24);
     --btn-primary-text: #ffffff;
@@ -702,6 +727,7 @@ body {
 }
 
 .calendar-day {
+    position: relative;
     min-height: 80px;
     background: var(--surface-2);
     border: 1px solid transparent;
@@ -735,6 +761,19 @@ body {
 .calendar-day.has-pending {
     background: var(--amber-soft);
     border-color: var(--amber-line);
+}
+
+/* Día con descuento (AFP + comida): franja al borde izquierdo, sin cifra */
+.calendar-day.has-deduction::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 5px;
+    background: var(--deduct);
+    border-radius: var(--r-sm) 0 0 var(--r-sm);
+    pointer-events: none;
 }
 
 /* Fin de semana */
@@ -3620,6 +3659,133 @@ body.boss-mode .boss-only-tab {
 }
 
 /* ==========================================
+   DESCUENTO DIARIO
+   ========================================== */
+.deduction-group .toggle-row {
+    border: 1px solid transparent;
+    transition: border-color 0.2s;
+}
+
+.deduction-group.on .toggle-row {
+    border-color: var(--deduct-line);
+}
+
+.deduction-group .toggle-switch.active {
+    background: var(--deduct-line);
+}
+
+.deduction-group .toggle-switch.active::after {
+    background: var(--deduct);
+}
+
+.deduction-fields {
+    display: none;
+    gap: 8px;
+    margin-top: 8px;
+    align-items: center;
+}
+
+.deduction-group.on .deduction-fields {
+    display: flex;
+}
+
+.deduction-fields input {
+    flex: 1;
+    min-width: 0;
+}
+
+.deduction-mode {
+    display: flex;
+    flex-shrink: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-sm);
+    overflow: hidden;
+}
+
+.dm-btn {
+    background: var(--surface-2);
+    border: none;
+    color: var(--text-2);
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+    padding: 9px 16px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.dm-btn + .dm-btn {
+    border-left: 1px solid var(--border-strong);
+}
+
+.dm-btn.active {
+    background: var(--deduct-soft);
+    color: var(--deduct);
+}
+
+.deduction-hint {
+    display: none;
+    font-size: 11px;
+    color: var(--text-3);
+    margin-top: 6px;
+    line-height: 1.4;
+}
+
+.deduction-group.on .deduction-hint {
+    display: block;
+}
+
+/* Desglose del día (modal del día) */
+.day-breakdown {
+    margin-top: 14px;
+    padding: 12px 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+}
+
+.db-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    font-size: 13px;
+    color: var(--text-2);
+    padding: 3px 0;
+}
+
+.db-row.db-deduct span:last-child {
+    color: var(--deduct);
+}
+
+.db-row.db-hold span:last-child {
+    color: var(--hold);
+}
+
+.db-row.db-net {
+    margin-top: 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.db-row.db-net span:last-child {
+    color: var(--green);
+}
+
+/* Subtítulo bruto en la tarjeta de total */
+.stat-sub {
+    display: block;
+    font-size: 10px;
+    color: var(--text-3);
+    margin-top: 3px;
+    letter-spacing: 0.3px;
+}
+
+/* ==========================================
    RESPONSIVE
    ========================================== */
 @media (max-width: 768px) {
@@ -3731,8 +3897,13 @@ body.boss-mode .boss-only-tab {
         gap: 6px;
     }
 
+    /* Los montos de seis cifras no cabían y quedaban cortados */
+    .stat-card {
+        padding: 14px 8px 12px;
+    }
+
     .stat-value {
-        font-size: 18px;
+        font-size: clamp(12px, 4vw, 18px);
     }
 
     .stat-label {

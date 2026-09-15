@@ -91,6 +91,7 @@
             <div class="stat-card highlight clickable" onclick="toggleTotalGeneral()">
                 <div class="stat-value" id="totalEarnings">$0</div>
                 <div class="stat-label" id="totalLabel">Total Mes</div>
+                <div class="stat-sub" id="totalGrossSub" style="display: none;"></div>
             </div>
             <div class="stat-card pending clickable" onclick="toggleTotalGeneral()">
                 <div class="stat-value" id="pendingAmount">$0</div>
@@ -394,7 +395,7 @@
 
                 <div class="form-group">
                     <label>Fecha</label>
-                    <input type="date" id="entryDate">
+                    <input type="date" id="entryDate" onchange="onEntryDateChange()">
                 </div>
 
                 <div id="entryTratoFields" class="conditional-fields">
@@ -431,6 +432,21 @@
                     </div>
                 </div>
 
+                <div class="form-group deduction-group" id="entryDeductionGroup">
+                    <div class="toggle-row">
+                        <span>Descuento del día</span>
+                        <div class="toggle-switch" id="entryDeductionToggle" onclick="toggleEntryDeduction()" role="switch" aria-checked="false" aria-label="Aplicar descuento del día"></div>
+                    </div>
+                    <div class="deduction-fields">
+                        <input type="number" id="entryDeductionValue" step="1" min="0" placeholder="0" oninput="onEntryDeductionInput()" aria-label="Monto del descuento">
+                        <div class="deduction-mode" role="group" aria-label="Tipo de descuento">
+                            <button type="button" class="dm-btn active" id="dmAmount" onclick="setEntryDeductionMode('amount')">$</button>
+                            <button type="button" class="dm-btn" id="dmPercent" onclick="setEntryDeductionMode('percent')">%</button>
+                        </div>
+                    </div>
+                    <div class="deduction-hint" id="entryDeductionHint"></div>
+                </div>
+
                 <div class="form-group">
                     <label>Notas (opcional)</label>
                     <textarea id="entryNotes" rows="2" placeholder="Observaciones..."></textarea>
@@ -453,6 +469,7 @@
             </div>
             <div class="modal-body">
                 <div id="dayEntriesList"></div>
+                <div id="dayBreakdown"></div>
                 <button class="btn btn-primary" style="width: 100%; margin-top: 15px;" onclick="addEntryForDay()">
                     + Agregar registro
                 </button>

@@ -31,6 +31,15 @@ let selectionMode = false; // Modo selección activo
 // Long press state
 let longPressTriggered = false;
 
+// Descuento diario (AFP + comida). Se guarda por FECHA, no por registro:
+// un día con dos registros se descuenta una sola vez.
+let dayDeductions = {}; // { 'YYYY-MM-DD': { applied, mode, value } }
+let deductionDefault = { mode: 'amount', value: 3323 };
+
+// Entry modal: estado del descuento del día que se está editando
+let entryDeductionOn = false;
+let entryDeductionMode = 'amount';
+
 // Helper: get local date as YYYY-MM-DD
 function getLocalDateString(date) {
     if (!date) date = new Date();
@@ -456,6 +465,70 @@ function loadData() {
         }
         checkDataReady();
     });
+
+    // Descuentos por día. Nodo propio: no toca harvest/ ni jobs/.
+    // Si las reglas de Firebase no permiten el nodo, la app sigue funcionando
+    // exactamente igual que antes: simplemente no hay descuentos.
+    db.ref(`deductions/${currentUser.uid}`).on('value', (snapshot) => {
+        dayDeductions = snapshot.val() || {};
+        if (entriesLoaded) {
+            updateStats();
+            renderCalendar();
+        }
+    }, (error) => {
+        console.warn('Descuentos no disponibles:', error && error.message);
+    });
+
+    // Monto de descuento recordado para los próximos registros
+    db.ref(`users/${currentUser.uid}/deductionDefault`).on('value', (snapshot) => {
+        const saved = snapshot.val();
+        if (saved && typeof saved.value === 'number') {
+            deductionDefault = {
+                mode: saved.mode === 'percent' ? 'percent' : 'amount',
+                value: saved.value
+            };
+        }
+    }, () => { /* sin preferencia guardada: se usa el valor por defecto */ });
+}
+
+// ============================================
+// DESCUENTO DIARIO (AFP + comida)
+// ============================================
+// El descuento pertenece al DÍA, no al registro: si una fecha tiene varios
+// registros se descuenta una sola vez. Se guarda en deductions/{uid}/{fecha}.
+
+// Lunes a viernes: el descuento se propone encendido. Sábado y domingo, no.
+function isWeekdayDate(dateStr) {
+    const d = new Date(dateStr + 'T12:00:00').getDay();
+    return d >= 1 && d <= 5;
+}
+
+function getDayGross(dateStr) {
+    return entries.reduce((sum, e) => e.date === dateStr ? sum + (e.total || 0) : sum, 0);
+}
+
+function hasDayDeduction(dateStr) {
+    const d = dayDeductions[dateStr];
+    return !!(d && d.applied);
+}
+
+// Monto del descuento de un día. Nunca supera el bruto de ese día, para que
+// ningún total pueda quedar en negativo.
+function getDayDeduction(dateStr) {
+    const d = dayDeductions[dateStr];
+    if (!d || !d.applied) return 0;
+    const gross = getDayGross(dateStr);
+    if (gross <= 0) return 0;
+    const raw = d.mode === 'percent' ? gross * (d.value || 0) / 100 : (d.value || 0);
+    return Math.min(Math.max(raw, 0), gross);
+}
+
+// Descuento acumulado de un conjunto de registros, contando cada fecha una vez
+function getDeductionForEntries(entryList) {
+    const dates = new Set(entryList.map(e => e.date));
+    let sum = 0;
+    dates.forEach(d => { sum += getDayDeduction(d); });
+    return sum;
 }
 
 // Update statistics - usar el mes del calendario
@@ -471,14 +544,34 @@ function updateStats() {
         return d.getMonth() === month && d.getFullYear() === year;
     });
 
-    const total = monthEntries.reduce((sum, e) => sum + (e.total || 0), 0);
-    const pending = monthEntries.filter(e => !e.paid).reduce((sum, e) => sum + (e.total || 0), 0);
+    const gross = monthEntries.reduce((sum, e) => sum + (e.total || 0), 0);
+    const deduction = getDeductionForEntries(monthEntries);
+    const total = gross - deduction;
+
+    const pendingEntries = monthEntries.filter(e => !e.paid);
+    const pendingGross = pendingEntries.reduce((sum, e) => sum + (e.total || 0), 0);
+    const pending = pendingGross - getDeductionForEntries(pendingEntries);
+
     const days = new Set(monthEntries.map(e => e.date)).size;
 
     document.getElementById('totalEarnings').textContent = '$' + total.toFixed(2);
     document.getElementById('pendingAmount').textContent = '$' + pending.toFixed(2);
     document.getElementById('totalDays').textContent = days;
     document.getElementById('totalLabel').textContent = 'Total ' + monthNames[month];
+    setGrossSub(deduction > 0 ? gross : null);
+}
+
+// Línea "Bruto $X" bajo el total. Se oculta si el periodo no tiene descuentos.
+function setGrossSub(gross) {
+    const el = document.getElementById('totalGrossSub');
+    if (!el) return;
+    if (gross === null || gross === undefined) {
+        el.style.display = 'none';
+        el.textContent = '';
+    } else {
+        el.textContent = 'Bruto $' + gross.toFixed(0);
+        el.style.display = 'block';
+    }
 }
 
 // Mostrar total general por 10 segundos
@@ -506,8 +599,12 @@ function toggleTotalGeneral() {
     }
 
     // Calcular totales generales
-    const totalGeneral = entries.reduce((sum, e) => sum + (e.total || 0), 0);
-    const pendingGeneral = entries.filter(e => !e.paid).reduce((sum, e) => sum + (e.total || 0), 0);
+    const grossGeneral = entries.reduce((sum, e) => sum + (e.total || 0), 0);
+    const deductionGeneral = getDeductionForEntries(entries);
+    const totalGeneral = grossGeneral - deductionGeneral;
+    const pendingEntriesGeneral = entries.filter(e => !e.paid);
+    const pendingGeneral = pendingEntriesGeneral.reduce((sum, e) => sum + (e.total || 0), 0)
+        - getDeductionForEntries(pendingEntriesGeneral);
     const daysGeneral = new Set(entries.map(e => e.date)).size;
 
     // Paso 1: Animar salida
@@ -521,6 +618,7 @@ function toggleTotalGeneral() {
         totalLabel.textContent = 'TOTAL GENERAL';
         pendingLabel.textContent = 'PEND. GENERAL';
         daysLabel.textContent = 'DÍAS TOTALES';
+        setGrossSub(deductionGeneral > 0 ? grossGeneral : null);
 
         // Agregar clase showing-general
         cards.forEach(card => card.classList.add('showing-general'));
@@ -606,6 +704,11 @@ function switchTab(tab) {
     // Cargar datos de cuadrilla cuando se abre esa tab (lazy)
     if (tab === 'cuadrilla' && bossMode && typeof loadCuadrillaData === 'function') {
         loadCuadrillaData();
+    }
+
+    // La cuadrícula de actividad solo se puede medir cuando está visible
+    if (tab === 'calendario') {
+        requestAnimationFrame(layoutActivityCalendar);
     }
 }
 
@@ -977,6 +1080,9 @@ function openEntryModal(entryId = null, preselectedJobId = null) {
 
     // Una sola llamada a onJobSelect después de configurar todo
     onJobSelect();
+    // Después de onJobSelect: el total del registro ya está calculado y el
+    // descuento en modo porcentaje necesita ese número para su ayuda
+    syncEntryDeductionUI();
     openModal('entryModal');
 }
 
@@ -1514,6 +1620,7 @@ function calculateEntryTotal() {
     }
 
     document.getElementById('entryTotal').textContent = '$' + total.toFixed(2);
+    updateEntryDeductionUI();
     return total;
 }
 
@@ -1525,6 +1632,125 @@ function toggleEntryPaid() {
 function updateEntryPaidUI() {
     document.getElementById('entryPaidToggle').classList.toggle('active', entryPaid);
     document.getElementById('entryPaidLabel').textContent = entryPaid ? 'Pagado' : 'Pendiente de pago';
+}
+
+// --- Descuento del día dentro del modal de registro ---
+
+function getEntryModalDate() {
+    return document.getElementById('entryDate').value || getLocalDateString();
+}
+
+// Carga el estado del descuento para la fecha del modal. Si esa fecha ya tiene
+// descuento guardado se respeta tal cual (así un segundo registro del mismo día
+// no lo cobra de nuevo); si no, se propone según el día de la semana.
+function syncEntryDeductionUI() {
+    const date = getEntryModalDate();
+    const saved = dayDeductions[date];
+    const valueInput = document.getElementById('entryDeductionValue');
+
+    if (saved) {
+        entryDeductionOn = !!saved.applied;
+        entryDeductionMode = saved.mode === 'percent' ? 'percent' : 'amount';
+        valueInput.value = (saved.value !== undefined && saved.value !== null)
+            ? saved.value
+            : deductionDefault.value;
+    } else {
+        entryDeductionOn = isWeekdayDate(date);
+        entryDeductionMode = deductionDefault.mode;
+        valueInput.value = deductionDefault.value;
+    }
+
+    updateEntryDeductionUI();
+}
+
+function updateEntryDeductionUI() {
+    const group = document.getElementById('entryDeductionGroup');
+    const toggle = document.getElementById('entryDeductionToggle');
+    if (!group || !toggle) return;
+
+    group.classList.toggle('on', entryDeductionOn);
+    toggle.classList.toggle('active', entryDeductionOn);
+    toggle.setAttribute('aria-checked', entryDeductionOn ? 'true' : 'false');
+    document.getElementById('dmAmount').classList.toggle('active', entryDeductionMode === 'amount');
+    document.getElementById('dmPercent').classList.toggle('active', entryDeductionMode === 'percent');
+    document.getElementById('entryDeductionHint').textContent = buildDeductionHint();
+}
+
+// Bruto del día contando el registro que se está editando en el modal.
+// Lee el total ya pintado en vez de recalcularlo, para no entrar en ciclo con
+// calculateEntryTotal(), que a su vez refresca esta ayuda.
+function getProjectedDayGross() {
+    const date = getEntryModalDate();
+    const editingId = document.getElementById('entryId').value;
+    const others = entries.reduce(
+        (sum, e) => (e.date === date && e.id !== editingId) ? sum + (e.total || 0) : sum, 0
+    );
+    const shown = parseFloat((document.getElementById('entryTotal').textContent || '').replace(/[^\d.-]/g, '')) || 0;
+    return others + shown;
+}
+
+function buildDeductionHint() {
+    const value = Math.max(0, parseFloat(document.getElementById('entryDeductionValue').value) || 0);
+    let hint;
+
+    if (entryDeductionMode === 'percent') {
+        const amount = Math.min(getProjectedDayGross() * value / 100, getProjectedDayGross());
+        hint = `${value}% del día ≈ $${amount.toFixed(0)}`;
+    } else {
+        hint = `$${value.toFixed(0)} fijo (AFP + comida)`;
+    }
+
+    hint += ' · se descuenta una sola vez en el día';
+
+    const date = getEntryModalDate();
+    const editingId = document.getElementById('entryId').value;
+    if (entries.some(e => e.date === date && e.id !== editingId)) {
+        hint += ', que ya tiene otro registro';
+    }
+
+    return hint;
+}
+
+function toggleEntryDeduction() {
+    entryDeductionOn = !entryDeductionOn;
+    updateEntryDeductionUI();
+}
+
+function setEntryDeductionMode(mode) {
+    entryDeductionMode = mode === 'percent' ? 'percent' : 'amount';
+    updateEntryDeductionUI();
+}
+
+function onEntryDeductionInput() {
+    updateEntryDeductionUI();
+}
+
+function onEntryDateChange() {
+    syncEntryDeductionUI();
+}
+
+// Guarda el descuento de la fecha y recuerda el monto para los próximos
+// registros. Se llama después de guardar el registro: si esto falla, el
+// registro ya quedó guardado igual.
+async function persistDayDeduction(date, payload) {
+    if (!currentUser || !date) return;
+
+    try {
+        await db.ref(`deductions/${currentUser.uid}/${date}`).update(payload);
+    } catch (error) {
+        showToast('Registro guardado, pero el descuento no se pudo guardar', 'error');
+        return;
+    }
+
+    if (payload.applied && (payload.value !== deductionDefault.value || payload.mode !== deductionDefault.mode)) {
+        try {
+            await db.ref(`users/${currentUser.uid}`).update({
+                deductionDefault: { mode: payload.mode, value: payload.value }
+            });
+        } catch (error) {
+            // Es solo la preferencia para el próximo registro: no vale un error visible
+        }
+    }
 }
 
 async function saveEntry() {
@@ -1642,6 +1868,14 @@ async function saveEntry() {
         }
     }
 
+    // Se lee antes de guardar porque cerrar el modal deja los campos atrás
+    const deductionPayload = {
+        applied: entryDeductionOn,
+        mode: entryDeductionMode,
+        value: Math.max(0, parseFloat(document.getElementById('entryDeductionValue').value) || 0),
+        updatedAt: Date.now()
+    };
+
     try {
         if (id) {
             await db.ref(`harvest/${currentUser.uid}/${id}`).update(data);
@@ -1650,6 +1884,7 @@ async function saveEntry() {
             await db.ref(`harvest/${currentUser.uid}`).push(data);
         }
         showToast('Registro guardado');
+        await persistDayDeduction(date, deductionPayload);
         closeEntryModal();
     } catch (error) {
         showToast('Error al guardar', 'error');
@@ -1772,6 +2007,9 @@ function renderActivityCalendar() {
                 const lbl = document.createElement('span');
                 lbl.className = 'ac-month-label';
                 lbl.textContent = AC_MONTH_NAMES[c.month];
+                // La posición definitiva la fija layoutActivityCalendar() con el
+                // ancho real de columna, que el CSS encoge en pantallas chicas
+                lbl.dataset.col = col;
                 lbl.style.left = (col * weekWidth) + 'px';
                 monthsBar.appendChild(lbl);
                 lastLabelMonth = c.month;
@@ -1789,6 +2027,7 @@ function renderActivityCalendar() {
             const cell = gridData[col][row];
             const el = document.createElement('div');
             el.className = 'ac-day';
+            el.dataset.date = cell.dateStr;
 
             if (!cell.inYear) {
                 el.style.visibility = 'hidden';
@@ -1841,7 +2080,85 @@ function renderActivityCalendar() {
         }
         graph.appendChild(weekEl);
     }
+
+    requestAnimationFrame(layoutActivityCalendar);
 }
+
+// El ancho de columna que usa el render (13px + 2 de separación) no es el que
+// termina aplicando el CSS: en pantallas chicas las celdas se encogen. Medimos
+// el ancho real del DOM y recolocamos las etiquetas de mes con él, que es lo
+// que las mantenía descuadradas respecto de la cuadrícula en móvil.
+function layoutActivityCalendar() {
+    const graph = document.getElementById('acGraph');
+    const monthsBar = document.getElementById('acMonths');
+    if (!graph || !monthsBar || graph.children.length < 2) return;
+
+    const pitch = graph.children[1].offsetLeft - graph.children[0].offsetLeft;
+    // Panel oculto (otra pestaña activa): se recalcula al volver al calendario
+    if (!(pitch > 0)) return;
+
+    monthsBar.style.width = (graph.children.length * pitch) + 'px';
+    Array.from(monthsBar.children).forEach(lbl => {
+        const col = parseInt(lbl.dataset.col, 10) || 0;
+        lbl.style.left = (col * pitch) + 'px';
+    });
+
+    centerActivityOnCurrentMonth(graph, pitch);
+}
+
+// El año no cabe en pantalla, así que la cuadrícula arranca centrada en el mes
+// actual en vez de en enero. Si el usuario desplaza a mano, se respeta su
+// posición y ya no se vuelve a recentrar.
+let acUserScrolled = false;
+let acProgrammaticScroll = false;
+
+function centerActivityOnCurrentMonth(graph, pitch) {
+    const scroller = graph.closest('.ac-scroll');
+    if (!scroller || !scroller.clientWidth) return;
+
+    if (!scroller.dataset.scrollBound) {
+        scroller.dataset.scrollBound = '1';
+        // Solo cuenta el desplazamiento hecho por el usuario: el programático
+        // queda marcado con una bandera mientras dura
+        scroller.addEventListener('scroll', () => {
+            if (!acProgrammaticScroll) acUserScrolled = true;
+        }, { passive: true });
+    }
+
+    if (acUserScrolled) return;
+
+    const now = new Date();
+    const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    let firstCol = -1, lastCol = -1;
+    Array.from(graph.children).forEach((week, col) => {
+        const inMonth = Array.from(week.children).some(d => (d.dataset.date || '').startsWith(prefix));
+        if (inMonth) {
+            if (firstCol === -1) firstCol = col;
+            lastCol = col;
+        }
+    });
+    if (firstCol === -1) return;
+
+    const graphLeft = (graph.getBoundingClientRect().left - scroller.getBoundingClientRect().left) + scroller.scrollLeft;
+    const monthCenter = graphLeft + (firstCol + (lastCol - firstCol + 1) / 2) * pitch;
+    const target = Math.max(0, Math.min(
+        monthCenter - scroller.clientWidth / 2,
+        scroller.scrollWidth - scroller.clientWidth
+    ));
+
+    acProgrammaticScroll = true;
+    scroller.scrollLeft = target;
+    requestAnimationFrame(() => { acProgrammaticScroll = false; });
+}
+
+// Al volver a la pestaña del calendario o al girar el teléfono, el panel tiene
+// medidas nuevas y hay que recolocar
+window.addEventListener('resize', () => {
+    if (document.getElementById('calendarioSection')?.classList.contains('active')) {
+        layoutActivityCalendar();
+    }
+});
 
 // Tooltip
 let acTooltipEl = null;
@@ -1954,6 +2271,11 @@ function renderCalendar() {
         }
         if (dayEntries.length > 0) {
             day.classList.add(hasPending ? 'has-pending' : 'has-entries');
+            // Franja al borde izquierdo: el día lleva descuento. Sin cifra:
+            // el monto es siempre el mismo y se ve al abrir el día.
+            if (hasDayDeduction(dateStr)) {
+                day.classList.add('has-deduction');
+            }
         }
 
         // Marcar si está seleccionado
@@ -2083,8 +2405,12 @@ function updateSelectionStats() {
         selected = entries.filter(e => selectedEntries.has(e.id));
     }
 
-    const total = selected.reduce((sum, e) => sum + (e.total || 0), 0);
-    const pending = selected.filter(e => !e.paid).reduce((sum, e) => sum + (e.total || 0), 0);
+    const gross = selected.reduce((sum, e) => sum + (e.total || 0), 0);
+    const deduction = getDeductionForEntries(selected);
+    const total = gross - deduction;
+    const pendingSelected = selected.filter(e => !e.paid);
+    const pending = pendingSelected.reduce((sum, e) => sum + (e.total || 0), 0)
+        - getDeductionForEntries(pendingSelected);
     const days = new Set(selected.map(e => e.date)).size;
 
     document.getElementById('totalEarnings').textContent = '$' + total.toFixed(2);
@@ -2093,6 +2419,7 @@ function updateSelectionStats() {
     document.getElementById('totalLabel').textContent = 'Selección';
     document.getElementById('pendingLabel').textContent = 'Pendiente';
     document.getElementById('daysLabel').textContent = 'Días';
+    setGrossSub(deduction > 0 ? gross : null);
 
     // Agregar clase visual
     document.querySelectorAll('.stat-card').forEach(card => {
@@ -2258,7 +2585,31 @@ function openDayModal(dateStr, dayEntries) {
         }).join('');
     }
 
+    renderDayBreakdown(dateStr, dayEntries);
     openModal('dayModal');
+}
+
+// Desglose bruto → descuento → líquido. Solo aparece si el día tiene descuento;
+// un día sin descuento deja el modal igual que siempre.
+function renderDayBreakdown(dateStr, dayEntries) {
+    const el = document.getElementById('dayBreakdown');
+    if (!el) return;
+
+    const deduction = getDayDeduction(dateStr);
+    if (!dayEntries.length || deduction <= 0) {
+        el.innerHTML = '';
+        return;
+    }
+
+    const gross = dayEntries.reduce((sum, e) => sum + (e.total || 0), 0);
+
+    el.innerHTML = `
+        <div class="day-breakdown">
+            <div class="db-row"><span>Bruto del día</span><span>$${gross.toFixed(2)}</span></div>
+            <div class="db-row db-deduct"><span>Descuento (AFP + comida)</span><span>−$${deduction.toFixed(2)}</span></div>
+            <div class="db-row db-net"><span>Líquido</span><span>$${(gross - deduction).toFixed(2)}</span></div>
+        </div>
+    `;
 }
 
 function closeDayModal() {
