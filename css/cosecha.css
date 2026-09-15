@@ -764,12 +764,14 @@ body {
 }
 
 /* Día con descuento (AFP + comida): franja al borde izquierdo, sin cifra */
+/* Se monta sobre el borde izquierdo (de ahí los -1px) para que un día que
+   además tenga retención no mezcle la franja con el borde punteado */
 .calendar-day.has-deduction::before {
     content: '';
     position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
+    left: -1px;
+    top: -1px;
+    bottom: -1px;
     width: 5px;
     background: var(--deduct);
     border-radius: var(--r-sm) 0 0 var(--r-sm);
@@ -3776,6 +3778,177 @@ body.boss-mode .boss-only-tab {
     color: var(--green);
 }
 
+/* ==========================================
+   RETENCIONES
+   ========================================== */
+.stat-card.retained .stat-value {
+    color: var(--hold);
+}
+
+.stat-card.retained {
+    border-color: var(--hold-line);
+    background: linear-gradient(180deg, var(--hold-soft), transparent), var(--surface);
+}
+
+/* Día cubierto por una retención activa: borde punteado + candado */
+.calendar-day.has-retention {
+    border-style: dashed;
+    border-color: var(--hold-line);
+}
+
+.calendar-day.has-retention::after {
+    content: '🔒';
+    position: absolute;
+    top: 4px;
+    right: 5px;
+    font-size: 10px;
+    line-height: 1;
+    opacity: 0.85;
+    pointer-events: none;
+}
+
+/* Franja de retenciones activas sobre el calendario */
+.retentions-strip {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.retention-chip {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--hold-line);
+    border-left: 4px solid var(--hold);
+    border-radius: var(--r-md);
+}
+
+.rc-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.rc-reason {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rc-meta {
+    font-size: 11px;
+    color: var(--text-3);
+    margin-top: 2px;
+}
+
+.rc-amount {
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--hold);
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.rc-edit {
+    flex-shrink: 0;
+    background: var(--hold-soft);
+    border: 1px solid var(--hold-line);
+    color: var(--hold);
+    border-radius: var(--r-sm);
+    padding: 7px 12px;
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.rc-edit:hover {
+    background: var(--hold-line);
+    color: var(--btn-primary-text);
+}
+
+/* Botón de retención en el modal del día */
+.day-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.day-actions .btn {
+    flex: 1;
+}
+
+.btn-hold {
+    background: var(--hold-soft);
+    border: 1px solid var(--hold-line);
+    color: var(--hold);
+}
+
+.btn-hold:hover {
+    background: var(--hold-line);
+    color: var(--btn-primary-text);
+}
+
+/* Modal de retención */
+.retention-status {
+    padding: 10px 12px;
+    border-radius: var(--r-sm);
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    border: 1px solid transparent;
+}
+
+.retention-status.st-retenida {
+    background: var(--hold-soft);
+    border-color: var(--hold-line);
+    color: var(--hold);
+}
+
+.retention-status.st-liberada {
+    background: var(--green-soft);
+    border-color: var(--green-line);
+    color: var(--green);
+}
+
+.retention-status.st-anulada {
+    background: var(--red-soft);
+    border-color: var(--red-line);
+    color: var(--red);
+}
+
+.retention-preview {
+    padding: 12px 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    font-size: 13px;
+    color: var(--text-2);
+    line-height: 1.5;
+}
+
+.retention-preview strong {
+    font-family: var(--font-display);
+    font-size: 16px;
+    color: var(--hold);
+}
+
+.retention-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
 /* Subtítulo bruto en la tarjeta de total */
 .stat-sub {
     display: block;
@@ -3803,6 +3976,15 @@ body.boss-mode .boss-only-tab {
 
     .stats-grid {
         grid-template-columns: repeat(3, 1fr);
+    }
+
+    /* Con la tarjeta de retenido son cuatro: 2x2 en vez de 3+1 suelta */
+    .stats-grid.has-retained {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .day-actions {
+        flex-direction: column;
     }
 
     .calendar-day {
@@ -3895,6 +4077,10 @@ body.boss-mode .boss-only-tab {
     .stats-grid {
         grid-template-columns: repeat(3, 1fr);
         gap: 6px;
+    }
+
+    .stats-grid.has-retained {
+        grid-template-columns: repeat(2, 1fr);
     }
 
     /* Los montos de seis cifras no cabían y quedaban cortados */

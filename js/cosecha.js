@@ -40,6 +40,12 @@ let deductionDefault = { mode: 'amount', value: 3323 };
 let entryDeductionOn = false;
 let entryDeductionMode = 'amount';
 
+// Retenciones: plata que el jefe congela sobre un rango de fechas hasta que
+// se haga el repaso o lo que pida. Se reparten por día para poder marcarlas
+// en el calendario y sumarlas por mes.
+let retentions = [];
+let retentionByDate = {}; // { 'YYYY-MM-DD': { held, lost } }
+
 // Helper: get local date as YYYY-MM-DD
 function getLocalDateString(date) {
     if (!date) date = new Date();
@@ -457,6 +463,9 @@ function loadData() {
         });
         entries.sort((a, b) => new Date(b.date) - new Date(a.date));
         entriesLoaded = true;
+        // El reparto de las retenciones depende de qué días tienen registro
+        refreshRetentionMap();
+        renderRetentionsStrip();
         updateStats();
         renderCalendar();
         renderActivityCalendar();
@@ -471,12 +480,31 @@ function loadData() {
     // exactamente igual que antes: simplemente no hay descuentos.
     db.ref(`deductions/${currentUser.uid}`).on('value', (snapshot) => {
         dayDeductions = snapshot.val() || {};
+        // El tope de lo retenido depende del descuento del día
+        refreshRetentionMap();
         if (entriesLoaded) {
             updateStats();
             renderCalendar();
         }
     }, (error) => {
         console.warn('Descuentos no disponibles:', error && error.message);
+    });
+
+    // Retenciones. Igual que los descuentos: nodo propio, y si no está
+    // disponible la app funciona como antes, sin retenciones.
+    db.ref(`retentions/${currentUser.uid}`).on('value', (snapshot) => {
+        retentions = [];
+        snapshot.forEach((child) => {
+            retentions.push({ id: child.key, ...child.val() });
+        });
+        refreshRetentionMap();
+        renderRetentionsStrip();
+        if (entriesLoaded) {
+            updateStats();
+            renderCalendar();
+        }
+    }, (error) => {
+        console.warn('Retenciones no disponibles:', error && error.message);
     });
 
     // Monto de descuento recordado para los próximos registros
@@ -531,6 +559,335 @@ function getDeductionForEntries(entryList) {
     return sum;
 }
 
+// ============================================
+// RETENCIONES
+// ============================================
+// Una retención cubre un rango de fechas. Para pintarla en el calendario y
+// sumarla por mes se reparte entre los días trabajados de ese rango.
+//   retenida → sigue congelada: se resta del total y aparece en "Retenido"
+//   anulada  → no la vas a recibir: se resta del total, pero ya no es retenido
+//   liberada → te la pagaron: vuelve al total, no se resta nada
+
+const RETENTION_MODE_LABELS = {
+    price: 'Precio de trato rebajado',
+    amount: 'Monto fijo del periodo',
+    percent: 'Porcentaje del periodo',
+    perday: 'Cantidad por día trabajado'
+};
+
+// Fechas con registros dentro del rango, ordenadas
+function getWorkedDatesInRange(from, to) {
+    if (!from) return [];
+    const end = to || from;
+    const dates = new Set();
+    entries.forEach(e => {
+        if (e.date >= from && e.date <= end) dates.add(e.date);
+    });
+    return Array.from(dates).sort();
+}
+
+// Cantidad de unidades registradas al trato en una fecha
+function getDayQuantity(dateStr) {
+    return entries.reduce(
+        (sum, e) => e.date === dateStr ? sum + (e.quantity || 0) : sum, 0
+    );
+}
+
+// Reparte cada retención entre los días que cubre. El resultado se cachea y se
+// refresca desde los listeners de datos.
+function refreshRetentionMap() {
+    const map = {};
+
+    const add = (date, amount, lost) => {
+        if (!map[date]) map[date] = { held: 0, lost: 0 };
+        map[date][lost ? 'lost' : 'held'] += amount;
+    };
+
+    retentions.forEach(r => {
+        if (r.status !== 'retenida' && r.status !== 'anulada') return;
+
+        const dates = getWorkedDatesInRange(r.from, r.to);
+        if (!dates.length) return;
+
+        const lost = r.status === 'anulada';
+        const value = r.value || 0;
+
+        if (r.mode === 'amount') {
+            // Monto fijo del periodo: se reparte a prorrata del bruto de cada día
+            const totalGross = dates.reduce((sum, d) => sum + getDayGross(d), 0);
+            dates.forEach(d => {
+                const share = totalGross > 0 ? getDayGross(d) / totalGross : 1 / dates.length;
+                add(d, value * share, lost);
+            });
+        } else if (r.mode === 'percent') {
+            dates.forEach(d => add(d, getDayGross(d) * value / 100, lost));
+        } else if (r.mode === 'perday') {
+            dates.forEach(d => add(d, value, lost));
+        } else {
+            // price: tantos pesos menos por unidad registrada al trato
+            dates.forEach(d => add(d, value * getDayQuantity(d), lost));
+        }
+    });
+
+    // Lo retenido nunca puede pasar de lo que queda del día tras el descuento,
+    // para que ningún total termine en negativo
+    Object.keys(map).forEach(d => {
+        const room = Math.max(0, getDayGross(d) - getDayDeduction(d));
+        const total = map[d].held + map[d].lost;
+        if (total > room && total > 0) {
+            const factor = room / total;
+            map[d].held *= factor;
+            map[d].lost *= factor;
+        }
+    });
+
+    retentionByDate = map;
+}
+
+// Lo que sigue congelado en un día (no incluye lo anulado)
+function getDayRetained(dateStr) {
+    return (retentionByDate[dateStr] && retentionByDate[dateStr].held) || 0;
+}
+
+// Todo lo que el día no te va a entregar por retención: congelado + perdido
+function getDayWithheld(dateStr) {
+    const r = retentionByDate[dateStr];
+    return r ? r.held + r.lost : 0;
+}
+
+function getRetainedForEntries(entryList) {
+    const dates = new Set(entryList.map(e => e.date));
+    let sum = 0;
+    dates.forEach(d => { sum += getDayRetained(d); });
+    return sum;
+}
+
+function getWithheldForEntries(entryList) {
+    const dates = new Set(entryList.map(e => e.date));
+    let sum = 0;
+    dates.forEach(d => { sum += getDayWithheld(d); });
+    return sum;
+}
+
+// Monto total que una retención tiene congelado ahora mismo
+function getRetentionAmount(r) {
+    const dates = getWorkedDatesInRange(r.from, r.to);
+    if (!dates.length) return 0;
+    const value = r.value || 0;
+
+    if (r.mode === 'amount') return value;
+    if (r.mode === 'percent') return dates.reduce((s, d) => s + getDayGross(d), 0) * value / 100;
+    if (r.mode === 'perday') return value * dates.length;
+    return dates.reduce((s, d) => s + getDayQuantity(d), 0) * value;
+}
+
+function formatRetentionRange(r) {
+    const fmt = (d) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+    if (!r.to || r.to === r.from) return fmt(r.from);
+    return `${fmt(r.from)} — ${fmt(r.to)}`;
+}
+
+// Franja sobre el calendario: solo aparece si hay retenciones activas
+function renderRetentionsStrip() {
+    const strip = document.getElementById('retentionsStrip');
+    if (!strip) return;
+
+    const active = retentions.filter(r => r.status === 'retenida');
+    if (!active.length) {
+        strip.style.display = 'none';
+        strip.innerHTML = '';
+        return;
+    }
+
+    strip.style.display = 'flex';
+    strip.innerHTML = active.map(r => {
+        const dates = getWorkedDatesInRange(r.from, r.to);
+        const amount = dates.reduce((sum, d) => sum + getDayRetained(d), 0);
+        const reason = escapeHtml(r.reason || 'Retención');
+        const days = dates.length === 1 ? '1 día' : `${dates.length} días`;
+        return `
+            <div class="retention-chip">
+                <div class="rc-main">
+                    <div class="rc-reason">🔒 ${reason}</div>
+                    <div class="rc-meta">${formatRetentionRange(r)} · ${days} · ${RETENTION_MODE_LABELS[r.mode] || ''}</div>
+                </div>
+                <div class="rc-amount">$${amount.toFixed(0)}</div>
+                <button type="button" class="rc-edit" onclick="openRetentionModal('${r.id}')">Gestionar</button>
+            </div>
+        `;
+    }).join('');
+}
+
+// --- Modal de retención ---
+
+function openRetentionForDay() {
+    const date = selectedDayDate;
+    closeDayModal();
+    openRetentionModal(null, date);
+}
+
+function openRetentionModal(retentionId = null, presetDate = null) {
+    const today = presetDate || getLocalDateString();
+
+    document.getElementById('retentionId').value = '';
+    document.getElementById('retentionReason').value = '';
+    document.getElementById('retentionFrom').value = today;
+    document.getElementById('retentionTo').value = today;
+    document.getElementById('retentionMode').value = 'price';
+    document.getElementById('retentionValue').value = '';
+    document.getElementById('retentionModalTitle').textContent = 'Nueva Retención';
+    document.getElementById('deleteRetentionBtn').style.display = 'none';
+    document.getElementById('retentionActions').style.display = 'none';
+    document.getElementById('retentionStatus').style.display = 'none';
+
+    if (retentionId) {
+        const r = retentions.find(x => x.id === retentionId);
+        if (r) {
+            document.getElementById('retentionId').value = r.id;
+            document.getElementById('retentionReason').value = r.reason || '';
+            document.getElementById('retentionFrom').value = r.from || today;
+            document.getElementById('retentionTo').value = r.to || r.from || today;
+            document.getElementById('retentionMode').value = r.mode || 'price';
+            document.getElementById('retentionValue').value = r.value || '';
+            document.getElementById('retentionModalTitle').textContent = 'Retención';
+            document.getElementById('deleteRetentionBtn').style.display = 'block';
+            document.getElementById('retentionActions').style.display = r.status === 'retenida' ? 'flex' : 'none';
+
+            const statusEl = document.getElementById('retentionStatus');
+            statusEl.style.display = 'block';
+            statusEl.className = 'retention-status st-' + (r.status || 'retenida');
+            statusEl.textContent = {
+                retenida: '🔒 Congelada: todavía no la recibes',
+                liberada: '✅ Liberada: ya te la pagaron',
+                anulada: '✕ Anulada: no la vas a recibir'
+            }[r.status] || '';
+        }
+    }
+
+    updateRetentionPreview();
+    openModal('retentionModal');
+}
+
+function closeRetentionModal() {
+    closeModal('retentionModal');
+}
+
+function readRetentionForm() {
+    const from = document.getElementById('retentionFrom').value;
+    let to = document.getElementById('retentionTo').value || from;
+    // Si las fechas vienen al revés, se enderezan en vez de rechazar
+    if (to < from) to = from;
+    return {
+        from,
+        to,
+        mode: document.getElementById('retentionMode').value,
+        value: Math.max(0, parseFloat(document.getElementById('retentionValue').value) || 0),
+        reason: document.getElementById('retentionReason').value.trim()
+    };
+}
+
+function updateRetentionPreview() {
+    const form = readRetentionForm();
+    const labels = {
+        price: 'Pesos menos por unidad',
+        amount: 'Monto retenido en total',
+        percent: 'Porcentaje retenido (%)',
+        perday: 'Pesos por cada día trabajado'
+    };
+    document.getElementById('retentionValueLabel').textContent = labels[form.mode] || 'Valor';
+
+    const preview = document.getElementById('retentionPreview');
+    if (!form.from) {
+        preview.textContent = 'Elige las fechas que cubre la retención.';
+        return;
+    }
+
+    const dates = getWorkedDatesInRange(form.from, form.to);
+    if (!dates.length) {
+        preview.textContent = 'No hay registros en ese rango de fechas, así que no hay nada que retener todavía.';
+        return;
+    }
+
+    const amount = getRetentionAmount(form);
+    const days = dates.length === 1 ? '1 día trabajado' : `${dates.length} días trabajados`;
+    preview.innerHTML = `Retiene <strong>$${amount.toFixed(2)}</strong> sobre ${days}.`;
+}
+
+async function saveRetention() {
+    if (!currentUser) return;
+
+    const id = document.getElementById('retentionId').value;
+    const form = readRetentionForm();
+
+    if (!form.from) {
+        showToast('Elige la fecha de inicio', 'error');
+        return;
+    }
+    if (form.value <= 0) {
+        showToast('Ingresa cuánto te retiene', 'error');
+        return;
+    }
+    if (!form.reason) {
+        showToast('Escribe el motivo de la retención', 'error');
+        return;
+    }
+
+    const data = { ...form, updatedAt: Date.now() };
+
+    try {
+        if (id) {
+            await db.ref(`retentions/${currentUser.uid}/${id}`).update(data);
+        } else {
+            data.status = 'retenida';
+            data.createdAt = Date.now();
+            await db.ref(`retentions/${currentUser.uid}`).push(data);
+        }
+        showToast('Retención guardada');
+        closeRetentionModal();
+    } catch (error) {
+        showToast('No se pudo guardar la retención', 'error');
+    }
+}
+
+async function setRetentionStatus(status, message) {
+    const id = document.getElementById('retentionId').value;
+    if (!id || !currentUser) return;
+
+    try {
+        await db.ref(`retentions/${currentUser.uid}/${id}`).update({
+            status,
+            releasedAt: Date.now()
+        });
+        showToast(message);
+        closeRetentionModal();
+    } catch (error) {
+        showToast('No se pudo actualizar la retención', 'error');
+    }
+}
+
+function releaseRetention() {
+    setRetentionStatus('liberada', 'Retención liberada: vuelve a tu total');
+}
+
+function voidRetention() {
+    setRetentionStatus('anulada', 'Retención anulada');
+}
+
+async function deleteRetention() {
+    const id = document.getElementById('retentionId').value;
+    if (!id || !currentUser) return;
+
+    showConfirmModal('Eliminar retención', '¿Eliminar esta retención? Los registros no se tocan.', 'Eliminar', async () => {
+        try {
+            await db.ref(`retentions/${currentUser.uid}/${id}`).remove();
+            showToast('Retención eliminada');
+            closeRetentionModal();
+        } catch (error) {
+            showToast('No se pudo eliminar', 'error');
+        }
+    });
+}
+
 // Update statistics - usar el mes del calendario
 function updateStats() {
     const month = currentDate.getMonth();
@@ -546,11 +903,12 @@ function updateStats() {
 
     const gross = monthEntries.reduce((sum, e) => sum + (e.total || 0), 0);
     const deduction = getDeductionForEntries(monthEntries);
-    const total = gross - deduction;
+    const withheld = getWithheldForEntries(monthEntries);
+    const total = gross - deduction - withheld;
 
     const pendingEntries = monthEntries.filter(e => !e.paid);
     const pendingGross = pendingEntries.reduce((sum, e) => sum + (e.total || 0), 0);
-    const pending = pendingGross - getDeductionForEntries(pendingEntries);
+    const pending = pendingGross - getDeductionForEntries(pendingEntries) - getWithheldForEntries(pendingEntries);
 
     const days = new Set(monthEntries.map(e => e.date)).size;
 
@@ -558,7 +916,22 @@ function updateStats() {
     document.getElementById('pendingAmount').textContent = '$' + pending.toFixed(2);
     document.getElementById('totalDays').textContent = days;
     document.getElementById('totalLabel').textContent = 'Total ' + monthNames[month];
-    setGrossSub(deduction > 0 ? gross : null);
+    setGrossSub((deduction + withheld) > 0 ? gross : null);
+    setRetainedCard(getRetainedForEntries(monthEntries));
+}
+
+// La tarjeta de retenido solo existe cuando hay algo congelado
+function setRetainedCard(amount) {
+    const card = document.getElementById('retainedCard');
+    const grid = document.getElementById('statsGrid');
+    if (!card || !grid) return;
+
+    const show = amount > 0.005;
+    card.style.display = show ? '' : 'none';
+    grid.classList.toggle('has-retained', show);
+    if (show) {
+        document.getElementById('retainedAmount').textContent = '$' + amount.toFixed(2);
+    }
 }
 
 // Línea "Bruto $X" bajo el total. Se oculta si el periodo no tiene descuentos.
@@ -601,10 +974,12 @@ function toggleTotalGeneral() {
     // Calcular totales generales
     const grossGeneral = entries.reduce((sum, e) => sum + (e.total || 0), 0);
     const deductionGeneral = getDeductionForEntries(entries);
-    const totalGeneral = grossGeneral - deductionGeneral;
+    const withheldGeneral = getWithheldForEntries(entries);
+    const totalGeneral = grossGeneral - deductionGeneral - withheldGeneral;
     const pendingEntriesGeneral = entries.filter(e => !e.paid);
     const pendingGeneral = pendingEntriesGeneral.reduce((sum, e) => sum + (e.total || 0), 0)
-        - getDeductionForEntries(pendingEntriesGeneral);
+        - getDeductionForEntries(pendingEntriesGeneral)
+        - getWithheldForEntries(pendingEntriesGeneral);
     const daysGeneral = new Set(entries.map(e => e.date)).size;
 
     // Paso 1: Animar salida
@@ -618,7 +993,8 @@ function toggleTotalGeneral() {
         totalLabel.textContent = 'TOTAL GENERAL';
         pendingLabel.textContent = 'PEND. GENERAL';
         daysLabel.textContent = 'DÍAS TOTALES';
-        setGrossSub(deductionGeneral > 0 ? grossGeneral : null);
+        setGrossSub((deductionGeneral + withheldGeneral) > 0 ? grossGeneral : null);
+        setRetainedCard(getRetainedForEntries(entries));
 
         // Agregar clase showing-general
         cards.forEach(card => card.classList.add('showing-general'));
@@ -2276,6 +2652,10 @@ function renderCalendar() {
             if (hasDayDeduction(dateStr)) {
                 day.classList.add('has-deduction');
             }
+            // Borde punteado + candado: el día está cubierto por una retención
+            if (getDayRetained(dateStr) > 0.005) {
+                day.classList.add('has-retention');
+            }
         }
 
         // Marcar si está seleccionado
@@ -2407,10 +2787,12 @@ function updateSelectionStats() {
 
     const gross = selected.reduce((sum, e) => sum + (e.total || 0), 0);
     const deduction = getDeductionForEntries(selected);
-    const total = gross - deduction;
+    const withheld = getWithheldForEntries(selected);
+    const total = gross - deduction - withheld;
     const pendingSelected = selected.filter(e => !e.paid);
     const pending = pendingSelected.reduce((sum, e) => sum + (e.total || 0), 0)
-        - getDeductionForEntries(pendingSelected);
+        - getDeductionForEntries(pendingSelected)
+        - getWithheldForEntries(pendingSelected);
     const days = new Set(selected.map(e => e.date)).size;
 
     document.getElementById('totalEarnings').textContent = '$' + total.toFixed(2);
@@ -2419,7 +2801,8 @@ function updateSelectionStats() {
     document.getElementById('totalLabel').textContent = 'Selección';
     document.getElementById('pendingLabel').textContent = 'Pendiente';
     document.getElementById('daysLabel').textContent = 'Días';
-    setGrossSub(deduction > 0 ? gross : null);
+    setGrossSub((deduction + withheld) > 0 ? gross : null);
+    setRetainedCard(getRetainedForEntries(selected));
 
     // Agregar clase visual
     document.querySelectorAll('.stat-card').forEach(card => {
@@ -2596,20 +2979,30 @@ function renderDayBreakdown(dateStr, dayEntries) {
     if (!el) return;
 
     const deduction = getDayDeduction(dateStr);
-    if (!dayEntries.length || deduction <= 0) {
+    const held = getDayRetained(dateStr);
+    const lost = getDayWithheld(dateStr) - held;
+
+    if (!dayEntries.length || (deduction <= 0 && held <= 0 && lost <= 0)) {
         el.innerHTML = '';
         return;
     }
 
     const gross = dayEntries.reduce((sum, e) => sum + (e.total || 0), 0);
+    const net = gross - deduction - held - lost;
 
-    el.innerHTML = `
-        <div class="day-breakdown">
-            <div class="db-row"><span>Bruto del día</span><span>$${gross.toFixed(2)}</span></div>
-            <div class="db-row db-deduct"><span>Descuento (AFP + comida)</span><span>−$${deduction.toFixed(2)}</span></div>
-            <div class="db-row db-net"><span>Líquido</span><span>$${(gross - deduction).toFixed(2)}</span></div>
-        </div>
-    `;
+    let rows = `<div class="db-row"><span>Bruto del día</span><span>$${gross.toFixed(2)}</span></div>`;
+    if (deduction > 0) {
+        rows += `<div class="db-row db-deduct"><span>Descuento (AFP + comida)</span><span>−$${deduction.toFixed(2)}</span></div>`;
+    }
+    if (held > 0) {
+        rows += `<div class="db-row db-hold"><span>🔒 Retenido</span><span>−$${held.toFixed(2)}</span></div>`;
+    }
+    if (lost > 0) {
+        rows += `<div class="db-row db-deduct"><span>Retención anulada</span><span>−$${lost.toFixed(2)}</span></div>`;
+    }
+    rows += `<div class="db-row db-net"><span>Líquido</span><span>$${net.toFixed(2)}</span></div>`;
+
+    el.innerHTML = `<div class="day-breakdown">${rows}</div>`;
 }
 
 function closeDayModal() {

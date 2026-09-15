@@ -101,6 +101,10 @@
                 <div class="stat-value" id="totalDays">0</div>
                 <div class="stat-label" id="daysLabel">Días</div>
             </div>
+            <div class="stat-card retained" id="retainedCard" style="display: none;">
+                <div class="stat-value" id="retainedAmount">$0</div>
+                <div class="stat-label">🔒 Retenido</div>
+            </div>
         </div>
 
         <!-- Quick Add Bar -->
@@ -162,6 +166,9 @@
                     </div>
                 </div>
             </div>
+            <!-- Retenciones activas -->
+            <div class="retentions-strip" id="retentionsStrip" style="display: none;"></div>
+
             <!-- Monthly Calendar -->
             <div class="calendar-container" id="monthlyCalendarContainer">
                 <div class="calendar-header">
@@ -470,9 +477,68 @@
             <div class="modal-body">
                 <div id="dayEntriesList"></div>
                 <div id="dayBreakdown"></div>
-                <button class="btn btn-primary" style="width: 100%; margin-top: 15px;" onclick="addEntryForDay()">
-                    + Agregar registro
-                </button>
+                <div class="day-actions">
+                    <button class="btn btn-primary" onclick="addEntryForDay()">+ Agregar registro</button>
+                    <button class="btn btn-hold" onclick="openRetentionForDay()">🔒 Retención</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Retention Modal -->
+    <div class="modal-overlay" id="retentionModal" role="dialog" aria-modal="true" aria-labelledby="retentionModalTitle">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="retentionModalTitle">Nueva Retención</h2>
+                <button class="modal-close" onclick="closeRetentionModal()" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="retentionId">
+
+                <div class="retention-status" id="retentionStatus" style="display: none;"></div>
+
+                <div class="form-group">
+                    <label>Motivo</label>
+                    <input type="text" id="retentionReason" placeholder="Ej: falta repaso hilera 4" maxlength="120">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Desde</label>
+                        <input type="date" id="retentionFrom" onchange="updateRetentionPreview()">
+                    </div>
+                    <div class="form-group">
+                        <label>Hasta</label>
+                        <input type="date" id="retentionTo" onchange="updateRetentionPreview()">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Cómo te retiene</label>
+                    <select id="retentionMode" onchange="updateRetentionPreview()">
+                        <option value="price">Precio de trato rebajado ($ menos por unidad)</option>
+                        <option value="amount">Monto fijo del periodo</option>
+                        <option value="percent">Porcentaje del periodo</option>
+                        <option value="perday">Cantidad por cada día trabajado</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label id="retentionValueLabel">Pesos menos por unidad</label>
+                    <input type="number" id="retentionValue" step="0.01" min="0" placeholder="0" oninput="updateRetentionPreview()">
+                </div>
+
+                <div class="retention-preview" id="retentionPreview"></div>
+
+                <div class="retention-actions" id="retentionActions" style="display: none;">
+                    <button type="button" class="btn btn-primary" onclick="releaseRetention()">Liberar · ya me la pagaron</button>
+                    <button type="button" class="btn btn-danger" onclick="voidRetention()">Anular · no la voy a recibir</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" id="deleteRetentionBtn" style="display: none;" onclick="deleteRetention()">Eliminar</button>
+                <button class="btn btn-secondary" onclick="closeRetentionModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveRetention()">Guardar</button>
             </div>
         </div>
     </div>
