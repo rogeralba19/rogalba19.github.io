@@ -987,12 +987,20 @@ function openPaydayModal(dateStr) {
     document.getElementById('paydayDateLabel').textContent = dateLabel;
 
     if (existing) {
+        const auto = computeExpectedForPayday(dateStr);
+        // Si no llegaste a anotar el "deberías recibir", se propone el calculado
+        const anotado = existing.expected > 0;
+
         document.getElementById('paydayReceived').value = existing.received || '';
-        document.getElementById('paydayExpected').value = existing.expected || '';
+        document.getElementById('paydayExpected').value = anotado
+            ? existing.expected
+            : (auto.expected ? auto.expected.toFixed(2) : '');
         document.getElementById('paydayNote').value = existing.note || '';
         document.getElementById('paydayModalTitle').textContent = 'Editar Día de Pago';
         document.getElementById('deletePaydayBtn').style.display = 'block';
-        document.getElementById('paydayExpectedHint').textContent = 'Guardado tal como lo anotaste ese día.';
+        document.getElementById('paydayExpectedHint').textContent = anotado
+            ? 'Guardado tal como lo anotaste ese día.'
+            : 'Calculado de tus registros del periodo. Puedes corregirlo.';
     } else {
         const auto = computeExpectedForPayday(dateStr);
         document.getElementById('paydayReceived').value = '';
@@ -1053,17 +1061,16 @@ async function savePayday() {
     if (!currentUser) return;
 
     const date = document.getElementById('paydayDate').value;
-    const received = parseFloat(document.getElementById('paydayReceived').value);
-
     if (!date) return;
-    if (isNaN(received) || received < 0) {
-        showToast('Anota cuánto recibiste', 'error');
-        return;
-    }
+
+    // Marcar el día no obliga a anotar nada: el monto se puede poner después,
+    // o nunca. La celda del calendario muestra el líquido del periodo igual.
+    const received = parseFloat(document.getElementById('paydayReceived').value);
+    const expected = parseFloat(document.getElementById('paydayExpected').value);
 
     const data = {
-        received,
-        expected: Math.max(0, parseFloat(document.getElementById('paydayExpected').value) || 0),
+        received: (isNaN(received) || received < 0) ? null : received,
+        expected: (isNaN(expected) || expected < 0) ? null : expected,
         note: document.getElementById('paydayNote').value.trim(),
         updatedAt: Date.now()
     };
