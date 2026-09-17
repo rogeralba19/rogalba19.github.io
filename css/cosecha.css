@@ -3844,18 +3844,6 @@ body.boss-mode .boss-only-tab {
     flex: 1;
 }
 
-.btn-hold {
-    background: var(--hold-soft);
-    border: 1px solid var(--hold-line);
-    color: var(--hold);
-}
-
-.btn-hold:hover {
-    background: var(--hold-line);
-    color: var(--btn-primary-text);
-}
-
-/* Modal de retención */
 .retention-status {
     padding: 10px 12px;
     border-radius: var(--r-sm);
@@ -3883,245 +3871,70 @@ body.boss-mode .boss-only-tab {
     color: var(--red);
 }
 
-/* Lista de días del trabajo, para marcar cuáles te retuvieron */
-.retention-days {
-    max-height: 210px;
-    overflow-y: auto;
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
-    background: var(--surface-2);
+/* Retención dentro del modal de registro */
+.retention-group .toggle-row {
+    border: 1px solid transparent;
+    transition: border-color 0.2s;
 }
 
-.rd-empty {
-    padding: 14px;
-    font-size: 13px;
-    color: var(--text-3);
-    margin: 0;
+.retention-group.on .toggle-row {
+    border-color: var(--hold-line);
 }
 
-.rd-day {
+.retention-group .toggle-switch.active {
+    background: var(--hold-line);
+}
+
+.retention-group .toggle-switch.active::after {
+    background: var(--hold);
+}
+
+.retention-fields {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.retention-group.on .retention-fields {
     display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 9px 12px;
-    cursor: pointer;
-    border-bottom: 1px solid var(--border);
-    transition: background 0.15s;
 }
 
-.rd-day:last-child {
-    border-bottom: none;
+.rf-row {
+    display: flex;
+    gap: 8px;
 }
 
-.rd-day:hover {
-    background: var(--hold-soft);
+.rf-row select {
+    flex: 1 1 58%;
+    min-width: 0;
 }
 
-.rd-day.on {
-    background: var(--hold-soft);
+.rf-row input {
+    flex: 1 1 42%;
+    min-width: 0;
 }
 
-.rd-day input {
-    width: 17px;
-    height: 17px;
-    accent-color: var(--hold);
-    flex-shrink: 0;
-    margin: 0;
-}
-
-.rd-date {
-    font-weight: 600;
-    font-size: 13px;
-    color: var(--text);
-    text-transform: capitalize;
-    flex-shrink: 0;
-}
-
-.rd-detail {
+.retention-hint {
     font-size: 11px;
-    color: var(--text-3);
-    margin-left: auto;
-    text-align: right;
-}
-
-/* Retenciones de un trabajo */
-.jr-item {
-    padding: 12px 14px;
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--hold);
-    border-radius: var(--r-sm);
-    margin-bottom: 10px;
-    background: var(--surface-2);
-}
-
-.jr-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 12px;
-}
-
-.jr-reason {
-    font-weight: 600;
-    font-size: 14px;
-    color: var(--text);
-}
-
-.jr-amount {
-    font-family: var(--font-display);
-    font-size: 16px;
-    font-weight: 700;
     color: var(--hold);
-    flex-shrink: 0;
-}
-
-.jr-meta {
-    font-size: 11px;
-    color: var(--text-3);
-    margin-top: 3px;
     line-height: 1.4;
 }
 
-.jr-actions {
+.retention-state {
     display: flex;
     gap: 8px;
-    margin-top: 10px;
+    margin-top: 4px;
 }
 
-.jr-actions .btn {
+.retention-state .btn {
     flex: 1;
-    padding: 7px 10px;
+    padding: 9px 10px;
     font-size: 12px;
 }
 
-.jr-total {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    padding-top: 12px;
-    margin-top: 4px;
-    border-top: 1px solid var(--border);
-    font-family: var(--font-display);
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--text);
-}
-
-.jr-total span:last-child {
-    color: var(--hold);
-}
-
-.retention-preview {
-    padding: 12px 14px;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
-    font-size: 13px;
-    color: var(--text-2);
-    line-height: 1.5;
-}
-
-.retention-preview strong {
-    font-family: var(--font-display);
-    font-size: 16px;
-    color: var(--hold);
-}
-
-.retention-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border);
-}
-
-/* ==========================================
-   DÍA DE PAGO
-   ========================================== */
-/* El borde más marcado del calendario: pesa más incluso que el día de hoy */
-.calendar-day.is-payday {
-    border-width: 2px;
-    border-style: solid;
-    border-color: var(--payday-ring);
-    box-shadow: 0 0 0 3px var(--payday-glow);
-}
-
-.day-payday {
-    margin-top: auto;
-    padding-top: 4px;
-    border-top: 1px solid var(--border-strong);
-    font-family: var(--font-display);
-    font-size: 15px;
-    font-weight: 800;
-    color: var(--text);
-    font-variant-numeric: tabular-nums;
-    line-height: 1.2;
-}
-
-.day-payday-expected {
-    font-size: 10px;
-    font-weight: 600;
-    color: var(--amber);
-    line-height: 1.2;
-}
-
-.btn-payday {
-    background: var(--surface-2);
-    border: 1px solid var(--border-strong);
-    color: var(--text);
-}
-
-.btn-payday:hover {
-    border-color: var(--payday-ring);
-}
-
-.payday-date {
-    font-family: var(--font-display);
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--text);
-    margin-bottom: 18px;
-    text-transform: capitalize;
-}
-
-.field-hint {
-    font-size: 11px;
-    color: var(--text-3);
-    margin-top: 6px;
-    line-height: 1.4;
-}
-
-.payday-diff {
-    display: none;
-    padding: 11px 13px;
-    border-radius: var(--r-sm);
-    font-size: 13px;
-    font-weight: 600;
-    border: 1px solid transparent;
-    margin-bottom: 18px;
-}
-
-.payday-diff.visible {
-    display: block;
-}
-
-.payday-diff.ok {
-    background: var(--green-soft);
-    border-color: var(--green-line);
-    color: var(--green);
-}
-
-.payday-diff.short {
-    background: var(--red-soft);
-    border-color: var(--red-line);
-    color: var(--red);
-}
-
-.payday-diff.over {
-    background: var(--blue-soft);
-    border-color: var(--blue-line);
-    color: var(--blue);
+.retention-group .retention-status {
+    margin: 8px 0 0;
 }
 
 /* Subtítulo bruto en la tarjeta de total */
