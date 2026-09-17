@@ -49,6 +49,15 @@ let retentionByDate = {}; // { 'YYYY-MM-DD': { held, lost } }
 // Días de pago: lo que recibiste ese día y lo que deberías haber recibido
 let paydays = {}; // { 'YYYY-MM-DD': { received, expected, note } }
 
+// Los datos de descuentos, retenciones y días de pago cuelgan del perfil del
+// usuario en vez de ir en nodos propios: las reglas de Firebase del proyecto
+// están escritas nodo por nodo, así que un nodo nuevo en la raíz queda sin
+// permiso y toda lectura y escritura falla. Bajo users/{uid} heredan los
+// permisos que ya tiene el perfil.
+function userPath(sub) {
+    return `users/${currentUser.uid}/${sub}`;
+}
+
 // Helper: get local date as YYYY-MM-DD
 function getLocalDateString(date) {
     if (!date) date = new Date();
@@ -481,7 +490,7 @@ function loadData() {
     // Descuentos por día. Nodo propio: no toca harvest/ ni jobs/.
     // Si las reglas de Firebase no permiten el nodo, la app sigue funcionando
     // exactamente igual que antes: simplemente no hay descuentos.
-    db.ref(`deductions/${currentUser.uid}`).on('value', (snapshot) => {
+    db.ref(userPath('deductions')).on('value', (snapshot) => {
         dayDeductions = snapshot.val() || {};
         // El tope de lo retenido depende del descuento del día
         refreshRetentionMap();
@@ -495,7 +504,7 @@ function loadData() {
 
     // Retenciones. Igual que los descuentos: nodo propio, y si no está
     // disponible la app funciona como antes, sin retenciones.
-    db.ref(`retentions/${currentUser.uid}`).on('value', (snapshot) => {
+    db.ref(userPath('retentions')).on('value', (snapshot) => {
         retentions = [];
         snapshot.forEach((child) => {
             retentions.push({ id: child.key, ...child.val() });
@@ -511,7 +520,7 @@ function loadData() {
     });
 
     // Días de pago
-    db.ref(`paydays/${currentUser.uid}`).on('value', (snapshot) => {
+    db.ref(userPath('paydays')).on('value', (snapshot) => {
         paydays = snapshot.val() || {};
         if (entriesLoaded) {
             renderCalendar();
@@ -849,11 +858,11 @@ async function saveRetention() {
 
     try {
         if (id) {
-            await db.ref(`retentions/${currentUser.uid}/${id}`).update(data);
+            await db.ref(userPath(`retentions/${id}`)).update(data);
         } else {
             data.status = 'retenida';
             data.createdAt = Date.now();
-            await db.ref(`retentions/${currentUser.uid}`).push(data);
+            await db.ref(userPath('retentions')).push(data);
         }
         showToast('Retención guardada');
         closeRetentionModal();
@@ -867,7 +876,7 @@ async function setRetentionStatus(status, message) {
     if (!id || !currentUser) return;
 
     try {
-        await db.ref(`retentions/${currentUser.uid}/${id}`).update({
+        await db.ref(userPath(`retentions/${id}`)).update({
             status,
             releasedAt: Date.now()
         });
@@ -1005,7 +1014,7 @@ async function savePayday() {
     if (!paydays[date]) data.createdAt = Date.now();
 
     try {
-        await db.ref(`paydays/${currentUser.uid}/${date}`).update(data);
+        await db.ref(userPath(`paydays/${date}`)).update(data);
         showToast('Día de pago guardado');
         closePaydayModal();
     } catch (error) {
@@ -1019,7 +1028,7 @@ async function deletePayday() {
 
     showConfirmModal('Quitar día de pago', '¿Quitar la marca de día de pago? Los registros no se tocan.', 'Quitar', async () => {
         try {
-            await db.ref(`paydays/${currentUser.uid}/${date}`).remove();
+            await db.ref(userPath(`paydays/${date}`)).remove();
             showToast('Día de pago quitado');
             closePaydayModal();
         } catch (error) {
@@ -1034,7 +1043,7 @@ async function deleteRetention() {
 
     showConfirmModal('Eliminar retención', '¿Eliminar esta retención? Los registros no se tocan.', 'Eliminar', async () => {
         try {
-            await db.ref(`retentions/${currentUser.uid}/${id}`).remove();
+            await db.ref(userPath(`retentions/${id}`)).remove();
             showToast('Retención eliminada');
             closeRetentionModal();
         } catch (error) {
@@ -2186,7 +2195,11 @@ function syncEntryDeductionUI() {
             ? saved.value
             : deductionDefault.value;
     } else {
-        entryDeductionOn = isWeekdayDate(date);
+        // Un registro que ya existe y no tiene descuento guardado se queda como
+        // está: no se le inventa uno. La propuesta de lunes a viernes es solo
+        // para registros nuevos.
+        const isEditing = !!document.getElementById('entryId').value;
+        entryDeductionOn = !isEditing && isWeekdayDate(date);
         entryDeductionMode = deductionDefault.mode;
         valueInput.value = deductionDefault.value;
     }
@@ -2267,7 +2280,7 @@ async function persistDayDeduction(date, payload) {
     if (!currentUser || !date) return;
 
     try {
-        await db.ref(`deductions/${currentUser.uid}/${date}`).update(payload);
+        await db.ref(userPath(`deductions/${date}`)).update(payload);
     } catch (error) {
         showToast('Registro guardado, pero el descuento no se pudo guardar', 'error');
         return;
@@ -2794,7 +2807,10 @@ function renderCalendar() {
 
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
         const dayEntries = entries.filter(e => e.date === dateStr);
-        const dayTotal = dayEntries.reduce((sum, e) => sum + (e.total || 0), 0);
+        // Lo que se muestra es lo que te queda: bruto menos descuento y menos
+        // lo retenido. La cifra del descuento no se muestra en ninguna parte.
+        const dayTotal = dayEntries.reduce((sum, e) => sum + (e.total || 0), 0)
+            - getDayDeduction(dateStr) - getDayWithheld(dateStr);
         const hasPending = dayEntries.some(e => !e.paid);
 
         if (today.getDate() === i && today.getMonth() === month && today.getFullYear() === year) {
@@ -3135,43 +3151,9 @@ function openDayModal(dateStr, dayEntries) {
         }).join('');
     }
 
-    renderDayBreakdown(dateStr, dayEntries);
     document.getElementById('dayPaydayBtn').textContent =
         paydays[dateStr] ? '💰 Editar pago' : '💰 Día de pago';
     openModal('dayModal');
-}
-
-// Desglose bruto → descuento → líquido. Solo aparece si el día tiene descuento;
-// un día sin descuento deja el modal igual que siempre.
-function renderDayBreakdown(dateStr, dayEntries) {
-    const el = document.getElementById('dayBreakdown');
-    if (!el) return;
-
-    const deduction = getDayDeduction(dateStr);
-    const held = getDayRetained(dateStr);
-    const lost = getDayWithheld(dateStr) - held;
-
-    if (!dayEntries.length || (deduction <= 0 && held <= 0 && lost <= 0)) {
-        el.innerHTML = '';
-        return;
-    }
-
-    const gross = dayEntries.reduce((sum, e) => sum + (e.total || 0), 0);
-    const net = gross - deduction - held - lost;
-
-    let rows = `<div class="db-row"><span>Bruto del día</span><span>$${gross.toFixed(2)}</span></div>`;
-    if (deduction > 0) {
-        rows += `<div class="db-row db-deduct"><span>Descuento (AFP + comida)</span><span>−$${deduction.toFixed(2)}</span></div>`;
-    }
-    if (held > 0) {
-        rows += `<div class="db-row db-hold"><span>🔒 Retenido</span><span>−$${held.toFixed(2)}</span></div>`;
-    }
-    if (lost > 0) {
-        rows += `<div class="db-row db-deduct"><span>Retención anulada</span><span>−$${lost.toFixed(2)}</span></div>`;
-    }
-    rows += `<div class="db-row db-net"><span>Líquido</span><span>$${net.toFixed(2)}</span></div>`;
-
-    el.innerHTML = `<div class="day-breakdown">${rows}</div>`;
 }
 
 function closeDayModal() {
