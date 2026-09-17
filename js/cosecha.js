@@ -945,10 +945,12 @@ function voidEntryRetention() {
 // DÍA DE PAGO
 // ============================================
 
-// Propuesta automática: todo lo que quedó pendiente desde el día de pago
-// anterior hasta esta fecha, ya en líquido. Se calcula solo al crear el día de
-// pago; después se guarda el número, para que marcar registros como pagados
-// más tarde no cambie lo que ya anotaste.
+// Propuesta automática: lo que quedó pendiente hasta el día ANTERIOR al de
+// pago. El día de pago no se paga a sí mismo: si te pagan el viernes, te pagan
+// hasta el jueves. Por eso el día de pago anterior sí entra en este periodo,
+// porque aquel tampoco se cubrió a sí mismo.
+// Se calcula solo al crear el día de pago; después se guarda el número, para
+// que marcar registros como pagados más tarde no cambie lo que ya anotaste.
 function computeExpectedForPayday(dateStr) {
     const previous = Object.keys(paydays)
         .filter(d => d < dateStr)
@@ -956,7 +958,7 @@ function computeExpectedForPayday(dateStr) {
         .pop();
 
     const covered = entries.filter(e =>
-        e.date <= dateStr && !e.paid && (!previous || e.date > previous)
+        e.date < dateStr && !e.paid && (!previous || e.date >= previous)
     );
 
     const gross = covered.reduce((sum, e) => sum + (e.total || 0), 0);
@@ -996,12 +998,17 @@ function openPaydayModal(dateStr) {
         document.getElementById('paydayModalTitle').textContent = 'Día de Pago';
         document.getElementById('deletePaydayBtn').style.display = 'none';
 
+        const hasta = new Date(dateStr + 'T12:00:00');
+        hasta.setDate(hasta.getDate() - 1);
+        const hastaLabel = hasta.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+
         const desde = auto.previous
             ? 'desde el día de pago anterior'
-            : 'de todo lo pendiente hasta esta fecha';
-        const dias = auto.days === 1 ? '1 día' : `${auto.days} días`;
+            : 'de todo lo pendiente';
+        const dias = auto.days === 1 ? '1 día trabajado' : `${auto.days} días trabajados`;
         document.getElementById('paydayExpectedHint').textContent =
-            `Calculado ${desde}: ${dias} pendientes, ya con descuentos restados y sin lo retenido. Puedes corregirlo.`;
+            `Calculado ${desde} hasta el ${hastaLabel}, el día antes de este: ${dias}, `
+            + 'ya con descuentos restados y sin lo retenido. Puedes corregirlo.';
     }
 
     updatePaydayDiff();
