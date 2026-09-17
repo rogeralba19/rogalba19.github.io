@@ -3737,47 +3737,6 @@ body.boss-mode .boss-only-tab {
     display: block;
 }
 
-/* Desglose del día (modal del día) */
-.day-breakdown {
-    margin-top: 14px;
-    padding: 12px 14px;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
-}
-
-.db-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 12px;
-    font-size: 13px;
-    color: var(--text-2);
-    padding: 3px 0;
-}
-
-.db-row.db-deduct span:last-child {
-    color: var(--deduct);
-}
-
-.db-row.db-hold span:last-child {
-    color: var(--hold);
-}
-
-.db-row.db-net {
-    margin-top: 6px;
-    padding-top: 8px;
-    border-top: 1px solid var(--border);
-    font-family: var(--font-display);
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--text);
-}
-
-.db-row.db-net span:last-child {
-    color: var(--green);
-}
-
 /* ==========================================
    RETENCIONES
    ========================================== */
