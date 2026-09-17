@@ -454,6 +454,30 @@
                     <div class="deduction-hint" id="entryDeductionHint"></div>
                 </div>
 
+                <div class="form-group retention-group" id="entryRetentionGroup">
+                    <div class="toggle-row">
+                        <span>Retención del jefe</span>
+                        <div class="toggle-switch" id="entryRetentionToggle" onclick="toggleEntryRetention()" role="switch" aria-checked="false" aria-label="Retención en este día"></div>
+                    </div>
+                    <div class="retention-status" id="entryRetentionNote" style="display: none;"></div>
+                    <div class="retention-fields">
+                        <div class="rf-row">
+                            <select id="entryRetentionMode" onchange="updateEntryRetentionUI()" aria-label="Cómo te retiene">
+                                <option value="price">$ menos por unidad</option>
+                                <option value="amount">Monto fijo del día</option>
+                                <option value="percent">% del día</option>
+                            </select>
+                            <input type="number" id="entryRetentionValue" step="0.01" min="0" placeholder="0" oninput="updateEntryRetentionUI()" aria-label="Cuánto te retiene">
+                        </div>
+                        <input type="text" id="entryRetentionReason" placeholder="Motivo (ej: falta repaso hilera 4)" maxlength="120">
+                        <div class="retention-hint" id="entryRetentionHint"></div>
+                        <div class="retention-state" id="entryRetentionState" style="display: none;">
+                            <button type="button" class="btn btn-primary" onclick="releaseEntryRetention()">Liberar · ya me la pagaron</button>
+                            <button type="button" class="btn btn-danger" onclick="voidEntryRetention()">Anular</button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label>Notas (opcional)</label>
                     <textarea id="entryNotes" rows="2" placeholder="Observaciones..."></textarea>
@@ -478,83 +502,8 @@
                 <div id="dayEntriesList"></div>
                 <div class="day-actions">
                     <button class="btn btn-primary" onclick="addEntryForDay()">+ Registro</button>
-                    <button class="btn btn-hold" onclick="openRetentionForDay()">🔒 Retención</button>
                     <button class="btn btn-payday" id="dayPaydayBtn" onclick="openPaydayForDay()">💰 Día de pago</button>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Retention Modal -->
-    <div class="modal-overlay" id="retentionModal" role="dialog" aria-modal="true" aria-labelledby="retentionModalTitle">
-        <div class="modal">
-            <div class="modal-header">
-                <h2 id="retentionModalTitle">Nueva Retención</h2>
-                <button class="modal-close" onclick="closeRetentionModal()" aria-label="Cerrar">&times;</button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="retentionId">
-
-                <div class="retention-status" id="retentionStatus" style="display: none;"></div>
-
-                <div class="form-group">
-                    <label>Trabajo</label>
-                    <select id="retentionJob" onchange="onRetentionJobChange()"></select>
-                </div>
-
-                <div class="form-group">
-                    <label>Días que te retuvieron</label>
-                    <div class="retention-days" id="retentionDays"></div>
-                </div>
-
-                <div class="form-group">
-                    <label>Motivo</label>
-                    <input type="text" id="retentionReason" placeholder="Ej: falta repaso hilera 4" maxlength="120">
-                </div>
-
-                <div class="form-group">
-                    <label>Cómo te retiene</label>
-                    <select id="retentionMode" onchange="updateRetentionPreview()">
-                        <option value="price">Precio de trato rebajado ($ menos por unidad)</option>
-                        <option value="amount">Monto fijo del periodo</option>
-                        <option value="percent">Porcentaje del periodo</option>
-                        <option value="perday">Cantidad por cada día trabajado</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label id="retentionValueLabel">Pesos menos por unidad</label>
-                    <input type="number" id="retentionValue" step="0.01" min="0" placeholder="0" oninput="updateRetentionPreview()">
-                </div>
-
-                <div class="retention-preview" id="retentionPreview"></div>
-
-                <div class="retention-actions" id="retentionActions" style="display: none;">
-                    <button type="button" class="btn btn-primary" onclick="releaseRetention()">Liberar · ya me la pagaron</button>
-                    <button type="button" class="btn btn-danger" onclick="voidRetention()">Anular · no la voy a recibir</button>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-danger" id="deleteRetentionBtn" style="display: none;" onclick="deleteRetention()">Eliminar</button>
-                <button class="btn btn-secondary" onclick="closeRetentionModal()">Cancelar</button>
-                <button class="btn btn-primary" onclick="saveRetention()">Guardar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Job Retentions Modal -->
-    <div class="modal-overlay" id="jobRetentionsModal" role="dialog" aria-modal="true" aria-labelledby="jobRetentionsTitle">
-        <div class="modal">
-            <div class="modal-header">
-                <h2><span class="jr-lock">🔒</span> <span id="jobRetentionsTitle">Retenciones</span></h2>
-                <button class="modal-close" onclick="closeJobRetentions()" aria-label="Cerrar">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div id="jobRetentionsList"></div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeJobRetentions()">Cerrar</button>
-                <button class="btn btn-hold" onclick="addRetentionToJob()">+ Otra retención</button>
             </div>
         </div>
     </div>
