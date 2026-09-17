@@ -957,8 +957,11 @@ function computeExpectedForPayday(dateStr) {
         .sort()
         .pop();
 
+    // Sin filtrar por pagado: el periodo son unos días concretos, y su líquido
+    // no puede cambiar después por marcar registros como pagados. Si cambiara,
+    // el monto de la celda del calendario bailaría solo.
     const covered = entries.filter(e =>
-        e.date < dateStr && !e.paid && (!previous || e.date >= previous)
+        e.date < dateStr && (!previous || e.date >= previous)
     );
 
     const gross = covered.reduce((sum, e) => sum + (e.total || 0), 0);
@@ -2884,11 +2887,10 @@ function renderCalendar() {
         const payday = paydays[dateStr];
         if (payday) day.classList.add('is-payday');
 
+        // En la celda va el líquido que sale de sumar los registros del periodo.
+        // Lo que anotaste (recibido y deberías recibir) se ve al abrir el día.
         const paydayHtml = payday
-            ? `<span class="day-payday">💰 $${(payday.received || 0).toFixed(0)}</span>`
-              + (Math.abs((payday.received || 0) - (payday.expected || 0)) >= 1
-                  ? `<span class="day-payday-expected">de $${(payday.expected || 0).toFixed(0)}</span>`
-                  : '')
+            ? `<span class="day-payday">$${computeExpectedForPayday(dateStr).expected.toFixed(0)}</span>`
             : '';
 
         day.innerHTML = `
