@@ -20,8 +20,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/cosecha.css">
-    <link rel="stylesheet" href="css/auth.css">
+    <link rel="stylesheet" href="css/cosecha.css?v=202609170316">
+    <link rel="stylesheet" href="css/auth.css?v=202609170316">
 </head>
 <body>
     <header class="header" role="banner">
@@ -907,17 +907,21 @@
         <p>Cargando datos...</p>
     </div>
 
+    <!-- Los ?v= de los css y js de abajo son para la caché: GitHub Pages sirve
+         estos archivos con max-age=600, así que sin ellos el navegador puede
+         quedarse hasta 10 minutos con la versión anterior después de publicar.
+         Hay que subirlos en cada despliegue que cambie css o js. -->
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 
     <!-- App Scripts -->
-    <script src="js/firebase-config.js"></script>
-    <script src="js/auth.js"></script>
-    <script src="js/cosecha.js"></script>
-    <script src="js/cuadrilla.js"></script>
-    <script src="js/boss-harvest.js"></script>
-    <script src="js/worker-integration.js"></script>
+    <script src="js/firebase-config.js?v=202609170316"></script>
+    <script src="js/auth.js?v=202609170316"></script>
+    <script src="js/cosecha.js?v=202609170316"></script>
+    <script src="js/cuadrilla.js?v=202609170316"></script>
+    <script src="js/boss-harvest.js?v=202609170316"></script>
+    <script src="js/worker-integration.js?v=202609170316"></script>
 </body>
 </html>
