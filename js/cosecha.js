@@ -597,26 +597,75 @@ const RETENTION_MODE_LABELS = {
     perday: 'Cantidad por día trabajado'
 };
 
-// Fechas con registros dentro del rango, ordenadas
-function getWorkedDatesInRange(from, to) {
-    if (!from) return [];
-    const end = to || from;
+// Días en que trabajaste en un trabajo concreto, del más reciente al más antiguo
+function getWorkedDatesForJob(jobId) {
+    if (!jobId) return [];
     const dates = new Set();
-    entries.forEach(e => {
-        if (e.date >= from && e.date <= end) dates.add(e.date);
-    });
-    return Array.from(dates).sort();
+    entries.forEach(e => { if (e.jobId === jobId) dates.add(e.date); });
+    return Array.from(dates).sort().reverse();
 }
 
-// Cantidad de unidades registradas al trato en una fecha
-function getDayQuantity(dateStr) {
-    return entries.reduce(
-        (sum, e) => e.date === dateStr ? sum + (e.quantity || 0) : sum, 0
-    );
+// Los días de una retención. Se guardan como objeto (Firebase no lleva bien los
+// arrays); las retenciones viejas guardaban un rango from/to y se convierten
+// aquí a los días de ese trabajo que caen dentro, para no perderlas.
+function getRetentionDates(r) {
+    if (r.dates) {
+        return Object.keys(r.dates).filter(d => r.dates[d]).sort();
+    }
+    if (r.from) {
+        const end = r.to || r.from;
+        return getWorkedDatesForJob(r.jobId)
+            .filter(d => d >= r.from && d <= end)
+            .sort();
+    }
+    return [];
 }
 
-// Reparte cada retención entre los días que cubre. El resultado se cachea y se
-// refresca desde los listeners de datos.
+// Registros de un trabajo en una fecha
+function getJobEntriesOn(jobId, dateStr) {
+    return entries.filter(e => e.date === dateStr && (!jobId || e.jobId === jobId));
+}
+
+// Lo que esa retención congela en un día concreto.
+// Clave: en trabajo de grupo el precio por unidad es del grupo, así que lo
+// retenido se divide entre las personas igual que se divide la ganancia. Si
+// fueron 5 personas no te retuvieron a ti las cinco partes.
+function getRetentionAmountOnDate(r, dateStr) {
+    const dayEntries = getJobEntriesOn(r.jobId, dateStr);
+    if (!dayEntries.length) return 0;
+    const value = r.value || 0;
+
+    if (r.mode === 'percent') {
+        // e.total ya viene dividido entre las personas
+        return dayEntries.reduce((sum, e) => sum + (e.total || 0), 0) * value / 100;
+    }
+    if (r.mode === 'perday') {
+        return value;
+    }
+    if (r.mode === 'price') {
+        return dayEntries.reduce((sum, e) => {
+            const people = Math.max(1, parseInt(e.people, 10) || 1);
+            return sum + value * (e.quantity || 0) / people;
+        }, 0);
+    }
+    return 0; // 'amount' se reparte fuera, mirando todos los días a la vez
+}
+
+// Total congelado por una retención, sumando todos sus días
+function getRetentionAmount(r) {
+    const dates = getRetentionDates(r);
+    if (!dates.length) return 0;
+    if (r.mode === 'amount') return r.value || 0;
+    return dates.reduce((sum, d) => sum + getRetentionAmountOnDate(r, d), 0);
+}
+
+// Bruto de un trabajo en una fecha (para repartir el monto fijo a prorrata)
+function getJobGrossOn(jobId, dateStr) {
+    return getJobEntriesOn(jobId, dateStr).reduce((sum, e) => sum + (e.total || 0), 0);
+}
+
+// Reparte cada retención entre sus días. Varias retenciones sobre el mismo día
+// se van sumando. El resultado se cachea y se refresca desde los listeners.
 function refreshRetentionMap() {
     const map = {};
 
@@ -628,26 +677,20 @@ function refreshRetentionMap() {
     retentions.forEach(r => {
         if (r.status !== 'retenida' && r.status !== 'anulada') return;
 
-        const dates = getWorkedDatesInRange(r.from, r.to);
+        const dates = getRetentionDates(r);
         if (!dates.length) return;
 
         const lost = r.status === 'anulada';
-        const value = r.value || 0;
 
         if (r.mode === 'amount') {
-            // Monto fijo del periodo: se reparte a prorrata del bruto de cada día
-            const totalGross = dates.reduce((sum, d) => sum + getDayGross(d), 0);
+            // Monto fijo del periodo: a prorrata del bruto de cada día
+            const totalGross = dates.reduce((sum, d) => sum + getJobGrossOn(r.jobId, d), 0);
             dates.forEach(d => {
-                const share = totalGross > 0 ? getDayGross(d) / totalGross : 1 / dates.length;
-                add(d, value * share, lost);
+                const share = totalGross > 0 ? getJobGrossOn(r.jobId, d) / totalGross : 1 / dates.length;
+                add(d, (r.value || 0) * share, lost);
             });
-        } else if (r.mode === 'percent') {
-            dates.forEach(d => add(d, getDayGross(d) * value / 100, lost));
-        } else if (r.mode === 'perday') {
-            dates.forEach(d => add(d, value, lost));
         } else {
-            // price: tantos pesos menos por unidad registrada al trato
-            dates.forEach(d => add(d, value * getDayQuantity(d), lost));
+            dates.forEach(d => add(d, getRetentionAmountOnDate(r, d), lost));
         }
     });
 
@@ -691,25 +734,8 @@ function getWithheldForEntries(entryList) {
     return sum;
 }
 
-// Monto total que una retención tiene congelado ahora mismo
-function getRetentionAmount(r) {
-    const dates = getWorkedDatesInRange(r.from, r.to);
-    if (!dates.length) return 0;
-    const value = r.value || 0;
-
-    if (r.mode === 'amount') return value;
-    if (r.mode === 'percent') return dates.reduce((s, d) => s + getDayGross(d), 0) * value / 100;
-    if (r.mode === 'perday') return value * dates.length;
-    return dates.reduce((s, d) => s + getDayQuantity(d), 0) * value;
-}
-
-function formatRetentionRange(r) {
-    const fmt = (d) => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
-    if (!r.to || r.to === r.from) return fmt(r.from);
-    return `${fmt(r.from)} — ${fmt(r.to)}`;
-}
-
-// Franja sobre el calendario: solo aparece si hay retenciones activas
+// Franja sobre el calendario. Se agrupa por trabajo: todas las retenciones de
+// un mismo trabajo se suman en una sola línea en vez de mostrarse sueltas.
 function renderRetentionsStrip() {
     const strip = document.getElementById('retentionsStrip');
     if (!strip) return;
@@ -721,40 +747,108 @@ function renderRetentionsStrip() {
         return;
     }
 
+    const byJob = {};
+    active.forEach(r => {
+        const key = r.jobId || 'sin-trabajo';
+        if (!byJob[key]) byJob[key] = { jobId: r.jobId, items: [], amount: 0, dates: new Set() };
+        byJob[key].items.push(r);
+        byJob[key].amount += getRetentionAmount(r);
+        getRetentionDates(r).forEach(d => byJob[key].dates.add(d));
+    });
+
     strip.style.display = 'flex';
-    strip.innerHTML = active.map(r => {
-        const dates = getWorkedDatesInRange(r.from, r.to);
-        const amount = dates.reduce((sum, d) => sum + getDayRetained(d), 0);
-        const reason = escapeHtml(r.reason || 'Retención');
-        const days = dates.length === 1 ? '1 día' : `${dates.length} días`;
+    strip.innerHTML = Object.values(byJob).map(g => {
+        const job = jobs.find(j => j.id === g.jobId);
+        const nombre = escapeHtml(job ? getJobDisplayName(job) : 'Sin trabajo');
+        const dias = g.dates.size === 1 ? '1 día' : `${g.dates.size} días`;
+        const partes = g.items.length === 1 ? '' : ` · ${g.items.length} retenciones sumadas`;
         return `
             <div class="retention-chip">
                 <div class="rc-main">
-                    <div class="rc-reason">🔒 ${reason}</div>
-                    <div class="rc-meta">${formatRetentionRange(r)} · ${days} · ${RETENTION_MODE_LABELS[r.mode] || ''}</div>
+                    <div class="rc-reason">🔒 ${nombre}</div>
+                    <div class="rc-meta">${dias}${partes}</div>
                 </div>
-                <div class="rc-amount">$${amount.toFixed(0)}</div>
-                <button type="button" class="rc-edit" onclick="openRetentionModal('${r.id}')">Gestionar</button>
+                <div class="rc-amount">$${g.amount.toFixed(0)}</div>
+                <button type="button" class="rc-edit" onclick="openJobRetentions('${g.jobId}')">Gestionar</button>
             </div>
         `;
     }).join('');
 }
 
+// --- Lista de retenciones de un trabajo ---
+
+let jobRetentionsJobId = null;
+
+function openJobRetentions(jobId) {
+    jobRetentionsJobId = jobId;
+    const job = jobs.find(j => j.id === jobId);
+    document.getElementById('jobRetentionsTitle').textContent =
+        job ? getJobDisplayName(job) : 'Retenciones';
+    renderJobRetentionsList();
+    openModal('jobRetentionsModal');
+}
+
+function closeJobRetentions() {
+    closeModal('jobRetentionsModal');
+    jobRetentionsJobId = null;
+}
+
+function renderJobRetentionsList() {
+    const list = document.getElementById('jobRetentionsList');
+    const items = retentions.filter(r => r.jobId === jobRetentionsJobId && r.status === 'retenida');
+
+    if (!items.length) {
+        list.innerHTML = '<p class="modal-empty-text">Este trabajo ya no tiene retenciones activas</p>';
+        return;
+    }
+
+    const total = items.reduce((sum, r) => sum + getRetentionAmount(r), 0);
+
+    list.innerHTML = items.map(r => {
+        const dates = getRetentionDates(r);
+        const fechas = dates
+            .map(d => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }))
+            .join(', ');
+        return `
+            <div class="jr-item">
+                <div class="jr-head">
+                    <span class="jr-reason">${escapeHtml(r.reason || 'Retención')}</span>
+                    <span class="jr-amount">$${getRetentionAmount(r).toFixed(0)}</span>
+                </div>
+                <div class="jr-meta">${RETENTION_MODE_LABELS[r.mode] || ''} · ${escapeHtml(fechas)}</div>
+                <div class="jr-actions">
+                    <button type="button" class="btn btn-secondary" onclick="openRetentionModal('${r.id}')">Editar</button>
+                    <button type="button" class="btn btn-primary" onclick="releaseRetentionById('${r.id}')">Liberar</button>
+                </div>
+            </div>
+        `;
+    }).join('') + `<div class="jr-total"><span>Total retenido</span><span>$${total.toFixed(0)}</span></div>`;
+}
+
+function addRetentionToJob() {
+    const jobId = jobRetentionsJobId;
+    closeJobRetentions();
+    openRetentionModal(null, null, jobId);
+}
+
 // --- Modal de retención ---
+
+let retentionSelectedDates = new Set();
 
 function openRetentionForDay() {
     const date = selectedDayDate;
+    // Si ese día solo tienes un trabajo, se preselecciona junto con el día
+    const dayEntries = entries.filter(e => e.date === date);
+    const jobId = dayEntries.length ? dayEntries[0].jobId : null;
     closeDayModal();
-    openRetentionModal(null, date);
+    openRetentionModal(null, date, jobId);
 }
 
-function openRetentionModal(retentionId = null, presetDate = null) {
-    const today = presetDate || getLocalDateString();
+function openRetentionModal(retentionId = null, presetDate = null, presetJobId = null) {
+    retentionSelectedDates = new Set();
 
     document.getElementById('retentionId').value = '';
     document.getElementById('retentionReason').value = '';
-    document.getElementById('retentionFrom').value = today;
-    document.getElementById('retentionTo').value = today;
     document.getElementById('retentionMode').value = 'price';
     document.getElementById('retentionValue').value = '';
     document.getElementById('retentionModalTitle').textContent = 'Nueva Retención';
@@ -762,18 +856,20 @@ function openRetentionModal(retentionId = null, presetDate = null) {
     document.getElementById('retentionActions').style.display = 'none';
     document.getElementById('retentionStatus').style.display = 'none';
 
+    populateRetentionJobSelect(presetJobId);
+
     if (retentionId) {
         const r = retentions.find(x => x.id === retentionId);
         if (r) {
             document.getElementById('retentionId').value = r.id;
             document.getElementById('retentionReason').value = r.reason || '';
-            document.getElementById('retentionFrom').value = r.from || today;
-            document.getElementById('retentionTo').value = r.to || r.from || today;
             document.getElementById('retentionMode').value = r.mode || 'price';
             document.getElementById('retentionValue').value = r.value || '';
             document.getElementById('retentionModalTitle').textContent = 'Retención';
             document.getElementById('deleteRetentionBtn').style.display = 'block';
             document.getElementById('retentionActions').style.display = r.status === 'retenida' ? 'flex' : 'none';
+            populateRetentionJobSelect(r.jobId);
+            getRetentionDates(r).forEach(d => retentionSelectedDates.add(d));
 
             const statusEl = document.getElementById('retentionStatus');
             statusEl.style.display = 'block';
@@ -784,24 +880,85 @@ function openRetentionModal(retentionId = null, presetDate = null) {
                 anulada: '✕ Anulada: no la vas a recibir'
             }[r.status] || '';
         }
+    } else if (presetDate) {
+        retentionSelectedDates.add(presetDate);
     }
 
-    updateRetentionPreview();
+    renderRetentionDays();
     openModal('retentionModal');
 }
 
-function closeRetentionModal() {
-    closeModal('retentionModal');
+function populateRetentionJobSelect(selectedId) {
+    const sel = document.getElementById('retentionJob');
+    // Solo trabajos en los que hay registros: no tiene sentido retener en uno vacío
+    const conRegistros = jobs.filter(j => entries.some(e => e.jobId === j.id));
+    sel.innerHTML = '<option value="">Elige el trabajo</option>' + conRegistros
+        .map(j => `<option value="${j.id}">${escapeHtml(getJobDisplayName(j))}</option>`)
+        .join('');
+    if (selectedId) sel.value = selectedId;
+}
+
+// Al cambiar de trabajo se rehace la lista de días y se olvidan los que ya no aplican
+function onRetentionJobChange() {
+    const valid = new Set(getWorkedDatesForJob(document.getElementById('retentionJob').value));
+    retentionSelectedDates.forEach(d => { if (!valid.has(d)) retentionSelectedDates.delete(d); });
+    renderRetentionDays();
+}
+
+// Lista de los días que fuiste a ese trabajo, para marcar cuáles te retuvieron.
+// Nada de rangos de fechas: en medio puede haber días de otro trabajo.
+function renderRetentionDays() {
+    const box = document.getElementById('retentionDays');
+    const jobId = document.getElementById('retentionJob').value;
+
+    if (!jobId) {
+        box.innerHTML = '<p class="rd-empty">Elige primero el trabajo para ver tus días.</p>';
+        updateRetentionPreview();
+        return;
+    }
+
+    const dates = getWorkedDatesForJob(jobId);
+    if (!dates.length) {
+        box.innerHTML = '<p class="rd-empty">No tienes registros en este trabajo.</p>';
+        updateRetentionPreview();
+        return;
+    }
+
+    box.innerHTML = dates.map(d => {
+        const dayEntries = getJobEntriesOn(jobId, d);
+        const cantidad = dayEntries.reduce((sum, e) => sum + (e.quantity || 0), 0);
+        const bruto = dayEntries.reduce((sum, e) => sum + (e.total || 0), 0);
+        const personas = Math.max(1, parseInt(dayEntries[0] && dayEntries[0].people, 10) || 1);
+        const etiqueta = new Date(d + 'T12:00:00')
+            .toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+        const detalle = (cantidad ? `${cantidad} u.` : 'jornada')
+            + (personas > 1 ? ` · ${personas} personas` : '')
+            + ` · $${bruto.toFixed(0)}`;
+        return `
+            <label class="rd-day${retentionSelectedDates.has(d) ? ' on' : ''}">
+                <input type="checkbox" value="${d}" ${retentionSelectedDates.has(d) ? 'checked' : ''} onchange="toggleRetentionDay(this)">
+                <span class="rd-date">${etiqueta}</span>
+                <span class="rd-detail">${detalle}</span>
+            </label>
+        `;
+    }).join('');
+
+    updateRetentionPreview();
+}
+
+function toggleRetentionDay(input) {
+    if (input.checked) retentionSelectedDates.add(input.value);
+    else retentionSelectedDates.delete(input.value);
+    input.closest('.rd-day').classList.toggle('on', input.checked);
+    updateRetentionPreview();
 }
 
 function readRetentionForm() {
-    const from = document.getElementById('retentionFrom').value;
-    let to = document.getElementById('retentionTo').value || from;
-    // Si las fechas vienen al revés, se enderezan en vez de rechazar
-    if (to < from) to = from;
+    const dates = {};
+    retentionSelectedDates.forEach(d => { dates[d] = true; });
     return {
-        from,
-        to,
+        jobId: document.getElementById('retentionJob').value,
+        dates,
         mode: document.getElementById('retentionMode').value,
         value: Math.max(0, parseFloat(document.getElementById('retentionValue').value) || 0),
         reason: document.getElementById('retentionReason').value.trim()
@@ -814,25 +971,36 @@ function updateRetentionPreview() {
         price: 'Pesos menos por unidad',
         amount: 'Monto retenido en total',
         percent: 'Porcentaje retenido (%)',
-        perday: 'Pesos por cada día trabajado'
+        perday: 'Pesos por cada día'
     };
     document.getElementById('retentionValueLabel').textContent = labels[form.mode] || 'Valor';
 
     const preview = document.getElementById('retentionPreview');
-    if (!form.from) {
-        preview.textContent = 'Elige las fechas que cubre la retención.';
-        return;
-    }
+    const dates = getRetentionDates(form);
 
-    const dates = getWorkedDatesInRange(form.from, form.to);
-    if (!dates.length) {
-        preview.textContent = 'No hay registros en ese rango de fechas, así que no hay nada que retener todavía.';
+    if (!form.jobId || !dates.length) {
+        preview.textContent = 'Elige el trabajo y marca los días que te retuvieron.';
         return;
     }
 
     const amount = getRetentionAmount(form);
-    const days = dates.length === 1 ? '1 día trabajado' : `${dates.length} días trabajados`;
-    preview.innerHTML = `Retiene <strong>$${amount.toFixed(2)}</strong> sobre ${days}.`;
+    const dias = dates.length === 1 ? '1 día' : `${dates.length} días`;
+
+    // Si hubo grupo, se dice en claro que lo retenido es tu parte
+    const enGrupo = dates.some(d =>
+        getJobEntriesOn(form.jobId, d).some(e => (parseInt(e.people, 10) || 1) > 1));
+    const nota = (enGrupo && form.mode === 'price')
+        ? ' Es tu parte: el precio por unidad se divide entre las personas del grupo.'
+        : '';
+
+    const yaRetenido = retentions
+        .filter(r => r.jobId === form.jobId && r.status === 'retenida' && r.id !== document.getElementById('retentionId').value)
+        .reduce((sum, r) => sum + getRetentionAmount(r), 0);
+    const suma = yaRetenido > 0
+        ? ` Se suma a los $${yaRetenido.toFixed(0)} que ya tienes retenidos en este trabajo: total $${(yaRetenido + amount).toFixed(0)}.`
+        : '';
+
+    preview.innerHTML = `Retiene <strong>$${amount.toFixed(2)}</strong> sobre ${dias}.${nota}${suma}`;
 }
 
 async function saveRetention() {
@@ -841,8 +1009,12 @@ async function saveRetention() {
     const id = document.getElementById('retentionId').value;
     const form = readRetentionForm();
 
-    if (!form.from) {
-        showToast('Elige la fecha de inicio', 'error');
+    if (!form.jobId) {
+        showToast('Elige el trabajo', 'error');
+        return;
+    }
+    if (!Object.keys(form.dates).length) {
+        showToast('Marca al menos un día', 'error');
         return;
     }
     if (form.value <= 0) {
@@ -855,6 +1027,9 @@ async function saveRetention() {
     }
 
     const data = { ...form, updatedAt: Date.now() };
+    // Las retenciones viejas guardaban un rango: al editarlas se borra
+    data.from = null;
+    data.to = null;
 
     try {
         if (id) {
@@ -871,8 +1046,11 @@ async function saveRetention() {
     }
 }
 
-async function setRetentionStatus(status, message) {
-    const id = document.getElementById('retentionId').value;
+function closeRetentionModal() {
+    closeModal('retentionModal');
+}
+
+async function setRetentionStatus(id, status, message) {
     if (!id || !currentUser) return;
 
     try {
@@ -881,18 +1059,45 @@ async function setRetentionStatus(status, message) {
             releasedAt: Date.now()
         });
         showToast(message);
-        closeRetentionModal();
     } catch (error) {
         showToast('No se pudo actualizar la retención', 'error');
     }
 }
 
 function releaseRetention() {
-    setRetentionStatus('liberada', 'Retención liberada: vuelve a tu total');
+    const id = document.getElementById('retentionId').value;
+    setRetentionStatus(id, 'liberada', 'Retención liberada: vuelve a tu total');
+    closeRetentionModal();
 }
 
 function voidRetention() {
-    setRetentionStatus('anulada', 'Retención anulada');
+    const id = document.getElementById('retentionId').value;
+    setRetentionStatus(id, 'anulada', 'Retención anulada');
+    closeRetentionModal();
+}
+
+async function releaseRetentionById(id) {
+    await setRetentionStatus(id, 'liberada', 'Retención liberada: vuelve a tu total');
+    if (retentions.filter(r => r.jobId === jobRetentionsJobId && r.status === 'retenida').length === 0) {
+        closeJobRetentions();
+    } else {
+        renderJobRetentionsList();
+    }
+}
+
+async function deleteRetention() {
+    const id = document.getElementById('retentionId').value;
+    if (!id || !currentUser) return;
+
+    showConfirmModal('Eliminar retención', '¿Eliminar esta retención? Los registros no se tocan.', 'Eliminar', async () => {
+        try {
+            await db.ref(userPath(`retentions/${id}`)).remove();
+            showToast('Retención eliminada');
+            closeRetentionModal();
+        } catch (error) {
+            showToast('No se pudo eliminar', 'error');
+        }
+    });
 }
 
 // ============================================
@@ -1033,21 +1238,6 @@ async function deletePayday() {
             closePaydayModal();
         } catch (error) {
             showToast('No se pudo quitar', 'error');
-        }
-    });
-}
-
-async function deleteRetention() {
-    const id = document.getElementById('retentionId').value;
-    if (!id || !currentUser) return;
-
-    showConfirmModal('Eliminar retención', '¿Eliminar esta retención? Los registros no se tocan.', 'Eliminar', async () => {
-        try {
-            await db.ref(userPath(`retentions/${id}`)).remove();
-            showToast('Retención eliminada');
-            closeRetentionModal();
-        } catch (error) {
-            showToast('No se pudo eliminar', 'error');
         }
     });
 }
@@ -3805,6 +3995,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 { id: 'dayModal', close: closeDayModal },
                 { id: 'entryModal', close: closeEntryModal },
                 { id: 'retentionModal', close: closeRetentionModal },
+                { id: 'jobRetentionsModal', close: closeJobRetentions },
                 { id: 'paydayModal', close: closePaydayModal },
                 { id: 'jobModal', close: closeJobModal },
                 { id: 'workerModal', close: closeWorkerModal },
