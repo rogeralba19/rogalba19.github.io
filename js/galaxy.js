@@ -123,6 +123,9 @@ import * as THREE from './vendor/three.module.min.js';
 
     const pulses = [];           // ondas viajando por aristas
     let hoverNode = null;
+    let selectedNode = null;
+    let spatialFold = null;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     let hoverBeat = 0;
     let focusAmt = 0;            // 0..1 modo Obsidian (atenuar el resto)
     let nextThought = 4.5;
@@ -162,7 +165,7 @@ import * as THREE from './vendor/three.module.min.js';
     function makeNode(label, domains, isSun, pos) {
         return {
             id: nextId++, label, domains, isSun,
-            pos: pos.clone(), vel: new THREE.Vector3(),
+            pos: pos.clone(), viewPos: pos.clone(), vel: new THREE.Vector3(),
             anchor: isSun ? pos.clone() : null,
             anchorIdx: -1,
             size: isSun ? 1.7 : 1.0, sizeT: isSun ? 1.7 : 1.0,
@@ -304,7 +307,7 @@ import * as THREE from './vendor/three.module.min.js';
         const cand = nodes.filter(n => !n.isSun && !n.dying && n.birth >= 1 &&
             time - n.bornAt > 20 &&
             [...n.domains].length < 2 &&
-            degree(n) <= 3 && n !== hoverNode);
+            degree(n) <= 3 && n !== hoverNode && n !== selectedNode);
         if (!cand.length) return;
         cand.sort((a, b) =>
             (degree(a) - degree(b)) || (b.pos.length() - a.pos.length()));
@@ -799,12 +802,12 @@ import * as THREE from './vendor/three.module.min.js';
     function projectNodes() {
         screenPos.length = 0;
         for (const n of nodes) {
-            _proj.copy(n.pos).project(camera);
+            _proj.copy(n.viewPos).project(camera);
             if (_proj.z > 1) continue;
             const x = (_proj.x * 0.5 + 0.5) * width;
             const y = (-_proj.y * 0.5 + 0.5) * height;
             if (x < -60 || x > width + 60 || y < -30 || y > height + 30) continue;
-            screenPos.push({ n, x, y, dist: camera.position.distanceTo(n.pos) });
+            screenPos.push({ n, x, y, dist: camera.position.distanceTo(n.viewPos) });
         }
     }
 
@@ -981,11 +984,12 @@ import * as THREE from './vendor/three.module.min.js';
     let camAngle = 0.6;
     let camR = 68;
     let fogNear = 30, fogFar = 120;
-    let camSpin = null;   // giro suave para traer el nodo seleccionado al frente
-    let hoverLock = null; // tras el giro, exige mover el puntero para re-armar hover
+    let hoverLock = null; // tras el pliegue, exige mover el puntero para re-armar hover
     let orbitSpeed = 0.008;
 
     function updateCamera(dt) {
+        // During a fold only the space moves; the ambient orbit resumes afterwards.
+        if (spatialFold) return;
         const spread = R * Math.max(anchorScale.x, anchorScale.y) + 14;
         // cámara pegada al volumen estirado en z: el nodo más cercano queda a
         // ~1/3 de la distancia del más lejano y la perspectiva hace el resto —
@@ -1001,22 +1005,9 @@ import * as THREE from './vendor/three.module.min.js';
         edgeMat.uniforms.uAspect.value = aspect;
         edgeMat.uniforms.uP11.value = camera.projectionMatrix.elements[5];
 
-        if (camSpin) {
-            const u = Math.min(1, (time - camSpin.t0) / camSpin.dur);
-            const e = u * u * (3 - 2 * u); // easing suave
-            camAngle = camSpin.from + (camSpin.to - camSpin.from) * e;
-            if (u >= 1) {
-                camSpin = null;
-                // el hover queda bloqueado hasta que el puntero se mueva unos
-                // píxeles: un nodo bajo el cursor estático no se auto-selecciona
-                hoverLock = { x: mouse.x, y: mouse.y };
-            }
-        } else {
-            // velocidad de órbita interpolada: sin frenazos ni arranques secos
-            const orbitTarget = booted ? (hoverNode ? 0 : 0.032) : 0.008;
-            orbitSpeed += (orbitTarget - orbitSpeed) * Math.min(1, dt * 2);
-            camAngle += dt * orbitSpeed;
-        }
+        const orbitTarget = booted ? (hoverNode ? 0 : 0.032) : 0.008;
+        orbitSpeed += (orbitTarget - orbitSpeed) * Math.min(1, dt * 2);
+        camAngle += dt * orbitSpeed;
 
         const px = mouse.active ? mouse.nx : gyro.x;
         const py = mouse.active ? mouse.ny : gyro.y;
@@ -1091,9 +1082,9 @@ import * as THREE from './vendor/three.module.min.js';
     }
 
     function pickHover() {
-        // BUG rotación infinita: sin detección de hover mientras la cámara gira;
+        // No cambiar el foco mientras el espacio se reorganiza;
         // el nodo ya seleccionado mantiene su estado activo durante el viaje
-        if (camSpin) return;
+        if (spatialFold) return;
         if (hoverLock) {
             const dx = mouse.x - hoverLock.x, dy = mouse.y - hoverLock.y;
             if (dx * dx + dy * dy < 81) return; // umbral ~9 px
@@ -1114,17 +1105,81 @@ import * as THREE from './vendor/three.module.min.js';
         }
     }
 
-    // SOLO con click: si el nodo está en la parte trasera, gira la cámara
-    // hasta traerlo al frente. Al terminar, la cámara se queda donde quedó.
+    // Presentation coordinates are separate from the force simulation. This
+    // prevents springs/anchors from undoing the selected arrangement. Every
+    // consumer (mesh, edges, labels and hit testing) uses the same viewPos.
+    const foldRight = new THREE.Vector3();
+    const foldUp = new THREE.Vector3();
+    const foldFront = new THREE.Vector3();
+    const foldDelta = new THREE.Vector3();
+    const foldTarget = new THREE.Vector3();
+
     function bringToFront(n) {
-        const na = Math.atan2(n.pos.x, n.pos.z);
-        let delta = na - ((camAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-        delta = ((delta + Math.PI * 3) % (Math.PI * 2)) - Math.PI; // camino más corto
-        if (Math.abs(delta) < 0.55) return; // ya está razonablemente al frente
-        camSpin = {
-            from: camAngle, to: camAngle + delta,
-            t0: time, dur: 0.7 + 0.35 * Math.min(1, Math.abs(delta) / Math.PI)
+        if (n === selectedNode || n.dying || n.birth < 0.8) return;
+        camera.updateMatrixWorld();
+        foldRight.set(1, 0, 0).applyQuaternion(camera.quaternion);
+        foldUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
+        foldFront.set(0, 0, 1).applyQuaternion(camera.quaternion);
+        selectedNode = n;
+        orbitSpeed = 0;
+        // Snapshot the currently visible shape, including an interrupted fold.
+        spatialFold = {
+            t0: time, duration: reducedMotion.matches ? 0.18 : 1.35,
+            from: new Map(nodes.map(node => [node, node.viewPos.clone()]))
         };
+        hoverNode = n;
+        hoverLock = null;
+        thoughtLabel = n.label;
+    }
+
+    function foldedPosition(n, out) {
+        foldDelta.subVectors(n.pos, selectedNode.pos);
+        const distance = foldDelta.length();
+        const locality = Math.exp(-distance * distance / (R * R * 0.85));
+        // Translate the chosen neighborhood, not the entire universe. Far
+        // clusters retain their bearings instead of piling up on one side.
+        const x = n.pos.dot(foldRight) - selectedNode.pos.dot(foldRight) * locality;
+        const y = n.pos.dot(foldUp) - selectedNode.pos.dot(foldUp) * locality;
+        const z = foldDelta.dot(foldFront);
+        // A continuous lens: nearby concepts remain neighbors, while distant
+        // clusters wrap into a deeper shell. No random reassignment of nodes.
+        const depth = camR * (0.42 - 0.78 * Math.tanh(distance / (R * 1.3)));
+        const halfH = (camR - depth) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+        const halfW = halfH * aspect;
+        const px = halfW * (0.12 + 0.76 * Math.tanh((x + z * 0.24) / (R * 0.8)));
+        const py = halfH * (0.03 + 0.78 * Math.tanh(y / (R * 0.85)));
+        return out.copy(foldRight).multiplyScalar(px)
+            .addScaledVector(foldUp, py).addScaledVector(foldFront, depth);
+    }
+
+    function updateSpatialFold() {
+        if (!selectedNode) {
+            for (const n of nodes) n.viewPos.copy(n.pos);
+            return;
+        }
+        const u = spatialFold ? Math.min(1, (time - spatialFold.t0) / spatialFold.duration) : 1;
+        const ease = u * u * u * (u * (u * 6 - 15) + 10);
+        // Zero position AND velocity offsets at either end: no snap on settle.
+        const envelope = reducedMotion.matches ? 0 : Math.sin(Math.PI * u) ** 2;
+        for (const n of nodes) {
+            foldedPosition(n, foldTarget);
+            const from = spatialFold && spatialFold.from.get(n);
+            if (from) {
+                n.viewPos.lerpVectors(from, foldTarget, ease);
+                // Bounded projective breathing evokes a rotating 4D shadow;
+                // it is intentionally an art-directed 3D deformation.
+                const phase = n.pos.dot(foldFront) / R;
+                const lens = 1 / (1 + envelope * 0.24 * Math.tanh(phase));
+                n.viewPos.multiplyScalar(lens);
+                const side = Math.tanh(n.pos.dot(foldRight) / R);
+                n.viewPos.addScaledVector(foldUp, envelope * R * 0.15 * side);
+                n.viewPos.addScaledVector(foldRight, -envelope * R * 0.12 * Math.tanh(phase));
+            } else n.viewPos.copy(foldTarget);
+        }
+        if (spatialFold && u >= 1) {
+            spatialFold = null;
+            hoverLock = { x: mouse.x, y: mouse.y };
+        }
     }
 
     function spontaneousThought() {
@@ -1203,7 +1258,7 @@ import * as THREE from './vendor/three.module.min.js';
                 jz = (Math.random() - 0.5) * 1.6 * g;
                 flick = Math.random() < 0.72 ? 1 : 0.25;
             }
-            _dummy.position.set(nd.pos.x + jx, nd.pos.y + jy, nd.pos.z + jz);
+            _dummy.position.set(nd.viewPos.x + jx, nd.viewPos.y + jy, nd.viewPos.z + jz);
             // rotación lenta propia, desincronizada entre nodos
             const sp = 0.22 + nd.seed * 0.34;
             _dummy.rotation.set(time * sp, time * sp * 0.71 + nd.seed * 6.283, time * 0.13 * (nd.seed - 0.5));
@@ -1215,7 +1270,7 @@ import * as THREE from './vendor/three.module.min.js';
             nodeMesh.setMatrixAt(i, _dummy.matrix);
 
             // brillo: jerarquía + pulso + niebla de profundidad (continua)
-            const dist = camera.position.distanceTo(nd.pos);
+            const dist = camera.position.distanceTo(nd.viewPos);
             const fog = THREE.MathUtils.clamp((fogFar - dist) / Math.max(fogFar - fogNear, 1), 0, 1);
             // lo lejano pierde contraste pero nunca baja del ~50%
             const inten = (0.5 + (nd.isSun ? 0.55 : 0) + nd.glow * 1.2) *
@@ -1233,8 +1288,8 @@ import * as THREE from './vendor/three.module.min.js';
         for (let i = 0; i < m; i++) {
             const e = edges[i];
             const i3 = i * 3;
-            eStart.array[i3] = e.a.pos.x; eStart.array[i3 + 1] = e.a.pos.y; eStart.array[i3 + 2] = e.a.pos.z;
-            eEnd.array[i3] = e.b.pos.x; eEnd.array[i3 + 1] = e.b.pos.y; eEnd.array[i3 + 2] = e.b.pos.z;
+            eStart.array[i3] = e.a.viewPos.x; eStart.array[i3 + 1] = e.a.viewPos.y; eStart.array[i3 + 2] = e.a.viewPos.z;
+            eEnd.array[i3] = e.b.viewPos.x; eEnd.array[i3 + 1] = e.b.viewPos.y; eEnd.array[i3 + 2] = e.b.viewPos.z;
             eProg.array[i] = e.progress;
             eGlow.array[i] = e.glow;
             eDim.array[i] = e.dim * Math.max(0, e.a.birth) * Math.max(0, e.b.birth);
@@ -1320,6 +1375,7 @@ import * as THREE from './vendor/three.module.min.js';
         if (e.target !== document.body && e.target !== glCanvas && e.target !== overlayCanvas) return;
         let best = null, bestD = 60;
         for (const s of screenPos) {
+            if (s.n.dying || s.n.birth < 0.8) continue;
             const dx = s.x - e.clientX, dy = s.y - e.clientY;
             const d = Math.sqrt(dx * dx + dy * dy);
             if (d < bestD) { bestD = d; best = s.n; }
@@ -1327,8 +1383,7 @@ import * as THREE from './vendor/three.module.min.js';
         if (best) {
             emitFrom(best, 2, 1.1, 3);
             thoughtLabel = best.label;
-            // click = seleccionar: se ilumina, mantiene su estado durante el
-            // viaje, y si está atrás la cámara gira para traerlo al frente
+            // click = reorganizar el espacio; cámara y estrellas permanecen quietas
             hoverNode = best;
             hoverBeat = time + 1.2;
             bringToFront(best);
@@ -1363,6 +1418,7 @@ import * as THREE from './vendor/three.module.min.js';
         physics(dt);
         updateNodesState(dt);
         updateCamera(dt);
+        updateSpatialFold();
 
         projectNodes();
         bootStep();
