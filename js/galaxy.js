@@ -1124,12 +1124,37 @@ import * as THREE from './vendor/three.module.min.js';
         orbitSpeed = 0;
         // Snapshot the currently visible shape, including an interrupted fold.
         spatialFold = {
-            t0: time, duration: reducedMotion.matches ? 0.18 : 1.35,
-            from: new Map(nodes.map(node => [node, node.viewPos.clone()]))
+            t0: time, duration: reducedMotion.matches ? 0.18 : 2.3,
+            from: new Map(nodes.map(node => [node, node.viewPos.clone()])),
+            paths: new Map(nodes.map(node => [node, makeChaosPath(node)]))
         };
         hoverNode = n;
         hoverLock = null;
         thoughtLabel = n.label;
+    }
+
+    function chaosPoint(front) {
+        // Independent locations throughout the viewing volume, including
+        // near-camera flybys. Stars and camera are not part of this motion.
+        const depth = camR * front;
+        const halfH = (camR - depth) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+        return foldRight.clone().multiplyScalar((Math.random() * 2 - 1) * halfH * aspect * 0.95)
+            .addScaledVector(foldUp, (Math.random() * 2 - 1) * halfH * 0.88)
+            .addScaledVector(foldFront, depth);
+    }
+
+    function makeChaosPath(n) {
+        // Each crystal crosses between different depth planes, with its own
+        // launch delay and route. Randomness is sampled once, never per frame.
+        const nearFirst = Math.random() > 0.5;
+        const near = 0.35 + Math.random() * 0.32;
+        const far = -0.35 - Math.random() * 0.6;
+        return {
+            a: chaosPoint(nearFirst ? near : far),
+            b: chaosPoint(nearFirst ? far : near),
+            delay: n === selectedNode ? 0.08 : Math.random() * 0.16,
+            spin: new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(9)
+        };
     }
 
     function foldedPosition(n, out) {
@@ -1143,7 +1168,8 @@ import * as THREE from './vendor/three.module.min.js';
         const z = foldDelta.dot(foldFront);
         // A continuous lens: nearby concepts remain neighbors, while distant
         // clusters wrap into a deeper shell. No random reassignment of nodes.
-        const depth = camR * (0.42 - 0.78 * Math.tanh(distance / (R * 1.3)));
+        const depth = n === selectedNode ? camR * 0.64 :
+            camR * (0.32 - 1.15 * Math.tanh(distance / (R * 0.95)));
         const halfH = (camR - depth) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
         const halfW = halfH * aspect;
         const px = halfW * (0.12 + 0.76 * Math.tanh((x + z * 0.24) / (R * 0.8)));
@@ -1158,22 +1184,27 @@ import * as THREE from './vendor/three.module.min.js';
             return;
         }
         const u = spatialFold ? Math.min(1, (time - spatialFold.t0) / spatialFold.duration) : 1;
-        const ease = u * u * u * (u * (u * 6 - 15) + 10);
-        // Zero position AND velocity offsets at either end: no snap on settle.
-        const envelope = reducedMotion.matches ? 0 : Math.sin(Math.PI * u) ** 2;
         for (const n of nodes) {
             foldedPosition(n, foldTarget);
             const from = spatialFold && spatialFold.from.get(n);
-            if (from) {
-                n.viewPos.lerpVectors(from, foldTarget, ease);
-                // Bounded projective breathing evokes a rotating 4D shadow;
-                // it is intentionally an art-directed 3D deformation.
-                const phase = n.pos.dot(foldFront) / R;
-                const lens = 1 / (1 + envelope * 0.24 * Math.tanh(phase));
-                n.viewPos.multiplyScalar(lens);
-                const side = Math.tanh(n.pos.dot(foldRight) / R);
-                n.viewPos.addScaledVector(foldUp, envelope * R * 0.15 * side);
-                n.viewPos.addScaledVector(foldRight, -envelope * R * 0.12 * Math.tanh(phase));
+            const route = spatialFold && spatialFold.paths.get(n);
+            n.chaosSpin = 0;
+            if (from && route) {
+                const t = THREE.MathUtils.clamp((u - route.delay) / (1 - route.delay), 0, 1);
+                const smooth = t * t * (3 - 2 * t);
+                if (reducedMotion.matches) n.viewPos.lerpVectors(from, foldTarget, smooth);
+                else {
+                    // Launch -> two independent crossings -> assembly. A
+                    // cubic path gives continuous velocity without a shared
+                    // deformation field pulling the graph like a rubber sheet.
+                    const v = 1 - smooth;
+                    n.viewPos.copy(from).multiplyScalar(v * v * v)
+                        .addScaledVector(route.a, 3 * v * v * smooth)
+                        .addScaledVector(route.b, 3 * v * smooth * smooth)
+                        .addScaledVector(foldTarget, smooth * smooth * smooth);
+                    n.chaosSpin = Math.sin(Math.PI * t) ** 2;
+                    n.spinAxis = route.spin;
+                }
             } else n.viewPos.copy(foldTarget);
         }
         if (spatialFold && u >= 1) {
@@ -1262,6 +1293,11 @@ import * as THREE from './vendor/three.module.min.js';
             // rotación lenta propia, desincronizada entre nodos
             const sp = 0.22 + nd.seed * 0.34;
             _dummy.rotation.set(time * sp, time * sp * 0.71 + nd.seed * 6.283, time * 0.13 * (nd.seed - 0.5));
+            if (nd.chaosSpin && nd.spinAxis) {
+                _dummy.rotation.x += nd.spinAxis.x * nd.chaosSpin;
+                _dummy.rotation.y += nd.spinAxis.y * nd.chaosSpin;
+                _dummy.rotation.z += nd.spinAxis.z * nd.chaosSpin;
+            }
             const scl = Math.max(0.001,
                 nd.size * 0.58 * (1 + Math.min(nd.degS, 10) * 0.02) * (0.5 + 0.5 * birth));
             nd.rScale = scl; // radio en mundo, para colocar la etiqueta encima
