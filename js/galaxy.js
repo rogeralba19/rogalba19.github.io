@@ -462,13 +462,71 @@ import * as THREE from './vendor/three.module.min.js';
     // ============================================
     // GEOMETRÍA GPU
     // ============================================
-    // Poliedros holográficos: UNA geometría compartida (icosaedro wireframe)
-    // instanciada para todos los nodos — geometría real en cámara de
-    // perspectiva, así el tamaño aparente escala solo con la distancia.
-    const nodeShape = new THREE.IcosahedronGeometry(1, 0);
-    const nodeMat = new THREE.MeshBasicMaterial({
-        wireframe: true, transparent: true,
-        blending: THREE.AdditiveBlending, depthWrite: false
+    // Poliedros de cristal energético: UNA geometría compartida (icosaedro
+    // SÓLIDO) instanciada para todos los nodos. Cuerpo semi-transparente con
+    // luz propia + filo luminoso: fresnel en los bordes respecto a la cámara
+    // y aristas reales de la geometría resaltadas vía baricéntricas.
+    let nodeShape = new THREE.IcosahedronGeometry(1, 0);
+    if (nodeShape.index) nodeShape = nodeShape.toNonIndexed();
+    {
+        const triCount = nodeShape.attributes.position.count / 3;
+        const bary = new Float32Array(triCount * 9);
+        for (let i = 0; i < triCount; i++) bary.set([1, 0, 0, 0, 1, 0, 0, 0, 1], i * 9);
+        nodeShape.setAttribute('aBary', new THREE.BufferAttribute(bary, 3));
+    }
+    const nodeMat = new THREE.ShaderMaterial({
+        transparent: true, depthWrite: false,
+        blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+        vertexShader: `
+            attribute vec3 aBary;
+            varying vec3 vBary;
+            varying vec3 vNormal;
+            varying vec3 vView;
+            varying vec3 vTint;
+            void main() {
+                vBary = aBary;
+                vec3 p = position;
+                vec3 n = normal;
+                #ifdef USE_INSTANCING
+                    p = (instanceMatrix * vec4(position, 1.0)).xyz;
+                    n = mat3(instanceMatrix) * normal;
+                #endif
+                #ifdef USE_INSTANCING_COLOR
+                    vTint = instanceColor;
+                #else
+                    vTint = vec3(1.0);
+                #endif
+                vec4 mv = modelViewMatrix * vec4(p, 1.0);
+                vNormal = normalize(normalMatrix * n);
+                vView = normalize(-mv.xyz);
+                gl_Position = projectionMatrix * mv;
+            }`,
+        fragmentShader: `
+            precision highp float;
+            varying vec3 vBary;
+            varying vec3 vNormal;
+            varying vec3 vView;
+            varying vec3 vTint;
+            void main() {
+                vec3 nrm = normalize(vNormal);
+                if (!gl_FrontFacing) nrm = -nrm;
+                float ndv = clamp(abs(dot(nrm, normalize(vView))), 0.0, 1.0);
+                // fresnel: los bordes del cuerpo respecto a la cámara brillan más
+                float fres = pow(1.0 - ndv, 2.2);
+                // sombreado sutil por cara: el cristal se lee como volumen
+                float lam = 0.5 + 0.5 * max(dot(nrm, normalize(vec3(0.4, 0.7, 0.6))), 0.0);
+                // filo de luz: distancia al borde del triángulo (aristas reales)
+                vec3 w = fwidth(vBary) * 1.7;
+                vec3 sm = smoothstep(vec3(0.0), w, vBary);
+                float edge = 1.0 - min(min(sm.x, sm.y), sm.z);
+                // cuerpo de cristal (caras con materia visible) + filo de luz
+                float backFade = gl_FrontFacing ? 1.0 : 0.3;
+                vec3 body = vTint * (0.55 * lam + 0.6 * fres);
+                vec3 rim  = vTint * edge * (1.15 + fres * 1.2);
+                vec3 col = (body + rim) * backFade + vec3(1.0) * edge * fres * 0.3;
+                float alpha = (0.55 * lam + 0.45 * fres + 0.8 * edge) * backFade;
+                gl_FragColor = vec4(col, min(alpha, 1.0));
+            }`
     });
     const nodeMesh = new THREE.InstancedMesh(nodeShape, nodeMat, MAXN);
     nodeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -581,30 +639,156 @@ import * as THREE from './vendor/three.module.min.js';
                 vec3 cold = vec3(0.0, 0.55, 1.0);
                 vec3 hot  = vec3(0.45, 1.0, 0.85);
                 vec3 col = mix(cold, hot, clamp(pulse + tip + vGlow * 0.35, 0.0, 1.0));
-                float fogFade = 0.08 + 0.92 * vFog;
+                float fogFade = 0.5 + 0.5 * vFog; // se funde al fondo, mínimo ~50%
                 float a = (base + pulse * 1.5 + tip) * vDim * fogFade * shape * 1.5;
-                gl_FragColor = vec4(col * (1.15 + (pulse + tip) * 1.8 + vGlow * 0.5) * (0.55 + 0.45 * vFog), a);
+                gl_FragColor = vec4(col * (1.15 + (pulse + tip) * 1.8 + vGlow * 0.5) * (0.6 + 0.4 * vFog), a);
             }`
     });
     const edgeMesh = new THREE.Mesh(edgeGeo, edgeMat);
     edgeMesh.frustumCulled = false;
     scene.add(edgeMesh);
 
-    // Estrellas de fondo — profundidad de galaxia, estáticas y baratas
-    const starGeo = new THREE.BufferGeometry();
-    const STARS = isMobile ? 140 : 260;
-    const sPos = new Float32Array(STARS * 3);
-    for (let i = 0; i < STARS; i++) {
-        const v = new THREE.Vector3().randomDirection().multiplyScalar(90 + Math.random() * 140);
-        sPos[i * 3] = v.x; sPos[i * 3 + 1] = v.y; sPos[i * 3 + 2] = v.z;
+    // Fondo estelar — INTOCABLE. Dos capas de estrellas tenues detrás de la
+    // galaxia, integradas con la niebla de profundidad: dan la escala cósmica
+    // sin competir con los nodos.
+    function makeStars(count, minR, maxR, size, opacity, color) {
+        const g = new THREE.BufferGeometry();
+        const arr = new Float32Array(count * 3);
+        for (let i = 0; i < count; i++) {
+            const v = new THREE.Vector3().randomDirection()
+                .multiplyScalar(minR + Math.random() * (maxR - minR));
+            arr[i * 3] = v.x; arr[i * 3 + 1] = v.y; arr[i * 3 + 2] = v.z;
+        }
+        g.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+        const m = new THREE.PointsMaterial({
+            color, size, sizeAttenuation: false,
+            transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false
+        });
+        const pts = new THREE.Points(g, m);
+        pts.frustumCulled = false;
+        scene.add(pts);
+        return pts;
     }
-    starGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
-    const starMat = new THREE.PointsMaterial({
-        color: 0x3a6a8a, size: 1.2, sizeAttenuation: false,
-        transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false
+    makeStars(isMobile ? 160 : 300, 110, 260, 1.4, 0.42, 0x35608a); // lejanas, se funden
+    makeStars(isMobile ? 60 : 120, 85, 150, 2.1, 0.5, 0x4a7fa8);    // capa media, algo más vivas
+
+    // ============================================
+    // BLOOM — post-procesado holográfico
+    // Pipeline propio (equivalente a UnrealBloomPass, sin dependencias):
+    // escena -> render target, bright-pass con umbral, blur gaussiano
+    // ping-pong a 1/4 de resolución, y composición final aditiva.
+    // ============================================
+    let bloomOn = true;
+    let bloomStrength = isMobile ? 0.75 : 1.05; // halo elegante, no neón quemado
+    const bloomDiv = isMobile ? 6 : 4;          // reducción de resolución del blur
+
+    const rtOpts = { depthBuffer: false, stencilBuffer: false };
+    const rtScene = new THREE.WebGLRenderTarget(2, 2, { depthBuffer: true, stencilBuffer: false });
+    const rtA = new THREE.WebGLRenderTarget(2, 2, rtOpts);
+    const rtB = new THREE.WebGLRenderTarget(2, 2, rtOpts);
+
+    const postScene = new THREE.Scene();
+    const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const postQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), null);
+    postQuad.frustumCulled = false;
+    postScene.add(postQuad);
+
+    const POST_VS = `
+        varying vec2 vUv;
+        void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
+
+    const brightMat = new THREE.ShaderMaterial({
+        uniforms: { tSrc: { value: null }, uThresh: { value: 0.22 } },
+        vertexShader: POST_VS,
+        fragmentShader: `
+            precision highp float;
+            varying vec2 vUv;
+            uniform sampler2D tSrc;
+            uniform float uThresh;
+            void main() {
+                vec3 c = texture2D(tSrc, vUv).rgb;
+                float lum = max(max(c.r, c.g), c.b);
+                float k = smoothstep(uThresh, uThresh + 0.35, lum);
+                gl_FragColor = vec4(c * k, 1.0);
+            }`
     });
-    const stars = new THREE.Points(starGeo, starMat);
-    scene.add(stars);
+
+    const blurMat = new THREE.ShaderMaterial({
+        uniforms: { tSrc: { value: null }, uDir: { value: new THREE.Vector2(1, 0) }, uTexel: { value: new THREE.Vector2() } },
+        vertexShader: POST_VS,
+        fragmentShader: `
+            precision highp float;
+            varying vec2 vUv;
+            uniform sampler2D tSrc;
+            uniform vec2 uDir;
+            uniform vec2 uTexel;
+            void main() {
+                vec2 o = uDir * uTexel;
+                vec3 c = texture2D(tSrc, vUv).rgb * 0.227027;
+                c += (texture2D(tSrc, vUv + o * 1.3846).rgb + texture2D(tSrc, vUv - o * 1.3846).rgb) * 0.3162162;
+                c += (texture2D(tSrc, vUv + o * 3.2308).rgb + texture2D(tSrc, vUv - o * 3.2308).rgb) * 0.0702703;
+                gl_FragColor = vec4(c, 1.0);
+            }`
+    });
+
+    const compositeMat = new THREE.ShaderMaterial({
+        transparent: true,
+        uniforms: { tScene: { value: null }, tBloom: { value: null }, uStrength: { value: 1 } },
+        vertexShader: POST_VS,
+        fragmentShader: `
+            precision highp float;
+            varying vec2 vUv;
+            uniform sampler2D tScene;
+            uniform sampler2D tBloom;
+            uniform float uStrength;
+            void main() {
+                vec4 s = texture2D(tScene, vUv);
+                vec3 b = texture2D(tBloom, vUv).rgb;
+                vec3 c = s.rgb + b * uStrength;
+                // alpha desde el brillo: la futura capa de foto sigue viéndose detrás
+                float a = clamp(max(max(c.r, c.g), c.b) * 1.5, 0.0, 1.0);
+                gl_FragColor = vec4(c, max(s.a, a));
+            }`
+    });
+
+    function renderWithBloom() {
+        renderer.setRenderTarget(rtScene);
+        renderer.clear();
+        renderer.render(scene, camera);
+        // bright-pass a baja resolución
+        postQuad.material = brightMat;
+        brightMat.uniforms.tSrc.value = rtScene.texture;
+        renderer.setRenderTarget(rtA);
+        renderer.render(postScene, postCam);
+        // blur gaussiano ping-pong (2 iteraciones H+V)
+        postQuad.material = blurMat;
+        blurMat.uniforms.uTexel.value.set(1 / rtA.width, 1 / rtA.height);
+        for (let i = 0; i < 2; i++) {
+            blurMat.uniforms.tSrc.value = rtA.texture;
+            blurMat.uniforms.uDir.value.set(1, 0);
+            renderer.setRenderTarget(rtB);
+            renderer.render(postScene, postCam);
+            blurMat.uniforms.tSrc.value = rtB.texture;
+            blurMat.uniforms.uDir.value.set(0, 1);
+            renderer.setRenderTarget(rtA);
+            renderer.render(postScene, postCam);
+        }
+        // composición final en pantalla
+        postQuad.material = compositeMat;
+        compositeMat.uniforms.tScene.value = rtScene.texture;
+        compositeMat.uniforms.tBloom.value = rtA.texture;
+        compositeMat.uniforms.uStrength.value = bloomStrength;
+        renderer.setRenderTarget(null);
+        renderer.render(postScene, postCam);
+    }
+
+    function resizeBloom() {
+        const w = Math.max(2, Math.floor(width * pixelRatio));
+        const h = Math.max(2, Math.floor(height * pixelRatio));
+        rtScene.setSize(w, h);
+        rtA.setSize(Math.max(2, (w / bloomDiv) | 0), Math.max(2, (h / bloomDiv) | 0));
+        rtB.setSize(Math.max(2, (w / bloomDiv) | 0), Math.max(2, (h / bloomDiv) | 0));
+    }
 
     // ============================================
     // PROYECCIÓN / ETIQUETAS (LOD) — overlay 2D
@@ -624,60 +808,76 @@ import * as THREE from './vendor/three.module.min.js';
         }
     }
 
-    function drawLabels(camR) {
+    function drawLabels(camR, dt) {
         const inFocus = hoverSet();
         const nearSat = camR * 0.8, farSat = camR * 1.02;
         const nearSun = camR * 1.05, farSun = camR * 1.45;
+        const onScreen = new Set();
         const cands = [];
         for (const s of screenPos) {
             const n = s.n;
-            if (n.birth < 0.55) continue;
+            onScreen.add(n);
+            if (n.birth < 0.55) { n.labelT = 0; continue; }
             const near = n.isSun ? nearSun : nearSat;
             const far = n.isSun ? farSun : farSat;
             let a = 1 - THREE.MathUtils.smoothstep(s.dist, near, far);
             const depth = THREE.MathUtils.clamp((fogFar - s.dist) / Math.max(fogFar - fogNear, 1), 0, 1);
-            a *= 0.22 + 0.78 * depth; // etiqueta lejana más desvanecida (continuo)
+            a *= 0.5 + 0.5 * depth; // etiqueta lejana desvanecida (continuo, mín ~50%)
             const focused = inFocus && inFocus.has(n);
             if (inFocus) a = focused ? Math.max(a, 0.95) : a * (1 - focusAmt * 0.55);
             a *= Math.min(1, (n.birth - 0.55) / 0.45) * n.dim;
-            if (a < 0.04) continue;
-            cands.push({ s, a, depth, pri: (focused ? 2 : 0) + (n.isSun ? 1 : 0) });
+            n.labelT = 0; // por defecto se desvanece; los elegidos lo sobreescriben
+            if (a < 0.03) continue;
+            cands.push({ s, a, pri: (focused ? 2 : 0) + (n.isSun ? 1 : 0) });
         }
         cands.sort((p, q) => (q.pri - p.pri) || (p.s.dist - q.s.dist));
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        const boxes = []; // anti-colisión: no superponer etiquetas
-        let drawn = 0;
-        for (let i = 0; i < cands.length && drawn < maxLabels; i++) {
-            const { s, a, depth } = cands[i];
+
+        // selección con anti-colisión: los elegidos fijan su alpha objetivo;
+        // el resto decae — nada aparece ni desaparece de golpe
+        const boxes = [];
+        let picked = 0;
+        for (let i = 0; i < cands.length && picked < maxLabels; i++) {
+            const { s, a } = cands[i];
             const n = s.n;
-            // escala de perspectiva real: la fuente crece/encoge con 1/distancia
-            // (clamp 0.5..2.1 → relación ~x4 entre lo más cercano y lo más lejano)
             const persp = THREE.MathUtils.clamp(camR / s.dist, 0.5, 2.1);
-            const fs = Math.max(7, Math.round((n.isSun ? 11 : 9) * persp));
-            // etiqueta por encima del poliedro: radio proyectado en píxeles
+            const fs = (n.isSun ? 11 : 9) * persp;
             const rPx = (n.rScale || 0.6) * camera.projectionMatrix.elements[5] * height / (2 * s.dist);
             let x = s.x, y = s.y - rPx - 4;
             const w = n.label.length * fs * 0.63 + 6;
             x = Math.max(w * 0.5 + 4, Math.min(width - w * 0.5 - 4, x));
-            if (y < 30) y = s.y + rPx + 4 + fs; // no invadir el HUD: debajo del nodo
+            if (y < 30) y = s.y + rPx + 4 + fs;
             let clash = false;
             for (const b of boxes) {
                 if (Math.abs(x - b.x) < (w + b.w) * 0.5 && Math.abs(y - b.y) < (fs + b.h) * 0.6 + 3) { clash = true; break; }
             }
             if (clash) continue;
             boxes.push({ x, y, w, h: fs });
-            drawn++;
+            n.labelT = a;
+            n.labelX = x; n.labelY = y; n.labelFs = fs;
+            picked++;
+        }
+
+        // interpolación continua del alpha de cada etiqueta + dibujado
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        const k = Math.min(1, dt * 7);
+        for (const n of nodes) {
+            const target = onScreen.has(n) ? (n.labelT || 0) : 0;
+            n.labelA = (n.labelA || 0) + (target - (n.labelA || 0)) * k;
+            if (n.labelA < 0.02 || n.labelX === undefined) continue;
+            let x = n.labelX, y = n.labelY;
             if (n.birth < 1) { // micro-glitch de la etiqueta al nacer
                 x += (Math.random() - 0.5) * 5;
                 if (Math.random() < 0.25) continue;
             }
+            const alpha = n.labelA;
+            const fs = n.labelFs;
             if (n.isSun) {
-                ctx.font = `bold ${fs}px "Courier New", monospace`;
-                ctx.fillStyle = `rgba(0, 255, 136, ${(0.85 * a).toFixed(3)})`;
+                ctx.font = `bold ${fs.toFixed(2)}px "Courier New", monospace`;
+                ctx.fillStyle = `rgba(0, 255, 136, ${(0.85 * alpha).toFixed(3)})`;
             } else {
-                ctx.font = `${fs}px "Courier New", monospace`;
-                ctx.fillStyle = `rgba(175, 220, 255, ${(0.8 * a).toFixed(3)})`;
+                ctx.font = `${fs.toFixed(2)}px "Courier New", monospace`;
+                ctx.fillStyle = `rgba(175, 220, 255, ${(0.8 * alpha).toFixed(3)})`;
             }
             if (n.glow > 0.4) {
                 ctx.shadowColor = 'rgba(0, 220, 255, 0.9)';
@@ -783,17 +983,19 @@ import * as THREE from './vendor/three.module.min.js';
     let fogNear = 30, fogFar = 120;
     let camSpin = null;   // giro suave para traer el nodo seleccionado al frente
     let hoverLock = null; // tras el giro, exige mover el puntero para re-armar hover
+    let orbitSpeed = 0.008;
 
     function updateCamera(dt) {
         const spread = R * Math.max(anchorScale.x, anchorScale.y) + 14;
-        // cámara cerca del volumen: la relación de distancias nodo cercano /
-        // lejano supera x4, que es lo que hace legible la perspectiva
-        const targetR = portrait ? spread * 1.5 : spread * 1.15;
+        // cámara pegada al volumen estirado en z: el nodo más cercano queda a
+        // ~1/3 de la distancia del más lejano y la perspectiva hace el resto —
+        // nodos grandes casi en primer plano, pequeños fundiéndose al fondo
+        const targetR = portrait ? spread * 1.42 : spread * 1.06;
         camR += (targetR - camR) * Math.min(1, dt * 1.2);
 
         // niebla de profundidad centrada en el volumen de la galaxia
-        fogNear = Math.max(5, camR - spread * 0.8);
-        fogFar = camR + spread * 0.85;
+        fogNear = Math.max(5, camR - spread * 0.85);
+        fogFar = camR + spread * 0.9;
         edgeMat.uniforms.uFogNear.value = fogNear;
         edgeMat.uniforms.uFogFar.value = fogFar;
         edgeMat.uniforms.uAspect.value = aspect;
@@ -810,8 +1012,10 @@ import * as THREE from './vendor/three.module.min.js';
                 hoverLock = { x: mouse.x, y: mouse.y };
             }
         } else {
-            const orbit = booted ? (hoverNode ? 0 : 0.032) : 0.008;
-            camAngle += dt * orbit;
+            // velocidad de órbita interpolada: sin frenazos ni arranques secos
+            const orbitTarget = booted ? (hoverNode ? 0 : 0.032) : 0.008;
+            orbitSpeed += (orbitTarget - orbitSpeed) * Math.min(1, dt * 2);
+            camAngle += dt * orbitSpeed;
         }
 
         const px = mouse.active ? mouse.nx : gyro.x;
@@ -906,12 +1110,12 @@ import * as THREE from './vendor/three.module.min.js';
         if (best !== hoverNode) {
             hoverNode = best;
             hoverBeat = time; // primer latido inmediato
-            if (best) bringToFront(best);
+            // el hover SOLO ilumina: jamás mueve la cámara ni rota el grafo
         }
     }
 
-    // Si el nodo seleccionado está en la parte trasera, gira la cámara
-    // hasta traerlo al frente. Al soltar, la cámara se queda donde quedó.
+    // SOLO con click: si el nodo está en la parte trasera, gira la cámara
+    // hasta traerlo al frente. Al terminar, la cámara se queda donde quedó.
     function bringToFront(n) {
         const na = Math.atan2(n.pos.x, n.pos.z);
         let delta = na - ((camAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
@@ -982,10 +1186,13 @@ import * as THREE from './vendor/three.module.min.js';
     // ============================================
     // BUFFERS → GPU
     // ============================================
-    function writeBuffers() {
+    function writeBuffers(dt) {
         const n = nodes.length;
+        const degK = Math.min(1, dt * 2.5);
         for (let i = 0; i < n; i++) {
             const nd = nodes[i];
+            // el grado entra suavizado: nada de saltos de escala al ganar aristas
+            nd.degS = (nd.degS === undefined) ? degree(nd) : nd.degS + (degree(nd) - nd.degS) * degK;
             const birth = nd.bornVisible ? Math.max(0, nd.birth) : 0;
             const g = 1 - birth;
             let jx = 0, jy = 0, jz = 0, flick = 1;
@@ -1001,7 +1208,7 @@ import * as THREE from './vendor/three.module.min.js';
             const sp = 0.22 + nd.seed * 0.34;
             _dummy.rotation.set(time * sp, time * sp * 0.71 + nd.seed * 6.283, time * 0.13 * (nd.seed - 0.5));
             const scl = Math.max(0.001,
-                nd.size * 0.58 * (1 + Math.min(degree(nd), 10) * 0.02) * (0.5 + 0.5 * birth));
+                nd.size * 0.58 * (1 + Math.min(nd.degS, 10) * 0.02) * (0.5 + 0.5 * birth));
             nd.rScale = scl; // radio en mundo, para colocar la etiqueta encima
             _dummy.scale.setScalar(scl);
             _dummy.updateMatrix();
@@ -1010,8 +1217,9 @@ import * as THREE from './vendor/three.module.min.js';
             // brillo: jerarquía + pulso + niebla de profundidad (continua)
             const dist = camera.position.distanceTo(nd.pos);
             const fog = THREE.MathUtils.clamp((fogFar - dist) / Math.max(fogFar - fogNear, 1), 0, 1);
+            // lo lejano pierde contraste pero nunca baja del ~50%
             const inten = (0.5 + (nd.isSun ? 0.55 : 0) + nd.glow * 1.2) *
-                nd.dim * birth * (0.12 + 0.88 * fog) * flick;
+                nd.dim * birth * (0.5 + 0.5 * fog) * flick;
             _col.copy(nd.isSun ? COL_GREEN : COL_CYAN).multiplyScalar(inten);
             const lift = nd.glow * 0.3 * nd.dim * birth;
             _col.r += lift; _col.g += lift; _col.b += lift;
@@ -1052,14 +1260,17 @@ import * as THREE from './vendor/three.module.min.js';
         }
         if (time > nextGovern) {
             nextGovern = time + 3;
+            // la fluidez manda: primero degrada el bloom, luego nodos/etiquetas
+            if (fpsEMA < 45) bloomStrength = Math.max(0.5, bloomStrength * 0.9);
             if (fpsEMA < 40 && nodeCap > 70) {
                 nodeCap = Math.max(70, Math.floor(nodeCap * 0.85));
                 maxLabels = Math.max(18, maxLabels - 6);
                 nextRecycle = Math.min(nextRecycle, time + 0.5);
             }
+            if (fpsEMA < 32) bloomOn = false;
             if (fpsEMA < 27) {
                 sweepEnabled = false;
-                if (pixelRatio > 1) { pixelRatio = 1; renderer.setPixelRatio(1); }
+                if (pixelRatio > 1) { pixelRatio = 1; renderer.setPixelRatio(1); resizeBloom(); }
             }
         }
     }
@@ -1073,13 +1284,15 @@ import * as THREE from './vendor/three.module.min.js';
         aspect = width / height;
         portrait = height > width;
         renderer.setSize(width, height, false);
+        resizeBloom();
         overlayCanvas.width = width;
         overlayCanvas.height = height;
         camera.aspect = aspect;
         camera.updateProjectionMatrix();
-        // La galaxia se acomoda a la orientación: ancha en horizontal, alta en vertical
-        if (portrait) anchorTarget.set(0.62, 1.28, 0.9);
-        else anchorTarget.set(1.22, 0.78, 1);
+        // La galaxia se acomoda a la orientación: ancha en horizontal, alta en
+        // vertical — y SIEMPRE estirada en profundidad hacia la cámara
+        if (portrait) anchorTarget.set(0.66, 1.2, 1.1);
+        else anchorTarget.set(1.15, 0.78, 1.18);
     }
 
     window.addEventListener('resize', resize);
@@ -1111,7 +1324,15 @@ import * as THREE from './vendor/three.module.min.js';
             const d = Math.sqrt(dx * dx + dy * dy);
             if (d < bestD) { bestD = d; best = s.n; }
         }
-        if (best) { emitFrom(best, 2, 1.1, 3); thoughtLabel = best.label; }
+        if (best) {
+            emitFrom(best, 2, 1.1, 3);
+            thoughtLabel = best.label;
+            // click = seleccionar: se ilumina, mantiene su estado durante el
+            // viaje, y si está atrás la cámara gira para traerlo al frente
+            hoverNode = best;
+            hoverBeat = time + 1.2;
+            bringToFront(best);
+        }
     });
 
     // Giroscopio (parallax móvil); iOS pedirá permiso solo si el SO lo permite sin gesto
@@ -1155,15 +1376,16 @@ import * as THREE from './vendor/three.module.min.js';
         updatePulses(dt);
         maintenanceSweep(dt);
 
-        writeBuffers();
-        renderer.render(scene, camera);
+        writeBuffers(dt);
+        if (bloomOn) renderWithBloom();
+        else { renderer.setRenderTarget(null); renderer.render(scene, camera); }
 
         // Overlay 2D: retícula (boot), barrido y etiquetas
         ctx.clearRect(0, 0, width, height);
         const gridA = time < 2 ? 1 : Math.max(0, 1 - (time - 2) / 1.5);
         drawGrid(gridA);
         drawSweep();
-        drawLabels(camR);
+        drawLabels(camR, dt);
 
         updateHUD();
         govern(ts);
