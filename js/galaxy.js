@@ -478,8 +478,8 @@ import * as THREE from './vendor/three.module.min.js';
         nodeShape.setAttribute('aBary', new THREE.BufferAttribute(bary, 3));
     }
     const nodeMat = new THREE.ShaderMaterial({
-        transparent: true, depthWrite: false,
-        blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+        transparent: false, depthWrite: true,
+        blending: THREE.NormalBlending, side: THREE.FrontSide,
         vertexShader: `
             attribute vec3 aBary;
             varying vec3 vBary;
@@ -519,16 +519,22 @@ import * as THREE from './vendor/three.module.min.js';
                 // sombreado sutil por cara: el cristal se lee como volumen
                 float lam = 0.5 + 0.5 * max(dot(nrm, normalize(vec3(0.4, 0.7, 0.6))), 0.0);
                 // filo de luz: distancia al borde del triángulo (aristas reales)
-                vec3 w = fwidth(vBary) * 1.7;
+                vec3 w = fwidth(vBary) * 1.05;
                 vec3 sm = smoothstep(vec3(0.0), w, vBary);
                 float edge = 1.0 - min(min(sm.x, sm.y), sm.z);
-                // cuerpo de cristal (caras con materia visible) + filo de luz
-                float backFade = gl_FrontFacing ? 1.0 : 0.3;
-                vec3 body = vTint * (0.55 * lam + 0.6 * fres);
-                vec3 rim  = vTint * edge * (1.15 + fres * 1.2);
-                vec3 col = (body + rim) * backFade + vec3(1.0) * edge * fres * 0.3;
-                float alpha = (0.55 * lam + 0.45 * fres + 0.8 * edge) * backFade;
-                gl_FragColor = vec4(col, min(alpha, 1.0));
+                // Opaque obsidian facets occlude links and crystals behind.
+                // Keep activity in the rim; the body never turns into white light.
+                float energy = max(max(vTint.r, vTint.g), vTint.b);
+                vec3 tint = vTint / max(energy, 0.001);
+                float key = max(dot(nrm, normalize(vec3(-0.5, 0.8, 0.7))), 0.0);
+                float fill = max(dot(nrm, normalize(vec3(0.7, -0.2, 0.3))), 0.0);
+                vec3 body = (vec3(0.012, 0.022, 0.036) + tint * (0.035 + key * 0.18 + fill * 0.035))
+                    * clamp(energy, 0.35, 1.0);
+                vec3 halfVector = normalize(normalize(vec3(-0.5, 0.8, 0.7)) + normalize(vView));
+                float spec = pow(max(dot(nrm, halfVector), 0.0), 40.0) * 0.18;
+                vec3 rim = tint * (0.7 + 0.2 * fres) * clamp(energy, 0.45, 1.1);
+                vec3 col = mix(body + vec3(0.4, 0.65, 0.8) * spec, rim, edge);
+                gl_FragColor = vec4(col, 1.0);
             }`
     });
     const nodeMesh = new THREE.InstancedMesh(nodeShape, nodeMat, MAXN);
@@ -567,11 +573,11 @@ import * as THREE from './vendor/three.module.min.js';
     edgeGeo.setAttribute('iPStr', ePStr);
 
     const edgeMat = new THREE.ShaderMaterial({
-        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+        transparent: true, depthWrite: false, blending: THREE.NormalBlending,
         side: THREE.DoubleSide,
         uniforms: {
             uFogNear: { value: 30 }, uFogFar: { value: 120 },
-            uAspect: { value: 1 }, uP11: { value: 1 }, uWidth: { value: 0.12 }
+            uAspect: { value: 1 }, uP11: { value: 1 }, uWidth: { value: 0.085 }
         },
         vertexShader: `
             attribute vec3 iStart;
@@ -609,7 +615,7 @@ import * as THREE from './vendor/three.module.min.js';
                 dir = len > 0.0001 ? dir / len : vec2(1.0, 0.0);
                 vec2 nrm = vec2(-dir.y, dir.x);
                 vec4 c = projectionMatrix * vp;
-                float w = uWidth * (1.0 + iGlow * 0.9 + iPStr * 0.5);
+                float w = uWidth * (1.0 + min(iGlow, 1.0) * 0.2);
                 vec2 off = nrm * (w * uP11) * position.y;
                 off.x /= uAspect;
                 c.xy += off; // sin multiplicar por w: el grosor cae con la distancia
@@ -633,18 +639,18 @@ import * as THREE from './vendor/three.module.min.js';
                 float shape = across * across; // perfil suave de la cinta
                 float pulse = 0.0;
                 if (vPulse >= 0.0) {
-                    pulse = exp(-pow((vT - vPulse) * 9.0, 2.0)) * vPStr;
+                    pulse = exp(-pow((vT - vPulse) * 32.0, 2.0)) * vPStr;
                 }
                 // punta brillante mientras la arista se está trazando
                 float tip = (vProg < 0.999) ? exp(-pow((vT - vProg) * 26.0, 2.0)) * 0.9 : 0.0;
                 // glow tenue permanente: la trama de la red siempre se insinúa
-                float base = 0.3 + vGlow * 0.4;
+                float base = 0.32 + min(vGlow, 1.0) * 0.1;
                 vec3 cold = vec3(0.0, 0.55, 1.0);
-                vec3 hot  = vec3(0.45, 1.0, 0.85);
+                vec3 hot  = vec3(0.12, 0.78, 0.9);
                 vec3 col = mix(cold, hot, clamp(pulse + tip + vGlow * 0.35, 0.0, 1.0));
                 float fogFade = 0.5 + 0.5 * vFog; // se funde al fondo, mínimo ~50%
-                float a = (base + pulse * 1.5 + tip) * vDim * fogFade * shape * 1.5;
-                gl_FragColor = vec4(col * (1.15 + (pulse + tip) * 1.8 + vGlow * 0.5) * (0.6 + 0.4 * vFog), a);
+                float a = min(0.65, (base + pulse * 0.65 + tip * 0.3) * min(vDim, 1.2) * fogFade * shape);
+                gl_FragColor = vec4(col * (0.65 + 0.25 * vFog), a);
             }`
     });
     const edgeMesh = new THREE.Mesh(edgeGeo, edgeMat);
@@ -682,7 +688,7 @@ import * as THREE from './vendor/three.module.min.js';
     // ping-pong a 1/4 de resolución, y composición final aditiva.
     // ============================================
     let bloomOn = true;
-    let bloomStrength = isMobile ? 0.75 : 1.05; // halo elegante, no neón quemado
+    let bloomStrength = isMobile ? 0.18 : 0.26; // halo elegante, no neón quemado
     const bloomDiv = isMobile ? 6 : 4;          // reducción de resolución del blur
 
     const rtOpts = { depthBuffer: false, stencilBuffer: false };
@@ -701,7 +707,7 @@ import * as THREE from './vendor/three.module.min.js';
         void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
 
     const brightMat = new THREE.ShaderMaterial({
-        uniforms: { tSrc: { value: null }, uThresh: { value: 0.22 } },
+        uniforms: { tSrc: { value: null }, uThresh: { value: 0.72 } },
         vertexShader: POST_VS,
         fragmentShader: `
             precision highp float;
@@ -886,6 +892,11 @@ import * as THREE from './vendor/three.module.min.js';
                 ctx.shadowColor = 'rgba(0, 220, 255, 0.9)';
                 ctx.shadowBlur = 8 * n.glow;
             } else ctx.shadowBlur = 0;
+            ctx.shadowBlur = 0;
+            ctx.lineWidth = 3;
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = `rgba(0, 5, 12, ${(alpha * 0.9).toFixed(3)})`;
+            ctx.strokeText(n.label, x, y);
             ctx.fillText(n.label, x, y);
         }
         ctx.shadowBlur = 0;
@@ -1360,7 +1371,7 @@ import * as THREE from './vendor/three.module.min.js';
         if (time > nextGovern) {
             nextGovern = time + 3;
             // la fluidez manda: primero degrada el bloom, luego nodos/etiquetas
-            if (fpsEMA < 45) bloomStrength = Math.max(0.5, bloomStrength * 0.9);
+            if (fpsEMA < 45) bloomStrength = Math.max(0.08, bloomStrength * 0.9);
             if (fpsEMA < 40 && nodeCap > 70) {
                 nodeCap = Math.max(70, Math.floor(nodeCap * 0.85));
                 maxLabels = Math.max(18, maxLabels - 6);
