@@ -1115,67 +1115,75 @@ import * as THREE from './vendor/three.module.min.js';
     const foldTarget = new THREE.Vector3();
 
     function bringToFront(n) {
-        if (n === selectedNode || n.dying || n.birth < 0.8) return;
+        if (n.dying || n.birth < 0.8) return;
         camera.updateMatrixWorld();
         foldRight.set(1, 0, 0).applyQuaternion(camera.quaternion);
         foldUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
         foldFront.set(0, 0, 1).applyQuaternion(camera.quaternion);
+        const repeated = n === selectedNode;
+        const live = nodes.filter(node => !node.dying);
+        const from = new Map(nodes.map(node => [node, node.viewPos.clone()]));
+        const depths = live.map(node => node.viewPos.dot(foldFront));
+        const front = Math.max(...depths), back = Math.min(...depths);
+        const gap = THREE.MathUtils.clamp((front - n.viewPos.dot(foldFront)) / Math.max(1, front - back), 0, 1);
+        const chaos = repeated || reducedMotion.matches ? 0 : gap * gap;
+        // Preserve the occupied sphere: permute existing positions instead of
+        // shrinking the cloud, moving the camera or pushing everyone back.
+        const destinations = new Map(from);
+        if (repeated) {
+            // Same crystal: simply center it at the same radial distance.
+            destinations.set(n, foldFront.clone().multiplyScalar(n.viewPos.length()));
+        } else {
+            const frontBand = live.filter(node => node.viewPos.dot(foldFront) >= front - (front - back) * 0.22);
+            const host = frontBand.sort((a, b) => {
+                const lateral = node => Math.hypot(node.viewPos.dot(foldRight), node.viewPos.dot(foldUp));
+                return lateral(a) - lateral(b);
+            })[0] || n;
+            destinations.set(n, from.get(host).clone());
+            destinations.set(host, from.get(n).clone());
+            // Deep choices reshuffle many slots; shallow choices disturb few.
+            const participants = live.filter(node => node !== n && node !== host && Math.random() < chaos);
+            const slots = participants.map(node => destinations.get(node));
+            for (let i = slots.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [slots[i], slots[j]] = [slots[j], slots[i]];
+            }
+            participants.forEach((node, i) => destinations.set(node, slots[i]));
+        }
         selectedNode = n;
         orbitSpeed = 0;
-        // Snapshot the currently visible shape, including an interrupted fold.
+        const positions = [...from.values()];
+        const paths = new Map();
+        for (const node of nodes) {
+            const start = from.get(node), end = destinations.get(node);
+            node.layoutPoint = end.clone();
+            node.layoutOrigin = node.pos.clone();
+            node.layoutScale = anchorScale.clone();
+            const pick = () => positions[Math.floor(Math.random() * positions.length)];
+            paths.set(node, {
+                a: start.clone().lerp(end, 1 / 3).lerp(pick(), chaos),
+                b: start.clone().lerp(end, 2 / 3).lerp(pick(), chaos),
+                delay: Math.random() * 0.16 * chaos,
+                spin: new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(9 * chaos)
+            });
+        }
         spatialFold = {
-            t0: time, duration: reducedMotion.matches ? 0.18 : 2.3,
-            from: new Map(nodes.map(node => [node, node.viewPos.clone()])),
-            paths: new Map(nodes.map(node => [node, makeChaosPath(node)]))
+            t0: time, duration: reducedMotion.matches ? 0.18 : repeated ? 0.55 : 0.65 + 1.65 * chaos,
+            chaos, repeated, from, paths
         };
         hoverNode = n;
         hoverLock = null;
         thoughtLabel = n.label;
     }
 
-    function chaosPoint(front) {
-        // Independent locations throughout the viewing volume, including
-        // near-camera flybys. Stars and camera are not part of this motion.
-        const depth = camR * front;
-        const halfH = (camR - depth) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-        return foldRight.clone().multiplyScalar((Math.random() * 2 - 1) * halfH * aspect * 0.95)
-            .addScaledVector(foldUp, (Math.random() * 2 - 1) * halfH * 0.88)
-            .addScaledVector(foldFront, depth);
-    }
-
-    function makeChaosPath(n) {
-        // Each crystal crosses between different depth planes, with its own
-        // launch delay and route. Randomness is sampled once, never per frame.
-        const nearFirst = Math.random() > 0.5;
-        const near = 0.35 + Math.random() * 0.32;
-        const far = -0.35 - Math.random() * 0.6;
-        return {
-            a: chaosPoint(nearFirst ? near : far),
-            b: chaosPoint(nearFirst ? far : near),
-            delay: n === selectedNode ? 0.08 : Math.random() * 0.16,
-            spin: new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(9)
-        };
-    }
-
     function foldedPosition(n, out) {
-        foldDelta.subVectors(n.pos, selectedNode.pos);
-        const distance = foldDelta.length();
-        const locality = Math.exp(-distance * distance / (R * R * 0.85));
-        // Translate the chosen neighborhood, not the entire universe. Far
-        // clusters retain their bearings instead of piling up on one side.
-        const x = n.pos.dot(foldRight) - selectedNode.pos.dot(foldRight) * locality;
-        const y = n.pos.dot(foldUp) - selectedNode.pos.dot(foldUp) * locality;
-        const z = foldDelta.dot(foldFront);
-        // A continuous lens: nearby concepts remain neighbors, while distant
-        // clusters wrap into a deeper shell. No random reassignment of nodes.
-        const depth = n === selectedNode ? camR * 0.64 :
-            camR * (0.32 - 1.15 * Math.tanh(distance / (R * 0.95)));
-        const halfH = (camR - depth) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-        const halfW = halfH * aspect;
-        const px = halfW * (0.12 + 0.76 * Math.tanh((x + z * 0.24) / (R * 0.8)));
-        const py = halfH * (0.03 + 0.78 * Math.tanh(y / (R * 0.85)));
-        return out.copy(foldRight).multiplyScalar(px)
-            .addScaledVector(foldUp, py).addScaledVector(foldFront, depth);
+        if (!n.layoutPoint) return out.copy(n.pos);
+        // Retain a little organic motion without changing the sphere's extent.
+        foldDelta.subVectors(n.pos, n.layoutOrigin).clampLength(0, 1.2);
+        return out.copy(n.layoutPoint).multiply(new THREE.Vector3(
+            anchorScale.x / n.layoutScale.x,
+            anchorScale.y / n.layoutScale.y,
+            anchorScale.z / n.layoutScale.z)).add(foldDelta);
     }
 
     function updateSpatialFold() {
