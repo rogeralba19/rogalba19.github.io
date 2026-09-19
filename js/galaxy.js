@@ -891,11 +891,18 @@ import * as THREE from './vendor/three.module.min.js';
                 ctx.font = `${fs.toFixed(2)}px "Courier New", monospace`;
                 ctx.fillStyle = `rgba(175, 220, 255, ${(0.8 * alpha).toFixed(3)})`;
             }
-            if (n.glow > 0.4) {
-                ctx.shadowColor = 'rgba(0, 220, 255, 0.9)';
-                ctx.shadowBlur = 8 * n.glow;
-            } else ctx.shadowBlur = 0;
+            // Dense dark outline plus a soft black halo isolates text from
+            // luminous links. Fade with the label to preserve depth cues.
+            ctx.save();
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = Math.max(3, Math.min(6, fs * 0.32));
+            ctx.strokeStyle = `rgba(0, 0, 0, ${alpha.toFixed(3)})`;
+            ctx.shadowColor = 'rgba(0, 0, 0, 1)';
+            ctx.shadowBlur = 7;
+            ctx.strokeText(n.label, x, y);
+            ctx.shadowBlur = 0;
             ctx.fillText(n.label, x, y);
+            ctx.restore();
         }
         ctx.shadowBlur = 0;
     }
