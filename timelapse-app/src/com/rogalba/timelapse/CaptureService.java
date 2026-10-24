@@ -58,6 +58,9 @@ public class CaptureService extends Service {
     static final String EXTRA_MAX_SHOTS = "max_shots";
     static final String EXTRA_FOCUS_INFINITY = "focus_infinity";
     static final String EXTRA_JPEG_ORIENTATION = "jpeg_orientation";
+    static final String EXTRA_CAMERA_ID = "camera_id";
+    static final String EXTRA_WIDTH = "width";
+    static final String EXTRA_HEIGHT = "height";
 
     private static final String CHANNEL = "timelapse";
     private static final int NOTIF_ID = 1;
@@ -84,6 +87,9 @@ public class CaptureService extends Service {
     private int maxShots;
     private boolean focusInfinity;
     private int jpegOrientation;
+    private String cameraId;
+    private int photoWidth;
+    private int photoHeight;
     private String sessionName;
     private long startUptime;
     private int shotsRequested;
@@ -107,6 +113,9 @@ public class CaptureService extends Service {
         maxShots = intent.getIntExtra(EXTRA_MAX_SHOTS, 0);
         focusInfinity = intent.getBooleanExtra(EXTRA_FOCUS_INFINITY, true);
         jpegOrientation = intent.getIntExtra(EXTRA_JPEG_ORIENTATION, 90);
+        cameraId = intent.getStringExtra(EXTRA_CAMERA_ID);
+        photoWidth = intent.getIntExtra(EXTRA_WIDTH, 0);
+        photoHeight = intent.getIntExtra(EXTRA_HEIGHT, 0);
         sessionName = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
 
         running = true;
@@ -189,22 +198,18 @@ public class CaptureService extends Service {
         if (!running) return;
         CameraManager mgr = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         try {
-            String id = null;
-            for (String c : mgr.getCameraIdList()) {
-                Integer facing = mgr.getCameraCharacteristics(c)
-                        .get(CameraCharacteristics.LENS_FACING);
-                if (facing != null && facing == CameraCharacteristics.LENS_FACING_BACK) {
-                    id = c;
-                    break;
-                }
-            }
-            if (id == null) id = mgr.getCameraIdList()[0];
+            String id = Arrays.asList(mgr.getCameraIdList()).contains(cameraId)
+                    ? cameraId : mgr.getCameraIdList()[0];
             chars = mgr.getCameraCharacteristics(id);
 
             StreamConfigurationMap map =
                     chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-            Size jpeg = Collections.max(Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),
+            Size[] jpegSizes = map.getOutputSizes(ImageFormat.JPEG);
+            Size jpeg = Collections.max(Arrays.asList(jpegSizes),
                     Comparator.comparingLong(s -> (long) s.getWidth() * s.getHeight()));
+            for (Size s : jpegSizes) {
+                if (s.getWidth() == photoWidth && s.getHeight() == photoHeight) jpeg = s;
+            }
             Size meter = smallestAtLeast(map.getOutputSizes(ImageFormat.YUV_420_888), 640);
 
             if (jpegReader == null) {

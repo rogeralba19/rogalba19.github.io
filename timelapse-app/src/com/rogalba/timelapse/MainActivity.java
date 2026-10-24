@@ -5,6 +5,7 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.SurfaceTexture;
@@ -31,7 +32,11 @@ import android.view.OrientationEventListener;
 import android.view.Surface;
 import android.view.TextureView;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.ScrollView;
+import android.widget.Spinner;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -72,6 +77,15 @@ public class MainActivity extends Activity {
     private Size previewSize;
     private Surface previewSurface;
     private int sensorOrientation = 90;
+    private boolean frontFacing = false;
+
+    private Spinner cameraSpinner;
+    private Spinner sizeSpinner;
+    private final List<String> cameraIds = new ArrayList<>();
+    private final List<Size> jpegSizes = new ArrayList<>();
+    private String currentCameraId;
+    private Size selectedSize;
+    private SharedPreferences prefs;
 
     private OrientationEventListener orientationListener;
     private int deviceDegrees = 0;
@@ -80,6 +94,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        prefs = getSharedPreferences("ajustes", MODE_PRIVATE);
         buildUi();
 
         orientationListener = new OrientationEventListener(this) {
@@ -113,7 +128,7 @@ public class MainActivity extends Activity {
         previewBox = new FrameLayout(this);
         previewBox.setBackgroundColor(Color.BLACK);
         LinearLayout.LayoutParams boxLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1.3f);
         boxLp.topMargin = dp(12);
         boxLp.bottomMargin = dp(12);
         root.addView(previewBox, boxLp);
@@ -133,9 +148,32 @@ public class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER));
 
-        intervalInput = addField(root, "Intervalo entre fotos (segundos)", "5");
-        maxShotsInput = addField(root, "Número de fotos (0 = sin límite)", "0");
-        focusInfinity = addCheck(root, "Enfoque fijo al infinito (recomendado para paisajes)", true);
+        // Ajustes en una zona desplazable para que quepan en pantallas pequeñas.
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(form);
+        root.addView(scroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        cameraSpinner = addSpinner(form, "Cámara");
+        cameraSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> p, android.view.View v, int pos, long id) {
+                onCameraChosen(pos);
+            }
+            @Override public void onNothingSelected(AdapterView<?> p) {}
+        });
+        sizeSpinner = addSpinner(form, "Tamaño de foto");
+        sizeSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> p, android.view.View v, int pos, long id) {
+                onSizeChosen(pos);
+            }
+            @Override public void onNothingSelected(AdapterView<?> p) {}
+        });
+
+        intervalInput = addField(form, "Intervalo entre fotos (segundos)", "5");
+        maxShotsInput = addField(form, "Número de fotos (0 = sin límite)", "0");
+        focusInfinity = addCheck(form, "Enfoque fijo al infinito (recomendado para paisajes)", true);
 
         startButton = new Button(this);
         startButton.setText("Iniciar");
@@ -173,6 +211,17 @@ public class MainActivity extends Activity {
         return e;
     }
 
+    private Spinner addSpinner(LinearLayout root, String label) {
+        TextView l = new TextView(this);
+        l.setText(label);
+        l.setTextColor(Color.parseColor("#AAAAAA"));
+        l.setTextSize(13);
+        root.addView(l);
+        Spinner s = new Spinner(this);
+        root.addView(s);
+        return s;
+    }
+
     private CheckBox addCheck(LinearLayout root, String label, boolean checked) {
         CheckBox c = new CheckBox(this);
         c.setText(label);
@@ -195,6 +244,8 @@ public class MainActivity extends Activity {
             intervalInput.setEnabled(!running);
             maxShotsInput.setEnabled(!running);
             focusInfinity.setEnabled(!running);
+            cameraSpinner.setEnabled(!running);
+            sizeSpinner.setEnabled(!running);
             startButton.setText(running ? "Detener" : "Iniciar");
             previewNote.setVisibility(running ? TextView.VISIBLE : TextView.GONE);
             preview.setVisibility(running ? TextView.INVISIBLE : TextView.VISIBLE);
@@ -314,26 +365,17 @@ public class MainActivity extends Activity {
         if (camera != null || camHandler == null) return;
         CameraManager mgr = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         try {
-            String id = null;
-            for (String c : mgr.getCameraIdList()) {
-                Integer facing = mgr.getCameraCharacteristics(c)
-                        .get(CameraCharacteristics.LENS_FACING);
-                if (facing != null && facing == CameraCharacteristics.LENS_FACING_BACK) {
-                    id = c;
-                    break;
-                }
-            }
-            if (id == null) id = mgr.getCameraIdList()[0];
+            if (cameraIds.isEmpty()) loadCameras(mgr);
+            String id = currentCameraId;
             chars = mgr.getCameraCharacteristics(id);
             Integer so = chars.get(CameraCharacteristics.SENSOR_ORIENTATION);
             sensorOrientation = so == null ? 90 : so;
+            Integer facing = chars.get(CameraCharacteristics.LENS_FACING);
+            frontFacing = facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT;
 
             StreamConfigurationMap map =
                     chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-            Size jpeg = java.util.Collections.max(
-                    Arrays.asList(map.getOutputSizes(android.graphics.ImageFormat.JPEG)),
-                    java.util.Comparator.comparingLong(s -> (long) s.getWidth() * s.getHeight()));
-            previewSize = choosePreviewSize(map.getOutputSizes(SurfaceTexture.class), jpeg);
+            previewSize = choosePreviewSize(map.getOutputSizes(SurfaceTexture.class), selectedSize);
             ui.post(this::fitPreview);
 
             mgr.openCamera(id, new CameraDevice.StateCallback() {
@@ -353,6 +395,109 @@ public class MainActivity extends Activity {
         } catch (CameraAccessException | SecurityException e) {
             setStatus("No se pudo abrir la cámara: " + e.getMessage());
         }
+    }
+
+    /** Llena el selector de cámaras (una vez) y elige la guardada o la trasera. */
+    private void loadCameras(CameraManager mgr) throws CameraAccessException {
+        List<String> labels = new ArrayList<>();
+        String saved = prefs.getString("camera", null);
+        String firstBack = null;
+        int backN = 0, frontN = 0, otherN = 0;
+        for (String id : mgr.getCameraIdList()) {
+            CameraCharacteristics c = mgr.getCameraCharacteristics(id);
+            Integer facing = c.get(CameraCharacteristics.LENS_FACING);
+            String label;
+            if (facing != null && facing == CameraCharacteristics.LENS_FACING_BACK) {
+                label = "Trasera " + (++backN);
+                if (firstBack == null) firstBack = id;
+            } else if (facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT) {
+                label = "Frontal " + (++frontN);
+            } else {
+                label = "Externa " + (++otherN);
+            }
+            float[] focal = c.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS);
+            if (focal != null && focal.length > 0) {
+                label += String.format(Locale.US, " · %.1f mm", focal[0]);
+            }
+            cameraIds.add(id);
+            labels.add(label);
+        }
+        if (cameraIds.contains(saved)) currentCameraId = saved;
+        else if (firstBack != null) currentCameraId = firstBack;
+        else currentCameraId = cameraIds.get(0);
+
+        cameraSpinner.setAdapter(spinnerAdapter(labels));
+        cameraSpinner.setSelection(cameraIds.indexOf(currentCameraId), false);
+        loadSizes(mgr);
+    }
+
+    /** Llena el selector de tamaños de foto para la cámara actual, de mayor a menor. */
+    private void loadSizes(CameraManager mgr) throws CameraAccessException {
+        StreamConfigurationMap map = mgr.getCameraCharacteristics(currentCameraId)
+                .get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+        jpegSizes.clear();
+        jpegSizes.addAll(Arrays.asList(map.getOutputSizes(android.graphics.ImageFormat.JPEG)));
+        jpegSizes.sort((a, b) -> Long.compare(
+                (long) b.getWidth() * b.getHeight(), (long) a.getWidth() * a.getHeight()));
+
+        List<String> labels = new ArrayList<>();
+        for (Size s : jpegSizes) {
+            double mp = s.getWidth() * (double) s.getHeight() / 1e6;
+            labels.add(String.format(Locale.US, "%d×%d · %.1f MP · %s",
+                    s.getWidth(), s.getHeight(), mp, aspectLabel(s)));
+        }
+        String saved = prefs.getString("size_" + currentCameraId, null);
+        selectedSize = jpegSizes.get(0);
+        for (Size s : jpegSizes) if (s.toString().equals(saved)) selectedSize = s;
+
+        sizeSpinner.setAdapter(spinnerAdapter(labels));
+        sizeSpinner.setSelection(jpegSizes.indexOf(selectedSize), false);
+    }
+
+    private static String aspectLabel(Size s) {
+        double r = (double) Math.max(s.getWidth(), s.getHeight())
+                / Math.min(s.getWidth(), s.getHeight());
+        if (Math.abs(r - 4.0 / 3) < 0.02) return "4:3";
+        if (Math.abs(r - 16.0 / 9) < 0.02) return "16:9";
+        if (Math.abs(r - 1) < 0.02) return "1:1";
+        if (Math.abs(r - 3.0 / 2) < 0.02) return "3:2";
+        return String.format(Locale.US, "%.2f:1", r);
+    }
+
+    private ArrayAdapter<String> spinnerAdapter(List<String> items) {
+        ArrayAdapter<String> a = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, items);
+        a.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        return a;
+    }
+
+    private void onCameraChosen(int pos) {
+        if (pos < 0 || pos >= cameraIds.size()) return;
+        String id = cameraIds.get(pos);
+        if (id.equals(currentCameraId)) return;
+        currentCameraId = id;
+        prefs.edit().putString("camera", id).apply();
+        try {
+            loadSizes((CameraManager) getSystemService(Context.CAMERA_SERVICE));
+        } catch (CameraAccessException e) {
+            setStatus("Error de cámara: " + e.getMessage());
+        }
+        restartPreview();
+    }
+
+    private void onSizeChosen(int pos) {
+        if (pos < 0 || pos >= jpegSizes.size()) return;
+        Size s = jpegSizes.get(pos);
+        if (s.equals(selectedSize)) return;
+        selectedSize = s;
+        prefs.edit().putString("size_" + currentCameraId, s.toString()).apply();
+        restartPreview();
+    }
+
+    private void restartPreview() {
+        if (CaptureService.running) return;
+        closePreview();
+        openPreviewIfPossible();
     }
 
     /** Elige un tamaño de vista previa con la misma proporción que la foto, ≤ 1920 px. */
@@ -442,6 +587,10 @@ public class MainActivity extends Activity {
             requestPermissions(neededPermissions(), REQ_PERMS);
             return;
         }
+        if (currentCameraId == null || selectedSize == null) {
+            Toast.makeText(this, "La cámara aún no está lista.", Toast.LENGTH_SHORT).show();
+            return;
+        }
         double secs;
         try {
             secs = Double.parseDouble(intervalInput.getText().toString().replace(',', '.'));
@@ -468,8 +617,12 @@ public class MainActivity extends Activity {
                 .putExtra(CaptureService.EXTRA_MAX_SHOTS, Math.max(0, max))
                 .putExtra(CaptureService.EXTRA_FOCUS_INFINITY, focusInfinity.isChecked())
                 // Fija la orientación al iniciar para que todas las fotos salgan iguales.
-                .putExtra(CaptureService.EXTRA_JPEG_ORIENTATION,
-                        (sensorOrientation + deviceDegrees) % 360);
+                .putExtra(CaptureService.EXTRA_JPEG_ORIENTATION, frontFacing
+                        ? (sensorOrientation - deviceDegrees + 360) % 360
+                        : (sensorOrientation + deviceDegrees) % 360)
+                .putExtra(CaptureService.EXTRA_CAMERA_ID, currentCameraId)
+                .putExtra(CaptureService.EXTRA_WIDTH, selectedSize.getWidth())
+                .putExtra(CaptureService.EXTRA_HEIGHT, selectedSize.getHeight());
         if (Build.VERSION.SDK_INT >= 26) startForegroundService(i); else startService(i);
 
         askIgnoreBatteryOptimizations();
