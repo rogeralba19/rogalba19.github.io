@@ -40,3 +40,19 @@ modelo `face_landmarker.task`).
 Abre <http://localhost:8000/?debug> para ver el panel lil-gui (densidad,
 inestabilidad, glitch, disolución, bloom, opacidad) y los FPS del avatar. Sin
 `?debug` el panel no se carga.
+
+### Probar por fases
+
+`?fase=N` limita el avatar a una fase de desarrollo (combinable con `?debug`):
+
+| URL | Qué se ve |
+| --- | --- |
+| `?debug&fase=1` | partículas estáticas sobre la malla, con el color de la foto |
+| `?debug&fase=2` | + parpadeo, respiración, cabeza, mirada, murmullo y cejas |
+| `?debug&fase=3` | + simulación GPU: resortes, curl noise y disolución |
+| `?debug&fase=4` | + post-procesado (grano, scanlines, aberración, glitch, fósforo) |
+| `?debug` (fase 6) | todo: entrada en escena, cursor que dispersa, coordinación con la Galaxia |
+| `?sinavatar` | la Galaxia sin avatar, para comparar |
+
+Rendimiento: 512² partículas en escritorio y 256² en móvil. Si los FPS
+bajan de 45 durante 3 s, baja de nivel solo (512 → 256 → 128).

@@ -138,6 +138,13 @@ import * as THREE from './vendor/three.module.min.js';
     let nextRecycle = 0;
 
     const mouse = { x: -1, y: -1, nx: 0, ny: 0, active: false };
+
+    // Avatar de conciencia digital (js/avatar/): se carga tarde, cuando la
+    // galaxia ya es visible. ?fase=N limita las fases (1-6) y ?debug abre lil-gui.
+    const urlParams = new URLSearchParams(location.search);
+    const avatarStage = THREE.MathUtils.clamp(parseInt(urlParams.get('fase'), 10) || 6, 1, 6);
+    let avatar = null;
+    let avatarRequested = false;
     const gyro = { x: 0, y: 0, ok: false };
     const par = { x: 0, y: 0 }; // parallax suavizado
 
@@ -710,18 +717,23 @@ import * as THREE from './vendor/three.module.min.js';
         void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
 
     const brightMat = new THREE.ShaderMaterial({
-        uniforms: { tSrc: { value: null }, uThresh: { value: 0.22 } },
+        uniforms: { tSrc: { value: null }, uThresh: { value: 0.22 }, tAvatar: { value: null }, uAvBloom: { value: 0 } },
         vertexShader: POST_VS,
         fragmentShader: `
             precision highp float;
             varying vec2 vUv;
             uniform sampler2D tSrc;
             uniform float uThresh;
+            uniform sampler2D tAvatar;
+            uniform float uAvBloom;
             void main() {
                 vec3 c = texture2D(tSrc, vUv).rgb;
                 float lum = max(max(c.r, c.g), c.b);
                 float k = smoothstep(uThresh, uThresh + 0.35, lum);
-                gl_FragColor = vec4(c * k, 1.0);
+                vec3 o = c * k;
+                // avatar: bloom suave propio, sin umbral duro
+                if (uAvBloom > 0.0) o += texture2D(tAvatar, vUv).rgb * uAvBloom;
+                gl_FragColor = vec4(o, 1.0);
             }`
     });
 
@@ -745,7 +757,10 @@ import * as THREE from './vendor/three.module.min.js';
 
     const compositeMat = new THREE.ShaderMaterial({
         transparent: true,
-        uniforms: { tScene: { value: null }, tBloom: { value: null }, uStrength: { value: 1 } },
+        uniforms: {
+            tScene: { value: null }, tBloom: { value: null }, uStrength: { value: 1 },
+            tAvatar: { value: null }, uAvOn: { value: 0 }, uTime: { value: 0 }
+        },
         vertexShader: POST_VS,
         fragmentShader: `
             precision highp float;
@@ -753,43 +768,62 @@ import * as THREE from './vendor/three.module.min.js';
             uniform sampler2D tScene;
             uniform sampler2D tBloom;
             uniform float uStrength;
+            uniform sampler2D tAvatar;
+            uniform float uAvOn;
+            uniform float uTime;
             void main() {
                 vec4 s = texture2D(tScene, vUv);
                 vec3 b = texture2D(tBloom, vUv).rgb;
                 vec3 c = s.rgb + b * uStrength;
+                if (uAvOn > 0.5) {
+                    // avatar DETRÁS del grafo: se apaga donde hay nodos/aristas
+                    float occ = smoothstep(0.04, 0.5, max(max(s.r, s.g), s.b));
+                    c += texture2D(tAvatar, vUv).rgb * (1.0 - occ * 0.85);
+                    // dithering contra banding en los degradados suaves
+                    c += (fract(sin(dot(gl_FragCoord.xy + fract(uTime) * 97.0, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;
+                }
                 // alpha desde el brillo: la futura capa de foto sigue viéndose detrás
                 float a = clamp(max(max(c.r, c.g), c.b) * 1.5, 0.0, 1.0);
                 gl_FragColor = vec4(c, max(s.a, a));
             }`
     });
 
-    function renderWithBloom() {
+    // avatarTex: capa del avatar ya post-procesada (o null). El avatar está
+    // en su propia capa (layer 1): este render de la escena no lo incluye.
+    function renderWithBloom(avatarTex, withBloom) {
         renderer.setRenderTarget(rtScene);
         renderer.clear();
         renderer.render(scene, camera);
-        // bright-pass a baja resolución
-        postQuad.material = brightMat;
-        brightMat.uniforms.tSrc.value = rtScene.texture;
-        renderer.setRenderTarget(rtA);
-        renderer.render(postScene, postCam);
-        // blur gaussiano ping-pong (2 iteraciones H+V)
-        postQuad.material = blurMat;
-        blurMat.uniforms.uTexel.value.set(1 / rtA.width, 1 / rtA.height);
-        for (let i = 0; i < 2; i++) {
-            blurMat.uniforms.tSrc.value = rtA.texture;
-            blurMat.uniforms.uDir.value.set(1, 0);
-            renderer.setRenderTarget(rtB);
-            renderer.render(postScene, postCam);
-            blurMat.uniforms.tSrc.value = rtB.texture;
-            blurMat.uniforms.uDir.value.set(0, 1);
+        if (withBloom) {
+            // bright-pass a baja resolución
+            postQuad.material = brightMat;
+            brightMat.uniforms.tSrc.value = rtScene.texture;
+            brightMat.uniforms.tAvatar.value = avatarTex;
+            brightMat.uniforms.uAvBloom.value = avatarTex ? avatar.bloom : 0;
             renderer.setRenderTarget(rtA);
             renderer.render(postScene, postCam);
+            // blur gaussiano ping-pong (2 iteraciones H+V)
+            postQuad.material = blurMat;
+            blurMat.uniforms.uTexel.value.set(1 / rtA.width, 1 / rtA.height);
+            for (let i = 0; i < 2; i++) {
+                blurMat.uniforms.tSrc.value = rtA.texture;
+                blurMat.uniforms.uDir.value.set(1, 0);
+                renderer.setRenderTarget(rtB);
+                renderer.render(postScene, postCam);
+                blurMat.uniforms.tSrc.value = rtB.texture;
+                blurMat.uniforms.uDir.value.set(0, 1);
+                renderer.setRenderTarget(rtA);
+                renderer.render(postScene, postCam);
+            }
         }
         // composición final en pantalla
         postQuad.material = compositeMat;
         compositeMat.uniforms.tScene.value = rtScene.texture;
         compositeMat.uniforms.tBloom.value = rtA.texture;
-        compositeMat.uniforms.uStrength.value = bloomStrength;
+        compositeMat.uniforms.uStrength.value = withBloom ? bloomStrength : 0;
+        compositeMat.uniforms.tAvatar.value = avatarTex;
+        compositeMat.uniforms.uAvOn.value = avatarTex ? 1 : 0;
+        compositeMat.uniforms.uTime.value = time;
         renderer.setRenderTarget(null);
         renderer.render(postScene, postCam);
     }
@@ -1372,7 +1406,10 @@ import * as THREE from './vendor/three.module.min.js';
             if (fpsEMA < 32) bloomOn = false;
             if (fpsEMA < 27) {
                 sweepEnabled = false;
-                if (pixelRatio > 1) { pixelRatio = 1; renderer.setPixelRatio(1); resizeBloom(); }
+                if (pixelRatio > 1) {
+                    pixelRatio = 1; renderer.setPixelRatio(1); resizeBloom();
+                    if (avatar) avatar.resize(width, height, pixelRatio, portrait);
+                }
             }
         }
     }
@@ -1395,6 +1432,7 @@ import * as THREE from './vendor/three.module.min.js';
         // vertical — y SIEMPRE estirada en profundidad hacia la cámara
         if (portrait) anchorTarget.set(0.66, 1.2, 1.1);
         else anchorTarget.set(1.15, 0.78, 1.18);
+        if (avatar) avatar.resize(width, height, pixelRatio, portrait);
     }
 
     window.addEventListener('resize', resize);
@@ -1455,12 +1493,37 @@ import * as THREE from './vendor/three.module.min.js';
     for (let i = 0; i < 90; i++) physics(1 / 45);
     typeText(hud.status, 'SCANNING...', 24);
 
+    function loadAvatar() {
+        if (avatarRequested || urlParams.has('sinavatar')) return;
+        avatarRequested = true;
+        const go = () => import('./avatar/avatar.js')
+            .then(m => m.createAvatar({
+                renderer, scene, camera, isMobile, reducedMotion,
+                debug: urlParams.has('debug'), stage: avatarStage
+            }))
+            .then(a => {
+                avatar = a;
+                avatar.resize(width, height, pixelRatio, portrait);
+                window.__avatar = urlParams.has('debug') ? avatar : undefined;
+            })
+            .catch(() => { avatar = null; }); // sin malla/WebGL2: la galaxia sigue sola
+        if ('requestIdleCallback' in window) requestIdleCallback(go, { timeout: 800 });
+        else setTimeout(go, 120);
+    }
+    const onMotionPref = () => { if (avatar) avatar.setReducedMotion(reducedMotion.matches); };
+    if (reducedMotion.addEventListener) reducedMotion.addEventListener('change', onMotionPref);
+
     let lastTs = 0;
+    let rafId = 0;
+    let lastRealDt = 0.016;
     function frame(ts) {
-        requestAnimationFrame(frame);
-        const dt = Math.min((ts - lastTs) / 1000 || 0.016, 1 / 25);
+        rafId = requestAnimationFrame(frame);
+        lastRealDt = lastTs ? (ts - lastTs) / 1000 : 0.016;
+        const dt = Math.min(lastRealDt || 0.016, 1 / 25);
         lastTs = ts;
         time += dt;
+        // la galaxia ya es visible: ahora sí, la foto y la malla del avatar
+        if (!avatarRequested && time > bootT.sweepStart) loadAvatar();
 
         physics(dt);
         updateNodesState(dt);
@@ -1480,7 +1543,14 @@ import * as THREE from './vendor/three.module.min.js';
         maintenanceSweep(dt);
 
         writeBuffers(dt);
-        if (bloomOn) renderWithBloom();
+        let avatarTex = null;
+        if (avatar) {
+            // al seleccionar un nodo el avatar se degrada y se atenúa
+            const focus = Math.max(focusAmt * 0.6, spatialFold ? 1 : 0, selectedNode && hoverNode === selectedNode ? 0.8 : 0);
+            avatar.update(dt, { mouse, focus, booted, dtReal: lastRealDt });
+            avatarTex = avatar.render(dt);
+        }
+        if (bloomOn || avatarTex) renderWithBloom(avatarTex, bloomOn);
         else { renderer.setRenderTarget(null); renderer.render(scene, camera); }
 
         // Overlay 2D: retícula (boot), barrido y etiquetas
@@ -1493,5 +1563,11 @@ import * as THREE from './vendor/three.module.min.js';
         updateHUD();
         govern(ts);
     }
-    requestAnimationFrame(frame);
+    rafId = requestAnimationFrame(frame);
+
+    // Pestaña oculta: se pausa todo (galaxia + avatar); al volver, sin saltos
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) { cancelAnimationFrame(rafId); rafId = 0; }
+        else if (!rafId) { lastTs = 0; rafId = requestAnimationFrame(frame); }
+    });
 })();
