@@ -72,11 +72,17 @@ export const TARGET = /* glsl */`
 uniform sampler2D tLand;
 uniform sampler2D tRefA;
 uniform sampler2D tRefB;
+uniform mat4 uHead;
 vec3 av_lm(float i) {
     vec2 c = vec2(mod(i, 32.0) + 0.5, floor(i / 32.0) + 0.5) / vec2(32.0, 16.0);
     return texture2D(tLand, c).xyz;
 }
 vec3 av_target(vec4 A, vec4 B, out vec3 nrm) {
+    if (B.w > 4.5) {
+        // pelo / orejas / cuello: siguen a la cabeza, sin deformarse
+        nrm = vec3(0.0, 0.0, 1.0);
+        return (uHead * vec4(A.xyz, 1.0)).xyz;
+    }
     vec3 a = av_lm(A.x), b = av_lm(A.y), c = av_lm(A.z);
     vec3 n = cross(b - a, c - a);
     float ln = length(n);
@@ -170,19 +176,6 @@ attribute vec2 aUv;
 varying vec3 vColor;
 varying float vAlpha;
 
-vec3 palette(float t) {
-    // negro azulado -> azul profundo -> cian #00aaff -> hielo -> blanco menta
-    vec3 c0 = vec3(0.004, 0.02, 0.06);
-    vec3 c1 = vec3(0.0, 0.16, 0.42);
-    vec3 c2 = vec3(0.0, 0.62, 1.0);
-    vec3 c3 = vec3(0.55, 0.92, 1.0);
-    vec3 c4 = vec3(0.86, 1.0, 0.94);
-    if (t < 0.25) return mix(c0, c1, t / 0.25);
-    if (t < 0.55) return mix(c1, c2, (t - 0.25) / 0.3);
-    if (t < 0.85) return mix(c2, c3, (t - 0.55) / 0.3);
-    return mix(c3, c4, (t - 0.85) / 0.15);
-}
-
 void main() {
     vec2 ref = position.xy;
     vec4 A = texture2D(tRefA, ref);
@@ -207,26 +200,33 @@ void main() {
 
     vec4 mv = modelViewMatrix * vec4(p, 1.0);
     float depthK = uRefDepth / max(-mv.z, 1e-3);
-    gl_PointSize = max(1.0, uPointSize * uSizePx * depthK * (0.55 + 0.9 * seed));
+    gl_PointSize = max(1.0, uPointSize * uSizePx * depthK * (0.8 + 0.4 * seed));
     gl_Position = projectionMatrix * mv;
 
-    float lum = dot(texture2D(tPhoto, aUv).rgb, vec3(0.299, 0.587, 0.114));
-    lum = smoothstep(uLumLo, uLumHi, lum);
-    vec3 col = palette(lum);
-    float a = uAlpha * (0.18 + 0.82 * lum);
+    // Look fotográfico: la luz de la foto ES la imagen. Lo oscuro desaparece,
+    // las luces brillan; tono monocromo azul-blanco (sin mapas de color).
+    vec4 tex = texture2D(tPhoto, aUv);
+    float lum = dot(tex.rgb, vec3(0.299, 0.587, 0.114));
+    lum = clamp((lum - uLumLo) / max(uLumHi - uLumLo, 0.05), 0.0, 1.0);
+    float vis = pow(lum, 1.3);
+    vec3 col = mix(vec3(0.08, 0.30, 0.62), vec3(0.82, 0.94, 1.0), smoothstep(0.05, 0.95, lum));
+
+    // compensa la densidad extra de ojos y boca (detalle, no brillo)
+    float comp = region < 0.5 ? 1.0 : region < 2.5 ? 0.5 : region < 3.5 ? 0.62 : region < 4.5 ? 0.77 : 1.0;
+    float mask = tex.a;
+    if (region > 4.5) mask *= B.x;   // viñeta suave de la cabeza (pelo, cuello)
+    float a = uAlpha * vis * comp * mask;
 
     // polvo liberado: más tenue cuanto más lejos de la malla
     float disp = length(p - target);
     a *= 1.0 - smoothstep(0.03, 0.6, disp) * 0.7;
-    // borde de disolución brillante
-    col += vec3(0.35, 1.0, 0.85) * edge * 1.6;
-    a += edge * uAlpha * 1.4;
+    // borde de disolución luminoso
+    col = mix(col, vec3(0.75, 0.95, 1.0), edge);
+    a += edge * uAlpha * 0.9 * mask;
 
-    // iris: tinte del verde del sitio y cierre con el párpado
     if (region > 0.5 && region < 2.5) {
         float blink = region < 1.5 ? uBlinkR : uBlinkL;
-        col = mix(col, vec3(0.0, 1.0, 0.533), 0.35);
-        a *= (1.0 - blink) * 1.25;
+        a *= 1.0 - blink;
     }
     vColor = col;
     vAlpha = a;

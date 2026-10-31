@@ -18,7 +18,10 @@ la web: solo lo usa la herramienta offline.
 
 ### Regenerar la malla (cuando cambies la foto)
 
-1. Copia tu foto frontal, bien iluminada, como `assets/avatar/rostro.jpg`.
+1. Copia tu foto como `assets/avatar/rostro.jpg`. Para que se parezca a ti:
+   de frente, expresión serena con la boca cerrada, luz pareja y suave, con
+   pelo, orejas y cuello visibles (la herramienta separa a la persona del
+   fondo y lo recorta sola).
    Este archivo está en `.gitignore`: el original no se publica.
 2. Arranca un servidor local en la raíz del repo:
    ```bash

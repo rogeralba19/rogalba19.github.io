@@ -109,6 +109,8 @@ class FaceRig {
         }
         // Pivote de la cabeza: detrás del centro del rostro
         this.pivot = [0, -0.05, -0.45];
+        this.head = new THREE.Matrix4();
+        this._m = new THREE.Matrix4();
     }
 
     // s: estado animado (ya suavizado)
@@ -161,6 +163,12 @@ class FaceRig {
         const cx = Math.cos(s.pitch), sx = Math.sin(s.pitch);
         const cz = Math.cos(s.roll), sz = Math.sin(s.roll);
         const [px, py, pz] = this.pivot;
+        // misma transformación como matriz: T(pivote+ty)·Ry·Rx·Rz·S·T(-pivote)
+        const H = this.head, M = this._m;
+        H.makeTranslation(px, py + ty, pz);
+        H.multiply(M.makeRotationY(s.yaw)).multiply(M.makeRotationX(s.pitch))
+            .multiply(M.makeRotationZ(s.roll)).multiply(M.makeScale(sc, sc, sc))
+            .multiply(M.makeTranslation(-px, -py, -pz));
         for (let i = 0; i < LM_COUNT; i++) {
             let x = (O[i * 3] - px) * sc, y = (O[i * 3 + 1] - py) * sc, z = (O[i * 3 + 2] - pz) * sc;
             // roll (Z)
@@ -178,7 +186,17 @@ class FaceRig {
 // ------------------------------------------------------------
 // Muestreo de partículas sobre la superficie (una sola vez por tamaño)
 // ------------------------------------------------------------
-function buildParticles(mesh, size, onFace) {
+function pointInPoly(x, y, poly) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const [xi, yi] = poly[i], [xj, yj] = poly[j];
+        if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+}
+
+// pix: { w, h, data } de la foto (RGBA, alfa = máscara de persona)
+function buildParticles(mesh, size, onFace, pix) {
     const L = mesh.landmarks, UV = mesh.uv, T = mesh.triangles, R = mesh.regions;
     const triCount = T.length / 3;
     const setOf = (...lists) => new Set(lists.flat());
@@ -193,29 +211,73 @@ function buildParticles(mesh, size, onFace) {
     let acc = 0;
     for (let t = 0; t < triCount; t++) {
         const a = T[t * 3], b = T[t * 3 + 1], c = T[t * 3 + 2];
-        const ux = L[b * 3] - L[a * 3], uy = L[b * 3 + 1] - L[a * 3 + 1], uz = L[b * 3 + 2] - L[a * 3 + 2];
-        const vx = L[c * 3] - L[a * 3], vy = L[c * 3 + 1] - L[a * 3 + 1], vz = L[c * 3 + 2] - L[a * 3 + 2];
-        const area = 0.5 * Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx);
+        // área PROYECTADA (vista frontal): densidad uniforme en pantalla, sin
+        // acumular partículas en los costados (eso dibujaba un contorno de máscara)
+        const ux = L[b * 3] - L[a * 3], uy = L[b * 3 + 1] - L[a * 3 + 1];
+        const vx = L[c * 3] - L[a * 3], vy = L[c * 3 + 1] - L[a * 3 + 1];
+        const area = 0.5 * Math.abs(ux * vy - uy * vx);
         const vs = [a, b, c];
         let mult = 1, region = 0;
-        if (vs.every(v => irisR.has(v))) { mult = 7; region = 1; }
-        else if (vs.every(v => irisL.has(v))) { mult = 7; region = 2; }
-        else if (vs.every(v => eyeRing.has(v))) { mult = 4.5; region = 3; }
-        else if (vs.some(v => eyeNear.has(v))) { mult = 3.0; region = 3; }
-        else if (vs.some(v => lips.has(v))) { mult = 2.6; region = 4; }
-        else if (vs.some(v => brows.has(v))) { mult = 1.5; }
+        // más densidad = más detalle; el shader compensa el brillo (comp)
+        if (vs.every(v => irisR.has(v))) { mult = 2; region = 1; }
+        else if (vs.every(v => irisL.has(v))) { mult = 2; region = 2; }
+        else if (vs.some(v => eyeNear.has(v))) { mult = 1.6; region = 3; }
+        else if (vs.some(v => lips.has(v))) { mult = 1.3; region = 4; }
+        else if (vs.some(v => brows.has(v))) { mult = 1.15; }
         acc += area * mult;
         cdf[t] = acc;
         triRegion[t] = region;
     }
 
+    // Cabeza completa: pelo, orejas, cuello (fuera del óvalo facial).
+    // Se ubican en 3D con uvToLocal y una profundidad que cae hacia atrás.
+    const map = mesh.uvToLocal || fitUvToLocal(mesh);
+    const oval = R.faceOval.map(i => [L[i * 3], L[i * 3 + 1], L[i * 3 + 2]]);
+    const mouthRing = [...R.lipsUpperInner, ...R.lipsLowerInner.slice().reverse()]
+        .map(i => [L[i * 3], L[i * 3 + 1], L[i * 3 + 2]]);
+    mouthRing.splice(0, 0, [L[78 * 3], L[78 * 3 + 1], L[78 * 3 + 2]]);
+    mouthRing.splice(R.lipsUpperInner.length + 1, 0, [L[308 * 3], L[308 * 3 + 1], L[308 * 3 + 2]]);
+    const mouthZ = mouthRing.reduce((a, q) => a + q[2], 0) / mouthRing.length - 0.02;
+    const pixAt = (u, v) => {
+        const x = Math.min(pix.w - 1, Math.max(0, (u * pix.w) | 0));
+        const y = Math.min(pix.h - 1, Math.max(0, (v * pix.h) | 0));
+        return (y * pix.w + x) * 4;
+    };
+    const vignette = (X, Y) => 1 - smoothstep(0.78, 1.18, Math.hypot(X / 0.74, (Y - 0.06) / 0.9));
+
+    // Zona libre aceptada: la persona (máscara) dentro de la viñeta, fuera
+    // del óvalo facial (salvo el interior de la boca, que la malla no cubre)
+    const accept = (u, v, out) => {
+        const X = map[0] * u + map[1], Y = map[2] * v + map[3];
+        const mouth = pointInPoly(X, Y, mouthRing);
+        if (!mouth && pointInPoly(X, Y, oval)) return false;
+        const vig = vignette(X, Y);
+        if (vig * pix.data[pixAt(u, v) + 3] / 255 < 0.04) return false;
+        if (out) { out.X = X; out.Y = Y; out.vig = vig; out.mouth = mouth; }
+        return true;
+    };
+    // Misma densidad por píxel en cara y cabeza: el reparto sigue a las áreas
+    let haloShare = 0;
+    if (pix) {
+        let hits = 0;
+        const N = 3000;
+        for (let k = 0; k < N; k++) if (accept(Math.random(), Math.random())) hits++;
+        const haloArea = hits / N * Math.abs(map[0] * map[2]);
+        haloShare = haloArea / (haloArea + acc);
+    }
     const count = size * size;
+    const haloCount = Math.floor(count * haloShare);
+    const faceCount = count - haloCount;
     const refA = new Float32Array(count * 4);
     const refB = new Float32Array(count * 4);
     const pos0 = new Float32Array(count * 4);
     const ref = new Float32Array(count * 3);
     const uv = new Float32Array(count * 2);
     for (let i = 0; i < count; i++) {
+        ref[i * 3] = ((i % size) + 0.5) / size;
+        ref[i * 3 + 1] = (Math.floor(i / size) + 0.5) / size;
+    }
+    for (let i = 0; i < faceCount; i++) {
         // triángulo por área ponderada (búsqueda binaria en la CDF)
         const r = Math.random() * acc;
         let lo = 0, hi = triCount - 1;
@@ -226,16 +288,14 @@ function buildParticles(mesh, size, onFace) {
         if (u + v > 1) { u = 1 - u; v = 1 - v; }
         const a = T[t * 3], b = T[t * 3 + 1], c = T[t * 3 + 2];
         const reg = triRegion[t];
-        // grosor volumétrico: la mayoría pegada a la piel, una bruma más profunda
-        const thick = reg === 1 || reg === 2 ? 0.002 : (Math.random() < 0.82 ? 0.006 : 0.03);
+        // grosor volumétrico fino: piel nítida y una bruma leve por detrás
+        const thick = reg === 1 || reg === 2 ? 0.0015 : (Math.random() < 0.9 ? 0.003 : 0.014);
         const off = gaussian() * thick;
         refA.set([a, b, c, off], i * 4);
         refB.set([u, v, Math.random(), reg], i * 4);
         const w = 1 - u - v;
         uv[i * 2] = UV[a * 2] * w + UV[b * 2] * u + UV[c * 2] * v;
         uv[i * 2 + 1] = UV[a * 2 + 1] * w + UV[b * 2 + 1] * u + UV[c * 2 + 1] * v;
-        ref[i * 3] = ((i % size) + 0.5) / size;
-        ref[i * 3 + 1] = (Math.floor(i / size) + 0.5) / size;
         if (onFace) {
             // ya ensamblado (reconstrucción por rendimiento / sin entrada)
             for (let k = 0; k < 3; k++) {
@@ -250,7 +310,49 @@ function buildParticles(mesh, size, onFace) {
             pos0.set([dir.x * rad * 1.6, dir.y * rad, dir.z * rad * 0.6, 1], i * 4);
         }
     }
+    for (let i = faceCount; i < count; i++) {
+        let u = 0, v = 0, Z = 0;
+        const q = { X: 0, Y: 0, vig: 0, mouth: false };
+        for (let tries = 0; tries < 200; tries++) {
+            u = Math.random(); v = Math.random();
+            if (accept(u, v, q)) break;
+            q.vig = 0;
+        }
+        const { X, Y, vig } = q, inMouth = q.mouth;
+        // profundidad: la del borde facial más cercano, cayendo hacia atrás
+        let best = Infinity, bz = 0;
+        for (const o of oval) {
+            const d = Math.hypot(X - o[0], Y - o[1]);
+            if (d < best) { best = d; bz = o[2]; }
+        }
+        Z = inMouth ? mouthZ : bz - 0.32 * Math.min(best, 0.6) - 0.04 + gaussian() * 0.01;
+        refA.set([X, Y, Z, 0], i * 4);
+        refB.set([vig, 0, Math.random(), 5], i * 4);
+        uv[i * 2] = u; uv[i * 2 + 1] = v;
+        if (onFace) pos0.set([X, Y, Z, 1], i * 4);
+        else {
+            const dir = new THREE.Vector3(gaussian(), gaussian(), gaussian()).normalize();
+            const rad = 0.6 + Math.pow(Math.random(), 0.5) * 2.2;
+            pos0.set([dir.x * rad * 1.6, dir.y * rad, dir.z * rad * 0.6, 1], i * 4);
+        }
+    }
+    // mezcla el orden: el control de densidad (drawRange) recorta parejo
+    for (let i = count - 1; i > 0; i--) {
+        const j = (Math.random() * (i + 1)) | 0;
+        for (const [arr, n] of [[refA, 4], [refB, 4], [pos0, 4], [uv, 2]]) {
+            for (let k = 0; k < n; k++) { const t = arr[i * n + k]; arr[i * n + k] = arr[j * n + k]; arr[j * n + k] = t; }
+        }
+    }
     return { count, refA, refB, pos0, ref, uv };
+}
+
+function fitUvToLocal(mesh) {
+    // malla v1 sin uvToLocal: ajuste lineal con dos landmarks lejanos
+    const L = mesh.landmarks, U = mesh.uv;
+    const a = 234, b = 454, c = 10, d = 152;
+    const ax = (L[b * 3] - L[a * 3]) / (U[b * 2] - U[a * 2]);
+    const ay = (L[d * 3 + 1] - L[c * 3 + 1]) / (U[d * 2 + 1] - U[c * 2 + 1]);
+    return [ax, L[a * 3] - ax * U[a * 2], ay, L[c * 3 + 1] - ay * U[c * 2 + 1]];
 }
 
 // ------------------------------------------------------------
@@ -278,13 +380,20 @@ export async function createAvatar(opts) {
 
     // Auto-nivel: rango de luminancia de la piel en ESTA foto (percentiles
     // sobre los landmarks), para que cualquier foto use toda la paleta.
-    const lumRange = (() => {
+    // Píxeles de la foto (alfa = máscara de persona) para muestrear la cabeza
+    const pix = (() => {
         try {
             const c = document.createElement('canvas');
-            c.width = 128; c.height = Math.max(1, Math.round(128 * img.naturalHeight / img.naturalWidth));
+            c.width = 256; c.height = Math.max(1, Math.round(256 * img.naturalHeight / img.naturalWidth));
             const x = c.getContext('2d', { willReadFrequently: true });
             x.drawImage(img, 0, 0, c.width, c.height);
-            const d = x.getImageData(0, 0, c.width, c.height).data;
+            return { w: c.width, h: c.height, data: x.getImageData(0, 0, c.width, c.height).data };
+        } catch (e) { return null; }
+    })();
+    const lumRange = (() => {
+        try {
+            const c = { width: pix.w, height: pix.h };
+            const d = pix.data;
             const v = [];
             for (let i = 0; i < LM_COUNT; i++) {
                 const px = Math.min(c.width - 1, Math.max(0, Math.round(mesh.uv[i * 2] * c.width)));
@@ -317,12 +426,12 @@ export async function createAvatar(opts) {
         // parámetros ajustables (lil-gui)
         params: {
             densidad: 1,
-            inestabilidad: 0.45,
-            glitch: 1,
-            disolucion: 0.55,
-            bloom: 0.55,
+            inestabilidad: 0.3,
+            glitch: 0.6,
+            disolucion: 0.35,
+            bloom: 0.45,
             opacidad: 1,
-            persistencia: 0.82
+            persistencia: 0.7
         },
         // estado animado
         anim: { blinkR: 0, blinkL: 0, gazeX: 0, gazeY: 0, jaw: 0, lip: 0, brow: 0, breath: 0, yaw: 0, pitch: 0, roll: 0 },
@@ -352,7 +461,7 @@ export async function createAvatar(opts) {
     let sys = null;
     function buildSystem(size, onFace) {
         disposeSystem();
-        const p = buildParticles(mesh, size, onFace);
+        const p = buildParticles(mesh, size, onFace, mesh.mask ? pix : null);
         const mk = (arr) => {
             const t = new THREE.DataTexture(arr, size, size, THREE.RGBAFormat, THREE.FloatType);
             t.minFilter = t.magFilter = THREE.NearestFilter;
@@ -370,7 +479,7 @@ export async function createAvatar(opts) {
         gpu.setVariableDependencies(velVar, [posVar, velVar]);
         gpu.setVariableDependencies(posVar, [posVar, velVar]);
         Object.assign(velVar.material.uniforms, {
-            tLand: { value: lmTex }, tRefA: { value: refA }, tRefB: { value: refB },
+            tLand: { value: lmTex }, tRefA: { value: refA }, tRefB: { value: refB }, uHead: { value: rig.head },
             uTime: { value: 0 }, uDt: { value: 0.016 }, uAssemble: { value: 0 }, uInstab: { value: 0 },
             uDissolve: { value: 0 }, uCurl: { value: 1 }, uStatic: { value: 0 },
             uPointer: { value: new THREE.Vector3(9, 9, 9) }, uPointerStr: { value: 0 }
@@ -388,7 +497,7 @@ export async function createAvatar(opts) {
             transparent: true, depthWrite: false, depthTest: false,
             blending: THREE.AdditiveBlending,
             uniforms: {
-                tLand: { value: lmTex }, tRefA: { value: refA }, tRefB: { value: refB },
+                tLand: { value: lmTex }, tRefA: { value: refA }, tRefB: { value: refB }, uHead: { value: rig.head },
                 tPos: { value: null }, tVel: { value: null }, tPhoto: { value: photo },
                 uUseSim: { value: 0 }, uSizePx: { value: 1 }, uRefDepth: { value: 1 },
                 uPointSize: { value: 0.0042 }, uAlpha: { value: 0.2 },
@@ -469,11 +578,11 @@ export async function createAvatar(opts) {
         let fh, y = 0;
         if (S.portrait) {
             // en vertical: más pequeño y arriba, deja libre el grafo
-            fh = Math.min(visH * 0.4, visW * 0.95 / 0.82);
-            y = visH * 0.5 - fh * 0.62;
+            fh = Math.min(visH * 0.27, visW * 0.92 / 1.5);
+            y = visH * 0.5 - fh * 1.2;
         } else {
-            fh = Math.min(visH * 0.74, visW * 0.9 / 0.82);
-            y = visH * 0.01;
+            fh = Math.min(visH * 0.42, visW * 0.9 / 1.5);
+            y = -visH * 0.02;
         }
         faceScale = fh;
         group.position.set(0, y, -DEPTH);
@@ -654,7 +763,7 @@ export async function createAvatar(opts) {
         u.uAssemble.value = S.assemble;
         u.uInstab.value = S.instab;
         // disolución: crece con la inestabilidad y el foco en la galaxia
-        u.uDissolve.value = S.reduced ? 0 : clamp(p.disolucion * (0.06 + 0.42 * S.instab) + S.focus * 0.06, 0, 0.9);
+        u.uDissolve.value = S.reduced ? 0 : clamp(p.disolucion * (0.03 + 0.3 * S.instab) + S.focus * 0.05, 0, 0.9);
         u.uCurl.value = 1;
         u.uStatic.value = S.reduced ? 1 : 0;
         u.uPointer.value.copy(pointerLocal);
@@ -681,11 +790,11 @@ export async function createAvatar(opts) {
         mu.uTime.value = S.time;
         mu.uBlinkR.value = S.anim.blinkR;
         mu.uBlinkL.value = S.anim.blinkL;
-        mu.uPointSize.value = 0.0042 * sys.sizeMul;
+        mu.uPointSize.value = 0.0062 * sys.sizeMul;
         // entrada: el brillo acompaña a la convergencia
         const enter = S.stage >= 5 && !S.reduced ? 0.35 + 0.65 * smoothstep(0, 0.8, S.assemble) : 1;
-        mu.uAlpha.value = 0.1 * sys.alphaMul * enter * (1 - S.focus * 0.3);
-        mu.uJitter.value = fxOn ? (glitchActive ? 1 : 0) * S.params.glitch + (S.microGlitch > 0 ? 0.6 : 0) + S.instab * 0.04 : 0;
+        mu.uAlpha.value = 0.16 * sys.alphaMul * enter * (1 - S.focus * 0.3);
+        mu.uJitter.value = fxOn ? (glitchActive ? 1 : 0) * S.params.glitch + (S.microGlitch > 0 ? 0.35 : 0) : 0;
 
         // 1) partículas -> rtRaw
         const prevTarget = renderer.getRenderTarget();
@@ -714,13 +823,13 @@ export async function createAvatar(opts) {
         lu.tSrc.value = src.texture;
         lu.uTime.value = S.time;
         if (fxOn) {
-            flick = smooth(flick, 0.86 + 0.14 * (fbm(noiseE, S.time * 0.9) * 0.5 + 0.5) - S.instab * 0.08, 6, dt);
-            lu.uChroma.value = 0.0012 + 0.009 * S.instab + (S.microGlitch > 0 ? 0.006 : 0);
+            flick = smooth(flick, 0.9 + 0.1 * (fbm(noiseE, S.time * 0.9) * 0.5 + 0.5) - S.instab * 0.05, 6, dt);
+            lu.uChroma.value = 0.0002 + 0.003 * S.instab + (S.microGlitch > 0 ? 0.004 : 0);
             lu.uGlitch.value = (glitchActive ? 1 : 0) * S.params.glitch + (S.microGlitch > 0 ? 0.35 : 0);
             lu.uGlitchSeed.value = S.glitchSeed + Math.floor(S.time * 30) * 0.37;
             lu.uFlicker.value = flick;
-            lu.uGrain.value = 0.16 + 0.25 * S.instab;
-            lu.uScan.value = 0.2;
+            lu.uGrain.value = 0.06 + 0.1 * S.instab;
+            lu.uScan.value = 0.12;
         } else {
             lu.uChroma.value = 0; lu.uGlitch.value = 0; lu.uFlicker.value = 1;
             lu.uGrain.value = 0; lu.uScan.value = 0;

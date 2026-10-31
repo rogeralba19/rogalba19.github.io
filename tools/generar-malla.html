@@ -41,8 +41,9 @@
 // La versión está fijada: los índices de la malla canónica no cambian entre versiones.
 const TASKS = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
 const MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+const SEG_MODEL = 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite';
 const SRC = '../assets/avatar/rostro.jpg';
-const MAX_SIDE = 768;          // lado mayor del recorte exportado
+const MAX_SIDE = 1024;         // lado mayor del recorte exportado
 const MAX_BYTES = 300 * 1024;  // presupuesto de la foto en la web
 
 const $ = (id) => document.getElementById(id);
@@ -91,6 +92,39 @@ async function loadImage(src) {
     return img;
 }
 
+// Máscara de la persona (pelo, orejas, cuello) para separar del fondo
+async function segmentPerson(img, nose) {
+    const { ImageSegmenter, FilesetResolver } = await import(`${TASKS}/vision_bundle.mjs`);
+    const fileset = await FilesetResolver.forVisionTasks(`${TASKS}/wasm`);
+    const make = (delegate) => ImageSegmenter.createFromOptions(fileset, {
+        baseOptions: { modelAssetPath: SEG_MODEL, delegate },
+        runningMode: 'IMAGE', outputConfidenceMasks: true, outputCategoryMask: false
+    });
+    let seg;
+    try { seg = await make('GPU'); } catch (e) { seg = await make('CPU'); }
+    const res = seg.segment(img);
+    const masks = res.confidenceMasks || [];
+    const mk = masks[masks.length - 1];
+    const w = mk.width, h = mk.height;
+    let data = Float32Array.from(mk.getAsFloat32Array());
+    masks.forEach(m => m.close());
+    seg.close();
+    // el modelo puede dar confianza de fondo o de persona: la nariz decide
+    const ni = Math.min(h - 1, Math.round(nose[1] * h)) * w + Math.min(w - 1, Math.round(nose[0] * w));
+    if (data[ni] < 0.5) data = data.map(v => 1 - v);
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const cx = c.getContext('2d');
+    const id = cx.createImageData(w, h);
+    for (let i = 0; i < w * h; i++) {
+        const a = Math.round(Math.min(1, Math.max(0, (data[i] - 0.2) / 0.6)) * 255);
+        id.data[i * 4] = id.data[i * 4 + 1] = id.data[i * 4 + 2] = 255;
+        id.data[i * 4 + 3] = a;
+    }
+    cx.putImageData(id, 0, 0);
+    return c;
+}
+
 async function createLandmarker() {
     const { FaceLandmarker, FilesetResolver } = await import(`${TASKS}/vision_bundle.mjs`);
     const fileset = await FilesetResolver.forVisionTasks(`${TASKS}/wasm`);
@@ -132,11 +166,14 @@ async function process(img) {
     }
     const faceH = y1 - y0, faceW = x1 - x0;
     const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, cz = zs / px.length;
-    const m = 0.18;
-    const cropX = Math.max(0, Math.floor(x0 - faceW * m));
-    const cropY = Math.max(0, Math.floor(y0 - faceH * m));
-    const cropW = Math.min(W, Math.ceil(x1 + faceW * m)) - cropX;
-    const cropH = Math.min(H, Math.ceil(y1 + faceH * m)) - cropY;
+    // margen amplio: pelo, orejas y cuello forman parte de la presencia
+    const cropX = Math.max(0, Math.floor(x0 - faceW * 0.5));
+    const cropY = Math.max(0, Math.floor(y0 - faceH * 0.6));
+    const cropW = Math.min(W, Math.ceil(x1 + faceW * 0.5)) - cropX;
+    const cropH = Math.min(H, Math.ceil(y1 + faceH * 0.45)) - cropY;
+
+    log('Separando a la persona del fondo…');
+    const mask = await segmentPerson(img, [pts[1].x, pts[1].y]);
 
     // Textura optimizada (WebP, ≤ 300 KB)
     const k = Math.min(1, MAX_SIDE / Math.max(cropW, cropH));
@@ -145,6 +182,12 @@ async function process(img) {
     const tctx = tex.getContext('2d');
     tctx.imageSmoothingQuality = 'high';
     tctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, tex.width, tex.height);
+    // la máscara va en el canal alfa del WebP
+    tctx.globalCompositeOperation = 'destination-in';
+    const sx = mask.width / W, sy = mask.height / H;
+    tctx.drawImage(mask, cropX * sx, cropY * sy, cropW * sx, cropH * sy, 0, 0, tex.width, tex.height);
+    tctx.globalCompositeOperation = 'source-over';
+    log('Fondo separado (canal alfa)', 'ok');
     let webp = null;
     for (let q = 0.86; q >= 0.4; q -= 0.08) {
         webp = await toBlob(tex, 'image/webp', q);
@@ -185,9 +228,12 @@ async function process(img) {
     log(`Triángulos: ${meshTris} de la teselación + ${triangles.length / 3 - meshTris} del iris`, 'ok');
 
     result = {
-        version: 1,
+        version: 2,
         source: { width: W, height: H, crop: [cropX, cropY, cropW, cropH] },
         texture: { file: 'rostro.webp', width: tex.width, height: tex.height },
+        // local = (ax·u + bx, ay·v + by): ubica en 3D el pelo, orejas y cuello
+        uvToLocal: [r4(cropW / faceH), r4((cropX - cx) / faceH), r4(-cropH / faceH), r4(-(cropY - cy) / faceH)],
+        mask: true,
         landmarks, uv, triangles, regions: REGIONS
     };
     const json = JSON.stringify(result);
@@ -204,6 +250,8 @@ function drawPreview(tex, uv, triangles) {
     const cv = $('preview');
     cv.width = tex.width; cv.height = tex.height;
     const c = cv.getContext('2d');
+    c.fillStyle = '#300';
+    c.fillRect(0, 0, cv.width, cv.height);
     c.drawImage(tex, 0, 0);
     c.fillStyle = 'rgba(0,0,0,0.35)';
     c.fillRect(0, 0, cv.width, cv.height);
