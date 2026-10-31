@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Generador de malla del avatar</title>
+<!--
+  HERRAMIENTA OFFLINE — no forma parte de la web pública.
+  Procesa assets/avatar/rostro.jpg con MediaPipe Face Landmarker (modo IMAGE)
+  y descarga:
+    · malla.json   → landmarks normalizados, UV, triangulación y regiones
+    · rostro.webp  → recorte optimizado de la foto (≤ 300 KB) al que apuntan las UV
+  Ábrela desde un servidor local (ver README), no con file://.
+-->
+<style>
+    :root { --bg: #02060c; --fg: #b9dcff; --accent: #00aaff; --ok: #00ff88; --err: #ff5470; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 13px/1.5 "Courier New", monospace; padding: 16px; }
+    h1 { font-size: 14px; letter-spacing: 3px; color: var(--ok); margin: 0 0 12px; }
+    #log { white-space: pre-wrap; border: 1px solid #12324d; padding: 10px; min-height: 80px; max-width: 900px; }
+    .ok { color: var(--ok); } .err { color: var(--err); }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0; align-items: center; }
+    button, label.btn { background: transparent; color: var(--accent); border: 1px solid var(--accent); padding: 6px 12px; font: inherit; cursor: pointer; }
+    button:disabled { opacity: .4; cursor: default; }
+    canvas { max-width: 100%; height: auto; border: 1px solid #12324d; }
+</style>
+</head>
+<body>
+<h1>GENERADOR DE MALLA — AVATAR DIGITAL</h1>
+<div class="row">
+    <button id="run">Procesar assets/avatar/rostro.jpg</button>
+    <label class="btn">…o elegir otra foto <input id="file" type="file" accept="image/*" hidden></label>
+    <button id="dl" disabled>Descargar malla.json + rostro.webp</button>
+</div>
+<div id="log"></div>
+<p>Vista previa (malla sobre el recorte que se usará como textura):</p>
+<canvas id="preview" width="10" height="10"></canvas>
+
+<script type="module">
+// La versión está fijada: los índices de la malla canónica no cambian entre versiones.
+const TASKS = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+const MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+const SRC = '../assets/avatar/rostro.jpg';
+const MAX_SIDE = 768;          // lado mayor del recorte exportado
+const MAX_BYTES = 300 * 1024;  // presupuesto de la foto en la web
+
+const $ = (id) => document.getElementById(id);
+const log = (msg, cls) => {
+    const line = document.createElement('div');
+    if (cls) line.className = cls;
+    line.textContent = msg;
+    $('log').appendChild(line);
+};
+
+// --------------------------------------------------------------
+// Regiones (índices de la malla canónica de 478 puntos de MediaPipe).
+// "right"/"left" = derecha/izquierda DEL SUJETO (en la foto, right queda a la izquierda).
+// Los párpados van emparejados índice a índice: upper[i] cierra hacia lower[i].
+// --------------------------------------------------------------
+const REGIONS = {
+    rightEyeUpper: [246, 161, 160, 159, 158, 157, 173],
+    rightEyeLower: [7, 163, 144, 145, 153, 154, 155],
+    rightEyeUpperOuter: [247, 30, 29, 27, 28, 56, 190],   // piel del párpado (sigue al cierre)
+    rightEyeCorners: [33, 133],
+    leftEyeUpper: [466, 388, 387, 386, 385, 384, 398],
+    leftEyeLower: [249, 390, 373, 374, 380, 381, 382],
+    leftEyeUpperOuter: [467, 260, 259, 257, 258, 286, 414],
+    leftEyeCorners: [263, 362],
+    rightIris: [468, 469, 470, 471, 472],                 // [0] = centro
+    leftIris: [473, 474, 475, 476, 477],
+    lipsUpperOuter: [185, 40, 39, 37, 0, 267, 269, 270, 409],
+    lipsUpperInner: [191, 80, 81, 82, 13, 312, 311, 310, 415],
+    lipsLowerOuter: [146, 91, 181, 84, 17, 314, 405, 321, 375],
+    lipsLowerInner: [95, 88, 178, 87, 14, 317, 402, 318, 324],
+    mouthCorners: [61, 291, 78, 308],
+    jaw: [132, 58, 172, 136, 150, 149, 176, 148, 152, 377, 400, 378, 379, 365, 397, 288, 361],
+    rightBrow: [70, 63, 105, 66, 107, 46, 53, 52, 65, 55],
+    leftBrow: [300, 293, 334, 296, 336, 276, 283, 282, 295, 285],
+    faceOval: [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400,
+        377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109]
+};
+
+let result = null;
+
+async function loadImage(src) {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = src;
+    await img.decode();
+    return img;
+}
+
+async function createLandmarker() {
+    const { FaceLandmarker, FilesetResolver } = await import(`${TASKS}/vision_bundle.mjs`);
+    const fileset = await FilesetResolver.forVisionTasks(`${TASKS}/wasm`);
+    const make = (delegate) => FaceLandmarker.createFromOptions(fileset, {
+        baseOptions: { modelAssetPath: MODEL, delegate },
+        runningMode: 'IMAGE', numFaces: 1,
+        outputFaceBlendshapes: false, outputFacialTransformationMatrixes: false
+    });
+    let lm;
+    try { lm = await make('GPU'); } catch (e) { lm = await make('CPU'); }
+    return { lm, FaceLandmarker };
+}
+
+function toBlob(canvas, type, q) {
+    return new Promise((res) => canvas.toBlob(res, type, q));
+}
+
+async function process(img) {
+    $('dl').disabled = true;
+    log(`Foto: ${img.naturalWidth}×${img.naturalHeight}px`);
+    log('Cargando MediaPipe Face Landmarker…');
+    const { lm, FaceLandmarker } = await createLandmarker();
+    const out = lm.detect(img);
+    lm.close();
+    const pts = out.faceLandmarks && out.faceLandmarks[0];
+    if (!pts) throw new Error('No se detectó ningún rostro. Usa una foto frontal, bien iluminada.');
+    log(`Landmarks detectados: ${pts.length}`, 'ok');
+    if (pts.length !== 478) throw new Error('Se esperaban 478 landmarks (malla con iris).');
+
+    const W = img.naturalWidth, H = img.naturalHeight;
+    const px = pts.map(p => [p.x * W, p.y * H, p.z * W]); // z de MediaPipe en escala del ancho
+
+    // Caja del rostro y recorte con margen (incluye pelo/cuello cercanos)
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, zs = 0;
+    for (const p of px) {
+        x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]);
+        y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]);
+        zs += p[2];
+    }
+    const faceH = y1 - y0, faceW = x1 - x0;
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, cz = zs / px.length;
+    const m = 0.18;
+    const cropX = Math.max(0, Math.floor(x0 - faceW * m));
+    const cropY = Math.max(0, Math.floor(y0 - faceH * m));
+    const cropW = Math.min(W, Math.ceil(x1 + faceW * m)) - cropX;
+    const cropH = Math.min(H, Math.ceil(y1 + faceH * m)) - cropY;
+
+    // Textura optimizada (WebP, ≤ 300 KB)
+    const k = Math.min(1, MAX_SIDE / Math.max(cropW, cropH));
+    const tex = document.createElement('canvas');
+    tex.width = Math.round(cropW * k); tex.height = Math.round(cropH * k);
+    const tctx = tex.getContext('2d');
+    tctx.imageSmoothingQuality = 'high';
+    tctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, tex.width, tex.height);
+    let webp = null;
+    for (let q = 0.86; q >= 0.4; q -= 0.08) {
+        webp = await toBlob(tex, 'image/webp', q);
+        if (webp && webp.type === 'image/webp' && webp.size <= MAX_BYTES) break;
+    }
+    if (!webp || webp.type !== 'image/webp') {
+        throw new Error('Este navegador no codifica WebP desde canvas. Usa Chrome, Edge o Firefox.');
+    }
+    log(`rostro.webp: ${tex.width}×${tex.height}px, ${(webp.size / 1024).toFixed(1)} KB`, 'ok');
+
+    // Landmarks normalizados: unidad = alto del rostro, origen = centro, +Y arriba, +Z hacia la cámara
+    const r4 = (v) => Math.round(v * 1e4) / 1e4;
+    const landmarks = [], uv = [];
+    for (const p of px) {
+        landmarks.push(r4((p[0] - cx) / faceH), r4(-(p[1] - cy) / faceH), r4(-(p[2] - cz) / faceH));
+        uv.push(r4((p[0] - cropX) / cropW), r4((p[1] - cropY) / cropH)); // v hacia abajo (convención imagen)
+    }
+
+    // Triangulación FACEMESH_TESSELATION: aristas consecutivas de 3 en 3 = un triángulo
+    const T = FaceLandmarker.FACE_LANDMARKS_TESSELATION;
+    const triangles = [];
+    for (let i = 0; i < T.length; i += 3) {
+        const a = T[i], b = T[i + 1], c = T[i + 2];
+        if (a.end !== b.start || b.end !== c.start || c.end !== a.start) {
+            throw new Error('Formato de teselación inesperado en esta versión de MediaPipe.');
+        }
+        triangles.push(a.start, b.start, c.start);
+    }
+    const meshTris = triangles.length / 3;
+    // Los iris no están en la teselación: se añaden como abanicos desde su centro
+    for (const iris of [REGIONS.rightIris, REGIONS.leftIris]) {
+        const [c, ...ring] = iris;
+        // orden angular alrededor del centro
+        ring.sort((p, q) => Math.atan2(px[p][1] - px[c][1], px[p][0] - px[c][0]) -
+                            Math.atan2(px[q][1] - px[c][1], px[q][0] - px[c][0]));
+        for (let i = 0; i < ring.length; i++) triangles.push(c, ring[i], ring[(i + 1) % ring.length]);
+    }
+    log(`Triángulos: ${meshTris} de la teselación + ${triangles.length / 3 - meshTris} del iris`, 'ok');
+
+    result = {
+        version: 1,
+        source: { width: W, height: H, crop: [cropX, cropY, cropW, cropH] },
+        texture: { file: 'rostro.webp', width: tex.width, height: tex.height },
+        landmarks, uv, triangles, regions: REGIONS
+    };
+    const json = JSON.stringify(result);
+    log(`malla.json: ${(json.length / 1024).toFixed(1)} KB`, 'ok');
+    result.__webp = webp;
+    window.__mallaResult = { json, webpSize: webp.size, webpW: tex.width, webpH: tex.height };
+
+    drawPreview(tex, uv, triangles);
+    $('dl').disabled = false;
+    log('Listo. Pulsa "Descargar" y guarda ambos archivos en assets/avatar/.', 'ok');
+}
+
+function drawPreview(tex, uv, triangles) {
+    const cv = $('preview');
+    cv.width = tex.width; cv.height = tex.height;
+    const c = cv.getContext('2d');
+    c.drawImage(tex, 0, 0);
+    c.fillStyle = 'rgba(0,0,0,0.35)';
+    c.fillRect(0, 0, cv.width, cv.height);
+    c.strokeStyle = 'rgba(0,170,255,0.55)';
+    c.lineWidth = 0.6;
+    c.beginPath();
+    for (let i = 0; i < triangles.length; i += 3) {
+        for (let k = 0; k < 3; k++) {
+            const a = triangles[i + k], b = triangles[i + (k + 1) % 3];
+            c.moveTo(uv[a * 2] * cv.width, uv[a * 2 + 1] * cv.height);
+            c.lineTo(uv[b * 2] * cv.width, uv[b * 2 + 1] * cv.height);
+        }
+    }
+    c.stroke();
+    const colors = { rightEyeUpper: '#00ff88', leftEyeUpper: '#00ff88', rightEyeLower: '#ffaa00',
+        leftEyeLower: '#ffaa00', rightIris: '#ff5470', leftIris: '#ff5470', lipsUpperInner: '#00ff88',
+        lipsLowerInner: '#ffaa00', jaw: '#ffffff', rightBrow: '#c08cff', leftBrow: '#c08cff' };
+    for (const [name, col] of Object.entries(colors)) {
+        c.fillStyle = col;
+        for (const i of REGIONS[name]) c.fillRect(uv[i * 2] * cv.width - 1.5, uv[i * 2 + 1] * cv.height - 1.5, 3, 3);
+    }
+}
+
+function download(blob, name) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+async function run(src) {
+    $('log').textContent = '';
+    try { await process(await loadImage(src)); }
+    catch (e) { log('ERROR: ' + (e && e.message || e), 'err'); window.__mallaError = String(e && e.message || e); }
+}
+
+$('run').onclick = () => run(SRC);
+$('file').onchange = (e) => { const f = e.target.files[0]; if (f) run(URL.createObjectURL(f)); };
+$('dl').onclick = () => {
+    if (!result) return;
+    const { __webp, ...data } = result;
+    download(new Blob([JSON.stringify(data)], { type: 'application/json' }), 'malla.json');
+    setTimeout(() => download(__webp, 'rostro.webp'), 400);
+};
+// ?auto procesa sin clic (útil para automatizar)
+if (new URLSearchParams(location.search).has('auto')) run(SRC);
+</script>
+</body>
+</html>
