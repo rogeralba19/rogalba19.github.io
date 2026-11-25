@@ -20,7 +20,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/cosecha.css?v=202609170316">
+    <link rel="stylesheet" href="css/cosecha.css?v=20261124">
     <link rel="stylesheet" href="css/auth.css?v=202609170316">
 </head>
 <body>
@@ -166,8 +166,6 @@
                     </div>
                 </div>
             </div>
-            <!-- Retenciones activas -->
-            <div class="retentions-strip" id="retentionsStrip" style="display: none;"></div>
 
             <!-- Monthly Calendar -->
             <div class="calendar-container" id="monthlyCalendarContainer">
@@ -180,6 +178,8 @@
                 </div>
                 <div class="calendar-grid" id="calendarGrid"></div>
             </div>
+            <!-- Retenciones: al final y cerradas (lo menos importante) -->
+            <div class="retentions-strip" id="retentionsStrip" style="display: none;"></div>
         </div>
 
         <!-- Registros Section -->
@@ -473,7 +473,7 @@
                         <div class="retention-hint" id="entryRetentionHint"></div>
                         <div class="retention-state" id="entryRetentionState" style="display: none;">
                             <button type="button" class="btn btn-primary" onclick="releaseEntryRetention()">Liberar · ya me la pagaron</button>
-                            <button type="button" class="btn btn-danger" onclick="voidEntryRetention()">Anular</button>
+                            <button type="button" class="btn btn-danger" onclick="voidEntryRetention()">No me la pagaron</button>
                         </div>
                     </div>
                 </div>
@@ -483,6 +483,7 @@
                     <textarea id="entryNotes" rows="2" placeholder="Observaciones..."></textarea>
                 </div>
             </div>
+            <div class="entry-history" id="entryHistory" style="display: none;"></div>
             <div class="modal-footer">
                 <button class="btn btn-danger" id="deleteEntryBtn" style="display: none;" onclick="deleteEntry()">Eliminar</button>
                 <button class="btn btn-secondary" onclick="closeEntryModal()">Cancelar</button>
@@ -520,6 +521,11 @@
 
                 <div class="payday-date" id="paydayDateLabel"></div>
 
+                <label class="payday-paid" id="paydayPaidBox">
+                    <input type="checkbox" id="paydayMarkPaid" onchange="onPaydayMarkPaid()">
+                    <span><b>✓ Ya me pagaron</b><br><span id="paydayPendingCount"></span></span>
+                </label>
+
                 <div class="form-group">
                     <label>Monto recibido (opcional)</label>
                     <input type="number" id="paydayReceived" step="0.01" min="0" placeholder="Anótalo cuando lo sepas" oninput="updatePaydayDiff()">
@@ -527,7 +533,8 @@
 
                 <div class="form-group">
                     <label>Deberías recibir</label>
-                    <input type="number" id="paydayExpected" step="0.01" min="0" placeholder="0" oninput="updatePaydayDiff()">
+                    <input type="hidden" id="paydayExpected">
+                    <div class="payday-expected-show" id="paydayExpectedShow"></div>
                     <div class="field-hint" id="paydayExpectedHint"></div>
                 </div>
 
@@ -919,7 +926,7 @@
     <!-- App Scripts -->
     <script src="js/firebase-config.js?v=202609170316"></script>
     <script src="js/auth.js?v=202609170316"></script>
-    <script src="js/cosecha.js?v=202609170316"></script>
+    <script src="js/cosecha.js?v=20261124"></script>
     <script src="js/cuadrilla.js?v=202609170316"></script>
     <script src="js/boss-harvest.js?v=202609170316"></script>
     <script src="js/worker-integration.js?v=202609170316"></script>

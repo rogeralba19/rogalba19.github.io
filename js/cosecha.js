@@ -542,6 +542,28 @@ function loadData() {
 // registros se descuenta una sola vez. Se guarda en deductions/{uid}/{fecha}.
 
 // Lunes a viernes: el descuento se propone encendido. Sábado y domingo, no.
+// Monto exacto en pesos chilenos (con centavos si los hay). Nunca redondea hacia arriba.
+function moneyExact(v) {
+    const n = Number(v) || 0;
+    return '$' + n.toLocaleString('es-CL', { maximumFractionDigits: 2 });
+}
+// Para celdas chicas del calendario: la cifra entera, cortando centavos (nunca sube)
+function moneyCell(v) {
+    const n = Number(v) || 0;
+    return '$' + Math.floor(Math.abs(n) + 1e-9).toLocaleString('es-CL') ;
+}
+
+// Historial de cada registro (harvest/<uid>/<id>/history): nunca se borra.
+function addHistoryEvent(updates, uid, entryId, text) {
+    const key = db.ref().push().key;
+    updates[`harvest/${uid}/${entryId}/history/${key}`] = { at: Date.now(), text };
+}
+
+function retentionAmountRaw(e) {
+    if (!e || !e.retention) return 0;
+    return getEntryRetention({ ...e, retention: { ...e.retention, status: 'retenida' } }).held;
+}
+
 function isWeekdayDate(dateStr) {
     const d = new Date(dateStr + 'T12:00:00').getDay();
     return d >= 1 && d <= 5;
@@ -551,28 +573,62 @@ function getDayGross(dateStr) {
     return entries.reduce((sum, e) => e.date === dateStr ? sum + (e.total || 0) : sum, 0);
 }
 
+// DESCUENTO POR REGISTRO: cada registro decide el suyo (entry.deduction).
+// En un dia con varios registros uno puede llevarlo y los demas no.
+// Registros antiguos (ningun registro del dia trae su propio descuento): el
+// descuento que se guardaba por dia se asigna a UN registro, el primero del dia,
+// para que los totales de siempre no cambien.
+let deductionByEntry = {};
+
+function deductionAmountOf(d, total) {
+    if (!d || !d.applied || !(total > 0)) return 0;
+    const raw = d.mode === 'percent' ? total * (d.value || 0) / 100 : (d.value || 0);
+    return Math.min(Math.max(raw, 0), total);
+}
+
+function refreshDeductionMap() {
+    const map = {};
+    const byDate = {};
+    entries.forEach(e => { (byDate[e.date] = byDate[e.date] || []).push(e); });
+    Object.keys(byDate).forEach(date => {
+        const list = byDate[date];
+        if (list.some(e => e.deduction)) {
+            list.forEach(e => {
+                const a = deductionAmountOf(e.deduction, e.total || 0);
+                if (a > 0) map[e.id] = a;
+            });
+        } else {
+            const d = dayDeductions[date];
+            if (!d || !d.applied) return;
+            const gross = list.reduce((s, e) => s + (e.total || 0), 0);
+            if (gross <= 0) return;
+            const raw = d.mode === 'percent' ? gross * (d.value || 0) / 100 : (d.value || 0);
+            const carrier = list.slice().sort((a, b) => {
+                const ca = a.createdAt || Number.MAX_SAFE_INTEGER, cb = b.createdAt || Number.MAX_SAFE_INTEGER;
+                if (ca !== cb) return ca - cb;
+                return a.id < b.id ? -1 : 1;
+            })[0];
+            map[carrier.id] = Math.min(Math.max(raw, 0), gross);
+        }
+    });
+    deductionByEntry = map;
+}
+
+function getEntryDeduction(e) {
+    return (e && deductionByEntry[e.id]) || 0;
+}
+
 function hasDayDeduction(dateStr) {
-    const d = dayDeductions[dateStr];
-    return !!(d && d.applied);
+    return getDayDeduction(dateStr) > 0.005;
 }
 
-// Monto del descuento de un día. Nunca supera el bruto de ese día, para que
-// ningún total pueda quedar en negativo.
+// Suma de los descuentos de los registros del dia
 function getDayDeduction(dateStr) {
-    const d = dayDeductions[dateStr];
-    if (!d || !d.applied) return 0;
-    const gross = getDayGross(dateStr);
-    if (gross <= 0) return 0;
-    const raw = d.mode === 'percent' ? gross * (d.value || 0) / 100 : (d.value || 0);
-    return Math.min(Math.max(raw, 0), gross);
+    return entries.reduce((s, e) => e.date === dateStr ? s + getEntryDeduction(e) : s, 0);
 }
 
-// Descuento acumulado de un conjunto de registros, contando cada fecha una vez
 function getDeductionForEntries(entryList) {
-    const dates = new Set(entryList.map(e => e.date));
-    let sum = 0;
-    dates.forEach(d => { sum += getDayDeduction(d); });
-    return sum;
+    return entryList.reduce((s, e) => s + getEntryDeduction(e), 0);
 }
 
 // ============================================
@@ -685,6 +741,7 @@ async function migrateLegacyRetentions() {
 
 // Reparte las retenciones por día. Varias en el mismo día se van sumando.
 function refreshRetentionMap() {
+    refreshDeductionMap();
     const map = {};
 
     entries.forEach(e => {
@@ -738,46 +795,152 @@ function getWithheldForEntries(entryList) {
 // Franja sobre el calendario: una línea por trabajo, con todas sus retenciones
 // sumadas. Liberar las suelta todas de una, que es lo que pasa en la práctica
 // cuando el jefe te cancela la retención de ese trabajo.
+let retentionsOpen = false;
+let retentionHistoryOpen = false;
+
+function toggleRetentionsStrip() { retentionsOpen = !retentionsOpen; renderRetentionsStrip(); }
+function toggleRetentionHistory() { retentionHistoryOpen = !retentionHistoryOpen; renderRetentionsStrip(); }
+
 function renderRetentionsStrip() {
     const strip = document.getElementById('retentionsStrip');
     if (!strip) return;
 
-    const conRetencion = entries.filter(e => e.retention && e.retention.status === 'retenida');
-    if (!conRetencion.length) {
+    const held = entries.filter(e => e.retention && e.retention.status === 'retenida');
+    const resolved = entries.filter(e => e.retention && (e.retention.status === 'liberada' || e.retention.status === 'anulada'));
+    if (!held.length && !resolved.length) {
         strip.style.display = 'none';
         strip.innerHTML = '';
         return;
     }
 
-    const byJob = {};
-    conRetencion.forEach(e => {
-        const key = e.jobId || 'sin-trabajo';
-        if (!byJob[key]) byJob[key] = { jobId: e.jobId, amount: 0, dates: new Set(), motivos: new Set() };
-        byJob[key].amount += getEntryRetention(e).held;
-        byJob[key].dates.add(e.date);
-        if (e.retention.reason) byJob[key].motivos.add(e.retention.reason);
-    });
+    const nameOf = jobId => {
+        const job = jobs.find(j => j.id === jobId);
+        return escapeHtml(job ? getJobDisplayName(job) : 'Sin trabajo');
+    };
 
-    strip.style.display = 'flex';
-    strip.innerHTML = Object.values(byJob).map(g => {
-        const job = jobs.find(j => j.id === g.jobId);
-        const nombre = escapeHtml(job ? getJobDisplayName(job) : 'Sin trabajo');
-        const dias = g.dates.size === 1 ? '1 día' : `${g.dates.size} días`;
-        const motivos = g.motivos.size ? ' · ' + escapeHtml(Array.from(g.motivos).join(' · ')) : '';
-        return `
-            <div class="retention-chip">
-                <div class="rc-main">
-                    <div class="rc-reason">🔒 ${nombre}</div>
-                    <div class="rc-meta">${dias}${motivos}</div>
-                </div>
-                <div class="rc-amount">$${g.amount.toFixed(0)}</div>
-                <button type="button" class="rc-edit" onclick="releaseJobRetentions('${g.jobId}')">Liberar</button>
-            </div>
-        `;
-    }).join('');
+    // Una fila por liberacion: mismo trabajo, mismo resultado, mismo minuto
+    const groups = {};
+    resolved.forEach(e => {
+        const k = `${e.jobId}|${e.retention.status}|${Math.floor((e.retention.releasedAt || 0) / 60000)}`;
+        (groups[k] = groups[k] || []).push(e);
+    });
+    const groupList = Object.values(groups).sort((a, b) => (b[0].retention.releasedAt || 0) - (a[0].retention.releasedAt || 0));
+    const heldTotal = held.reduce((s, e) => s + getEntryRetention(e).held, 0);
+
+    const summary = [held.length ? `Vigentes ${moneyExact(heldTotal)}` : '', groupList.length ? `historial ${groupList.length}` : '']
+        .filter(Boolean).join(' · ');
+
+    let html = `
+        <button type="button" class="rs-header" onclick="toggleRetentionsStrip()" aria-expanded="${retentionsOpen}">
+            <span class="rs-title">🔒 Retenciones</span>
+            <span class="rs-summary">${summary}</span>
+            <span class="rs-caret">${retentionsOpen ? '▴' : '▾'}</span>
+        </button>`;
+
+    if (retentionsOpen) {
+        const byJob = {};
+        held.forEach(e => {
+            const key = e.jobId || 'sin-trabajo';
+            if (!byJob[key]) byJob[key] = { jobId: e.jobId, amount: 0, dates: new Set(), motivos: new Set() };
+            byJob[key].amount += getEntryRetention(e).held;
+            byJob[key].dates.add(e.date);
+            if (e.retention.reason) byJob[key].motivos.add(e.retention.reason);
+        });
+        html += Object.values(byJob).map(g => {
+            const dias = g.dates.size === 1 ? '1 día' : `${g.dates.size} días`;
+            const motivos = g.motivos.size ? ' · ' + escapeHtml(Array.from(g.motivos).join(' · ')) : '';
+            return `
+                <div class="retention-chip">
+                    <div class="rc-main">
+                        <div class="rc-reason">${nameOf(g.jobId)}</div>
+                        <div class="rc-meta">${dias}${motivos}</div>
+                    </div>
+                    <div class="rc-amount">${moneyExact(g.amount)}</div>
+                    <button type="button" class="rc-edit" onclick="releaseJobRetentions('${g.jobId}')">Liberar</button>
+                </div>`;
+        }).join('');
+
+        if (groupList.length) {
+            html += `<button type="button" class="rs-history-toggle" onclick="toggleRetentionHistory()">🗂 Historial de retenciones (${groupList.length}) ${retentionHistoryOpen ? '▴' : '▾'}</button>`;
+            if (retentionHistoryOpen) {
+                html += groupList.map(list => {
+                    const paid = list[0].retention.status === 'liberada';
+                    const amount = list.reduce((s, e) => s + retentionAmountRaw(e), 0);
+                    const days = Array.from(new Set(list.map(e => e.date))).sort();
+                    const at = list[0].retention.releasedAt;
+                    const fmt = d => { const x = new Date(d + 'T12:00:00'); return `${x.getDate()}/${x.getMonth() + 1}`; };
+                    const range = days.length === 1 ? `1 día (${fmt(days[0])})` : `${days.length} días (${fmt(days[0])} al ${fmt(days[days.length - 1])})`;
+                    const when = at ? ' · liberada el ' + new Date(at).toLocaleString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+                    const ids = list.map(e => e.id).join(',');
+                    return `
+                        <div class="rh-item ${paid ? 'paid' : 'lost'}">
+                            <div class="rh-top"><span>${paid ? '✓ Me la pagaron' : '✕ No me la pagaron'}</span><b>${moneyExact(amount)}</b></div>
+                            <div class="rh-name">${nameOf(list[0].jobId)}</div>
+                            <div class="rh-meta">${range}${when}</div>
+                            <button type="button" class="rh-undo" onclick="undoRetentionRelease('${ids}')">Deshacer</button>
+                        </div>`;
+                }).join('');
+            }
+        }
+    }
+
+    strip.style.display = 'block';
+    strip.innerHTML = html;
 }
 
-// Liberar de una vez todas las retenciones de un trabajo
+// Ventana con varias respuestas (p. ej. "me la pagaron" / "no me la pagaron")
+function showChoiceModal(title, messageHtml, choices) {
+    const old = document.getElementById('choiceModal');
+    if (old) old.remove();
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay visible';
+    overlay.id = 'choiceModal';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    const close = () => overlay.remove();
+    overlay.addEventListener('click', ev => { if (ev.target === overlay) close(); });
+    overlay.innerHTML = `
+        <div class="modal">
+            <div class="modal-header"><h2>${escapeHtml(title)}</h2>
+                <button class="modal-close" aria-label="Cerrar">&times;</button></div>
+            <div class="modal-body"><p class="choice-msg">${messageHtml}</p><div class="choice-list"></div></div>
+            <div class="modal-footer"><button class="btn btn-secondary choice-cancel">Cancelar</button></div>
+        </div>`;
+    overlay.querySelector('.modal-close').onclick = close;
+    overlay.querySelector('.choice-cancel').onclick = close;
+    const listEl = overlay.querySelector('.choice-list');
+    choices.forEach(c => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn ' + (c.className || 'btn-primary');
+        b.textContent = c.label;
+        b.onclick = () => { close(); c.onClick(); };
+        listEl.appendChild(b);
+        if (c.help) { const h = document.createElement('div'); h.className = 'choice-help'; h.textContent = c.help; listEl.appendChild(h); }
+    });
+    document.body.appendChild(overlay);
+}
+
+async function resolveJobRetentions(afectados, status) {
+    const uid = currentUser.uid;
+    const updates = {};
+    afectados.forEach(e => {
+        const amount = retentionAmountRaw(e);
+        updates[`harvest/${uid}/${e.id}/retention/status`] = status;
+        updates[`harvest/${uid}/${e.id}/retention/releasedAt`] = Date.now();
+        addHistoryEvent(updates, uid, e.id, status === 'liberada'
+            ? `Retención liberada: me la pagaron (${moneyExact(amount)} vuelve al total)`
+            : `Retención liberada: no me la pagaron (se pierden ${moneyExact(amount)})`);
+    });
+    try {
+        await db.ref().update(updates);
+        showToast(status === 'liberada' ? 'Retención liberada: vuelve a tu total' : 'Retención marcada como no pagada');
+    } catch (error) {
+        showToast('No se pudo actualizar la retención', 'error');
+    }
+}
+
+// Liberar: se pregunta si te la pagaron o no
 function releaseJobRetentions(jobId) {
     const afectados = entries.filter(e => e.jobId === jobId && e.retention && e.retention.status === 'retenida');
     if (!afectados.length || !currentUser) return;
@@ -787,25 +950,34 @@ function releaseJobRetentions(jobId) {
     const total = afectados.reduce((sum, e) => sum + getEntryRetention(e).held, 0);
     const dias = new Set(afectados.map(e => e.date)).size;
 
-    showConfirmModal(
-        'Liberar retención',
-        `¿Te pagaron los $${total.toFixed(0)} retenidos en <strong>${escapeHtml(nombre)}</strong>? `
-        + `Se liberan ${dias === 1 ? 'el día retenido' : `los ${dias} días retenidos`} y el monto vuelve a tu total.`,
-        'Sí, me la pagaron',
-        async () => {
-            const updates = {};
-            afectados.forEach(e => {
-                updates[`harvest/${currentUser.uid}/${e.id}/retention/status`] = 'liberada';
-                updates[`harvest/${currentUser.uid}/${e.id}/retention/releasedAt`] = Date.now();
-            });
-            try {
-                await db.ref().update(updates);
-                showToast('Retención liberada: vuelve a tu total');
-            } catch (error) {
-                showToast('No se pudo liberar la retención', 'error');
-            }
+    showChoiceModal('Liberar retención',
+        `¿Te pagaron los ${moneyExact(total)} retenidos en <strong>${escapeHtml(nombre)}</strong> (${dias === 1 ? '1 día' : dias + ' días'})?`,
+        [
+            { label: '✓ Sí, me la pagaron', className: 'btn-primary', help: 'El monto vuelve a tu total.', onClick: () => resolveJobRetentions(afectados, 'liberada') },
+            { label: '✕ No me la pagaron', className: 'btn-danger', help: 'Se da por perdido; el descuento de esos registros se mantiene.', onClick: () => resolveJobRetentions(afectados, 'anulada') }
+        ]);
+}
+
+// Deshacer una liberacion del historial: vuelven a vigentes
+function undoRetentionRelease(idsCsv) {
+    const ids = idsCsv.split(',');
+    const afectados = entries.filter(e => ids.includes(e.id) && e.retention && e.retention.status !== 'retenida');
+    if (!afectados.length || !currentUser) return;
+    showConfirmModal('Deshacer liberación', 'Esa retención vuelve a estar vigente. Queda anotado en el historial de cada registro.', 'Deshacer', async () => {
+        const uid = currentUser.uid;
+        const updates = {};
+        afectados.forEach(e => {
+            updates[`harvest/${uid}/${e.id}/retention/status`] = 'retenida';
+            updates[`harvest/${uid}/${e.id}/retention/releasedAt`] = null;
+            addHistoryEvent(updates, uid, e.id, 'Retención vuelta a vigente (se deshizo la liberación)');
+        });
+        try {
+            await db.ref().update(updates);
+            showToast('Retención vigente de nuevo');
+        } catch (error) {
+            showToast('No se pudo deshacer', 'error');
         }
-    );
+    });
 }
 
 // --- Retención dentro del modal de registro ---
@@ -890,8 +1062,8 @@ function buildEntryRetentionHint() {
     const { amount, mode, total } = computeEntryRetentionPreview();
     const personas = Math.max(1, parseInt(document.getElementById('entryPeople').value, 10) || 1);
 
-    let hint = `Retiene $${amount.toFixed(0)} de este día`;
-    if (total > 0) hint += `, te quedan $${(total - amount).toFixed(0)}`;
+    let hint = `Retiene ${moneyExact(amount)} de este día`;
+    if (total > 0) hint += `, te quedan ${moneyExact(total - amount)}`;
     if (mode === 'price' && personas > 1) {
         hint += `. Es tu parte: el precio se divide entre las ${personas} personas del grupo`;
     }
@@ -922,10 +1094,17 @@ async function setEntryRetentionStatus(status, message) {
     if (!id || !currentUser) return;
 
     try {
-        await db.ref(`harvest/${currentUser.uid}/${id}/retention`).update({
-            status,
-            releasedAt: Date.now()
-        });
+        const uid = currentUser.uid;
+        const e = entries.find(x => x.id === id);
+        const updates = {
+            [`harvest/${uid}/${id}/retention/status`]: status,
+            [`harvest/${uid}/${id}/retention/releasedAt`]: Date.now()
+        };
+        const amount = retentionAmountRaw(e);
+        addHistoryEvent(updates, uid, id, status === 'liberada'
+            ? `Retención liberada: me la pagaron (${moneyExact(amount)} vuelve al total)`
+            : `Retención liberada: no me la pagaron (se pierden ${moneyExact(amount)})`);
+        await db.ref().update(updates);
         showToast(message);
         closeEntryModal();
     } catch (error) {
@@ -938,7 +1117,7 @@ function releaseEntryRetention() {
 }
 
 function voidEntryRetention() {
-    setEntryRetentionStatus('anulada', 'Retención anulada');
+    setEntryRetentionStatus('anulada', 'Retención marcada como no pagada');
 }
 
 // ============================================
@@ -976,6 +1155,12 @@ function openPaydayForDay() {
     openPaydayModal(date);
 }
 
+// Registros que paga un dia de pago: desde el dia de pago anterior (incluido) hasta el dia antes
+function getPaydayEntries(dateStr) {
+    const previous = Object.keys(paydays).filter(d => d < dateStr).sort().pop();
+    return entries.filter(e => e.date < dateStr && (!previous || e.date >= previous));
+}
+
 function openPaydayModal(dateStr) {
     if (!dateStr) return;
 
@@ -986,44 +1171,40 @@ function openPaydayModal(dateStr) {
     document.getElementById('paydayDate').value = dateStr;
     document.getElementById('paydayDateLabel').textContent = dateLabel;
 
-    if (existing) {
-        const auto = computeExpectedForPayday(dateStr);
-        // Si no llegaste a anotar el "deberías recibir", se propone el calculado
-        const anotado = existing.expected > 0;
+    // "Deberias recibir" es SIEMPRE la suma automatica del periodo: no se edita ni se guarda
+    const auto = computeExpectedForPayday(dateStr);
+    document.getElementById('paydayReceived').value = existing ? (existing.received || '') : '';
+    document.getElementById('paydayExpected').value = Math.round(auto.expected * 100) / 100;
+    document.getElementById('paydayExpectedShow').textContent = moneyExact(auto.expected);
+    document.getElementById('paydayNote').value = existing ? (existing.note || '') : '';
+    document.getElementById('paydayModalTitle').textContent = existing ? 'Editar Día de Pago' : 'Día de Pago';
+    document.getElementById('deletePaydayBtn').style.display = existing ? 'block' : 'none';
 
-        document.getElementById('paydayReceived').value = existing.received || '';
-        document.getElementById('paydayExpected').value = anotado
-            ? existing.expected
-            : (auto.expected ? auto.expected.toFixed(2) : '');
-        document.getElementById('paydayNote').value = existing.note || '';
-        document.getElementById('paydayModalTitle').textContent = 'Editar Día de Pago';
-        document.getElementById('deletePaydayBtn').style.display = 'block';
-        document.getElementById('paydayExpectedHint').textContent = anotado
-            ? 'Guardado tal como lo anotaste ese día.'
-            : 'Calculado de tus registros del periodo. Puedes corregirlo.';
-    } else {
-        const auto = computeExpectedForPayday(dateStr);
-        document.getElementById('paydayReceived').value = '';
-        document.getElementById('paydayExpected').value = auto.expected ? auto.expected.toFixed(2) : '';
-        document.getElementById('paydayNote').value = '';
-        document.getElementById('paydayModalTitle').textContent = 'Día de Pago';
-        document.getElementById('deletePaydayBtn').style.display = 'none';
+    const hasta = new Date(dateStr + 'T12:00:00');
+    hasta.setDate(hasta.getDate() - 1);
+    const hastaLabel = hasta.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+    const desde = auto.previous ? 'desde el día de pago anterior' : 'de todo lo pendiente';
+    const dias = auto.days === 1 ? '1 día trabajado' : `${auto.days} días trabajados`;
+    document.getElementById('paydayExpectedHint').textContent =
+        `Suma automática ${desde} hasta el ${hastaLabel} (${dias}), con descuentos restados y sin lo retenido.`;
 
-        const hasta = new Date(dateStr + 'T12:00:00');
-        hasta.setDate(hasta.getDate() - 1);
-        const hastaLabel = hasta.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
-
-        const desde = auto.previous
-            ? 'desde el día de pago anterior'
-            : 'de todo lo pendiente';
-        const dias = auto.days === 1 ? '1 día trabajado' : `${auto.days} días trabajados`;
-        document.getElementById('paydayExpectedHint').textContent =
-            `Calculado ${desde} hasta el ${hastaLabel}, el día antes de este: ${dias}, `
-            + 'ya con descuentos restados y sin lo retenido. Puedes corregirlo.';
-    }
+    // "Ya me pagaron": marca de una vez los registros pendientes del periodo
+    const pending = getPaydayEntries(dateStr).filter(e => !e.paid).length;
+    const box = document.getElementById('paydayPaidBox');
+    document.getElementById('paydayMarkPaid').checked = false;
+    box.style.display = pending > 0 ? 'flex' : 'none';
+    document.getElementById('paydayPendingCount').textContent =
+        `Marca como pagados los ${pending} registros pendientes del período`;
 
     updatePaydayDiff();
     openModal('paydayModal');
+}
+
+function onPaydayMarkPaid() {
+    const checked = document.getElementById('paydayMarkPaid').checked;
+    const received = document.getElementById('paydayReceived');
+    if (checked && !received.value) received.value = document.getElementById('paydayExpected').value;
+    updatePaydayDiff();
 }
 
 function closePaydayModal() {
@@ -1066,11 +1247,12 @@ async function savePayday() {
     // Marcar el día no obliga a anotar nada: el monto se puede poner después,
     // o nunca. La celda del calendario muestra el líquido del periodo igual.
     const received = parseFloat(document.getElementById('paydayReceived').value);
-    const expected = parseFloat(document.getElementById('paydayExpected').value);
+    const markPaid = document.getElementById('paydayMarkPaid').checked;
 
+    // Nunca se guarda un "deberias recibir": siempre se calcula en vivo
     const data = {
         received: (isNaN(received) || received < 0) ? null : received,
-        expected: (isNaN(expected) || expected < 0) ? null : expected,
+        expected: null,
         note: document.getElementById('paydayNote').value.trim(),
         updatedAt: Date.now()
     };
@@ -1078,7 +1260,16 @@ async function savePayday() {
 
     try {
         await db.ref(userPath(`paydays/${date}`)).update(data);
-        showToast('Día de pago guardado');
+        if (markPaid) {
+            const uid = currentUser.uid;
+            const updates = {};
+            getPaydayEntries(date).filter(e => !e.paid).forEach(e => {
+                updates[`harvest/${uid}/${e.id}/paid`] = true;
+                addHistoryEvent(updates, uid, e.id, 'Marcado como pagado (día de pago)');
+            });
+            if (Object.keys(updates).length) await db.ref().update(updates);
+        }
+        showToast(markPaid ? 'Día de pago guardado y período marcado como pagado' : 'Día de pago guardado');
         closePaydayModal();
     } catch (error) {
         showToast('No se pudo guardar el día de pago', 'error');
@@ -1154,7 +1345,7 @@ function setGrossSub(gross) {
         el.style.display = 'none';
         el.textContent = '';
     } else {
-        el.textContent = 'Bruto $' + gross.toFixed(0);
+        el.textContent = 'Bruto ' + moneyExact(gross);
         el.style.display = 'block';
     }
 }
@@ -1646,6 +1837,7 @@ function openEntryModal(entryId = null, preselectedJobId = null) {
     entryPaid = false;
     updateEntryPaidUI();
     document.getElementById('deleteEntryBtn').style.display = 'none';
+    renderEntryHistory(null);
     document.getElementById('entryModalTitle').textContent = 'Nuevo Registro';
 
     if (entryId) {
@@ -1662,6 +1854,7 @@ function openEntryModal(entryId = null, preselectedJobId = null) {
             entryPaid = entry.paid || false;
             updateEntryPaidUI();
             document.getElementById('deleteEntryBtn').style.display = 'block';
+            renderEntryHistory(entries.find(x => x.id === entryId) || null);
             document.getElementById('entryModalTitle').textContent = 'Editar Registro';
         }
     }
@@ -1708,14 +1901,21 @@ let jobPickerQuery = '';
 function computeUsageStats() {
     const byProduct = {};
     const byCategory = {};
+    const lastByJob = {};
+    const lastByProduct = {};
     entries.forEach(e => {
         const jd = getEntryJobData(e);
         if (!jd.product) return;
         byProduct[normalizeName(jd.product)] = (byProduct[normalizeName(jd.product)] || 0) + 1;
         const catId = inferJobCategory({ product: jd.product, category: jd.category });
         byCategory[catId] = (byCategory[catId] || 0) + 1;
+        // Ultimo uso: fecha del registro y, si empatan, el que se creo despues
+        const key = (e.date || '') + '|' + String(e.createdAt || 0).padStart(15, '0');
+        if (e.jobId && (!lastByJob[e.jobId] || key > lastByJob[e.jobId])) lastByJob[e.jobId] = key;
+        const pk = normalizeName(jd.product);
+        if (!lastByProduct[pk] || key > lastByProduct[pk]) lastByProduct[pk] = key;
     });
-    return { byProduct, byCategory };
+    return { byProduct, byCategory, lastByJob, lastByProduct };
 }
 
 function toggleJobPicker(event) {
@@ -1785,9 +1985,13 @@ function buildPickerItems() {
     return items;
 }
 
-// Orden: más usado primero, luego alfabético
+// Orden: lo usado más recientemente primero, luego lo más usado, luego alfabético
 function sortPickerItems(items, byProduct) {
+    const lastByProduct = computeUsageStats().lastByProduct;
     return items.sort((a, b) => {
+        const la = lastByProduct[normalizeName(a.name)] || '';
+        const lb = lastByProduct[normalizeName(b.name)] || '';
+        if (la !== lb) return la > lb ? -1 : 1;
         const ua = byProduct[normalizeName(a.name)] || 0;
         const ub = byProduct[normalizeName(b.name)] || 0;
         if (ua !== ub) return ub - ua;
@@ -1858,6 +2062,20 @@ function renderJobPicker() {
     }
 
     let html = '';
+
+    // Usados recientemente: los últimos 5 trabajos, del más nuevo al más viejo
+    const { lastByJob } = computeUsageStats();
+    const recent = jobs.filter(j => lastByJob[j.id])
+        .sort((a, b) => (lastByJob[b.id] > lastByJob[a.id] ? 1 : -1))
+        .slice(0, 5);
+    if (recent.length > 0) {
+        html += '<div class="jp-section-title">🕓 Usados recientemente</div>';
+        recent.forEach(j => {
+            const catId = getJobCategory(j);
+            html += jpItemHtml({ kind: 'job', catId, name: j.product || '', emoji: getTaskEmoji(j.product, catId), job: j }, true);
+        });
+        html += '<div class="jp-section-title">Todas las tareas</div>';
+    }
 
     // "Trabajo al Día" fijo como primera opción (único, sin desplegable)
     const diaCat = getCategoryById('dia');
@@ -2235,21 +2453,24 @@ function getEntryModalDate() {
 // no lo cobra de nuevo); si no, se propone según el día de la semana.
 function syncEntryDeductionUI() {
     const date = getEntryModalDate();
-    const saved = dayDeductions[date];
     const valueInput = document.getElementById('entryDeductionValue');
+    const editingId = document.getElementById('entryId').value;
+    const editing = editingId ? entries.find(e => e.id === editingId) : null;
 
-    if (saved) {
-        entryDeductionOn = !!saved.applied;
-        entryDeductionMode = saved.mode === 'percent' ? 'percent' : 'amount';
-        valueInput.value = (saved.value !== undefined && saved.value !== null)
-            ? saved.value
-            : deductionDefault.value;
+    if (editing && editing.deduction) {
+        // Registro con su propio descuento
+        entryDeductionOn = !!editing.deduction.applied;
+        entryDeductionMode = editing.deduction.mode === 'percent' ? 'percent' : 'amount';
+        valueInput.value = editing.deduction.value ?? deductionDefault.value;
+    } else if (editing) {
+        // Registro antiguo: lleva descuento solo si era el que cargaba el del dia
+        const amount = getEntryDeduction(editing);
+        entryDeductionOn = amount > 0.005;
+        entryDeductionMode = 'amount';
+        valueInput.value = amount > 0.005 ? amount : deductionDefault.value;
     } else {
-        // Un registro que ya existe y no tiene descuento guardado se queda como
-        // está: no se le inventa uno. La propuesta de lunes a viernes es solo
-        // para registros nuevos.
-        const isEditing = !!document.getElementById('entryId').value;
-        entryDeductionOn = !isEditing && isWeekdayDate(date);
+        // Nuevo: lo lleva si es dia habil y ningun otro registro del dia ya lo lleva
+        entryDeductionOn = isWeekdayDate(date) && !hasDayDeduction(date);
         entryDeductionMode = deductionDefault.mode;
         valueInput.value = deductionDefault.value;
     }
@@ -2283,25 +2504,23 @@ function getProjectedDayGross() {
     return others + shown;
 }
 
+function getModalEntryTotal() {
+    // El total se pinta como "$72000.00" (punto decimal)
+    return parseFloat((document.getElementById('entryTotal').textContent || '').replace(/[^\d.-]/g, '')) || 0;
+}
+
 function buildDeductionHint() {
     const value = Math.max(0, parseFloat(document.getElementById('entryDeductionValue').value) || 0);
-    let hint;
-
-    if (entryDeductionMode === 'percent') {
-        const amount = Math.min(getProjectedDayGross() * value / 100, getProjectedDayGross());
-        hint = `${value}% del día ≈ $${amount.toFixed(0)}`;
-    } else {
-        hint = `$${value.toFixed(0)} fijo (AFP + comida)`;
-    }
-
-    hint += ' · se descuenta una sola vez en el día';
+    const total = getModalEntryTotal();
+    const amount = deductionAmountOf({ applied: true, mode: entryDeductionMode, value }, total);
+    let hint = `Solo en este registro · se descuentan ${moneyExact(amount)}`;
+    if (total > 0) hint += `, te quedan ${moneyExact(Math.max(0, total - amount))}`;
 
     const date = getEntryModalDate();
     const editingId = document.getElementById('entryId').value;
-    if (entries.some(e => e.date === date && e.id !== editingId)) {
-        hint += ', que ya tiene otro registro';
-    }
-
+    const others = entries.filter(e => e.date === date && e.id !== editingId && getEntryDeduction(e) > 0.005).length;
+    if (others === 1) hint += ' · otro registro del día ya lleva descuento';
+    else if (others > 1) hint += ` · otros ${others} registros del día ya llevan descuento`;
     return hint;
 }
 
@@ -2323,18 +2542,26 @@ function onEntryDateChange() {
     syncEntryDeductionUI();
 }
 
-// Guarda el descuento de la fecha y recuerda el monto para los próximos
-// registros. Se llama después de guardar el registro: si esto falla, el
-// registro ya quedó guardado igual.
+// Registros antiguos del dia (sin descuento propio): se les escribe el que les
+// toca hoy, para que al editar o borrar otro registro del dia nadie gane ni
+// pierda un descuento.
+function fixLegacyDeductions(list, updates, uid) {
+    list.filter(e => !e.deduction).forEach(e => {
+        const amount = getEntryDeduction(e);
+        updates[`harvest/${uid}/${e.id}/deduction`] = { applied: amount > 0.005, mode: 'amount', value: amount };
+    });
+}
+
+// Total de descuentos del dia: se sigue guardando por dia (users/<uid>/deductions)
+function dayDeductionTotal(updates, uid, date, total) {
+    updates[`users/${uid}/deductions/${date}`] = {
+        applied: total > 0.005, mode: 'amount', value: total, updatedAt: Date.now()
+    };
+}
+
+// Recuerda el monto para los proximos registros
 async function persistDayDeduction(date, payload) {
     if (!currentUser || !date) return;
-
-    try {
-        await db.ref(userPath(`deductions/${date}`)).update(payload);
-    } catch (error) {
-        showToast('Registro guardado, pero el descuento no se pudo guardar', 'error');
-        return;
-    }
 
     if (payload.applied && (payload.value !== deductionDefault.value || payload.mode !== deductionDefault.mode)) {
         try {
@@ -2345,6 +2572,31 @@ async function persistDayDeduction(date, payload) {
             // Es solo la preferencia para el próximo registro: no vale un error visible
         }
     }
+}
+
+function describeEntryChanges(old, data) {
+    if (!old) return [];
+    const out = [];
+    const fmtDate = d => new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+    if (old.date !== data.date) out.push(`Fecha ${fmtDate(old.date)} → ${fmtDate(data.date)}`);
+    const oldProduct = (old.snapshot && old.snapshot.product) || '';
+    const newProduct = (data.snapshot && data.snapshot.product) || '';
+    if (oldProduct !== newProduct) out.push(`Trabajo ${oldProduct || '—'} → ${newProduct || '—'}`);
+    if (data.quantity !== undefined && (old.quantity || 0) !== (data.quantity || 0)) out.push(`Cantidad ${old.quantity || 0} → ${data.quantity || 0}`);
+    if (data.hours !== undefined && (old.hours || null) !== (data.hours || null)) out.push(`Horas ${old.hours || '—'} → ${data.hours || '—'}`);
+    if (data.people !== undefined && (old.people || 1) !== (data.people || 1)) out.push(`Personas ${old.people || 1} → ${data.people || 1}`);
+    if (Math.abs((old.total || 0) - (data.total || 0)) > 0.004) out.push(`Total ${moneyExact(old.total || 0)} → ${moneyExact(data.total || 0)}`);
+    if (!!old.paid !== !!data.paid) out.push(data.paid ? 'Marcado como pagado' : 'Marcado como pendiente');
+    if ((old.notes || '').trim() !== (data.notes || '').trim()) out.push((data.notes || '').trim() ? `Nota: "${data.notes.trim()}"` : 'Nota borrada');
+    const oldDed = getEntryDeduction(old);
+    const newDed = deductionAmountOf(data.deduction, data.total || 0);
+    if (Math.abs(oldDed - newDed) > 0.004) {
+        out.push(newDed <= 0.004 ? `Descuento quitado (era ${moneyExact(oldDed)})`
+            : oldDed <= 0.004 ? `Descuento de ${moneyExact(newDed)}` : `Descuento ${moneyExact(oldDed)} → ${moneyExact(newDed)}`);
+    }
+    if (!old.retention && data.retention) out.push('Retención agregada');
+    else if (old.retention && !data.retention) out.push('Retención quitada');
+    return out;
 }
 
 async function saveEntry() {
@@ -2472,13 +2724,34 @@ async function saveEntry() {
         updatedAt: Date.now()
     };
 
+    // Descuento: va en el propio registro (cada uno decide el suyo)
+    data.deduction = { applied: deductionPayload.applied, mode: deductionPayload.mode, value: deductionPayload.value };
+
     try {
+        const uid = currentUser.uid;
+        const updates = {};
+        const entryId = id || db.ref(`harvest/${uid}`).push().key;
+        const previous = id ? entries.find(e => e.id === id) : null;
         if (id) {
-            await db.ref(`harvest/${currentUser.uid}/${id}`).update(data);
+            Object.keys(data).forEach(k => { updates[`harvest/${uid}/${id}/${k}`] = data[k]; });
+            const changes = describeEntryChanges(previous, data);
+            if (changes.length) addHistoryEvent(updates, uid, id, 'Editado: ' + changes.join(' · '));
         } else {
             data.createdAt = Date.now();
-            await db.ref(`harvest/${currentUser.uid}`).push(data);
+            data.history = { [db.ref().push().key]: { at: Date.now(), text: 'Registrado' } };
+            updates[`harvest/${uid}/${entryId}`] = data;
         }
+        // Los demas registros del dia y el total del dia
+        const sameDay = entries.filter(e => e.date === date && e.id !== entryId);
+        fixLegacyDeductions(sameDay, updates, uid);
+        dayDeductionTotal(updates, uid, date,
+            sameDay.reduce((s, e) => s + getEntryDeduction(e), 0) + deductionAmountOf(data.deduction, data.total));
+        if (previous && previous.date !== date) {
+            const rest = entries.filter(e => e.date === previous.date && e.id !== entryId);
+            fixLegacyDeductions(rest, updates, uid);
+            dayDeductionTotal(updates, uid, previous.date, rest.reduce((s, e) => s + getEntryDeduction(e), 0));
+        }
+        await db.ref().update(updates);
         showToast('Registro guardado');
         await persistDayDeduction(date, deductionPayload);
         closeEntryModal();
@@ -2487,13 +2760,42 @@ async function saveEntry() {
     }
 }
 
+// Cuando se registro, la ultima edicion y todos sus cambios (del mas nuevo al mas viejo)
+function renderEntryHistory(entry) {
+    const box = document.getElementById('entryHistory');
+    if (!box) return;
+    if (!entry) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    const fmt = ms => new Date(ms).toLocaleString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const events = Object.values(entry.history || {}).filter(h => h && h.at).sort((a, b) => b.at - a.at);
+    let html = `<div class="eh-title">🕓 Historial</div>`;
+    html += `<div class="eh-line">${entry.createdAt ? 'Registrado el ' + fmt(entry.createdAt) : 'Registrado antes de que se guardara la hora'}</div>`;
+    if (entry.updatedAt && (!entry.createdAt || entry.updatedAt - entry.createdAt > 60000)) html += `<div class="eh-sub">Última edición: ${fmt(entry.updatedAt)}</div>`;
+    if (!events.length) {
+        html += `<div class="eh-sub">Sin cambios anotados todavía. Desde ahora cada edición, pago y retención queda aquí.</div>`;
+    } else {
+        html += `<details class="eh-details"><summary>Ver ${events.length} ${events.length === 1 ? 'cambio' : 'cambios'}</summary>` +
+            events.map(ev => `<div class="eh-item"><div>${escapeHtml(ev.text || '')}</div><div class="eh-sub">${fmt(ev.at)}</div></div>`).join('') +
+            `</details>`;
+    }
+    box.innerHTML = html;
+    box.style.display = 'block';
+}
+
 async function deleteEntry() {
     const id = document.getElementById('entryId').value;
     if (!id || !currentUser) return;
 
     showConfirmModal('Eliminar registro', '¿Eliminar este registro?', 'Eliminar', async () => {
         try {
-            await db.ref(`harvest/${currentUser.uid}/${id}`).remove();
+            const uid = currentUser.uid;
+            const entry = entries.find(e => e.id === id);
+            const updates = { [`harvest/${uid}/${id}`]: null };
+            if (entry) {
+                const rest = entries.filter(e => e.date === entry.date && e.id !== id);
+                fixLegacyDeductions(rest, updates, uid);
+                dayDeductionTotal(updates, uid, entry.date, rest.reduce((s, e) => s + getEntryDeduction(e), 0));
+            }
+            await db.ref().update(updates);
             showToast('Registro eliminado');
             closeEntryModal();
         } catch (error) {
@@ -2773,8 +3075,8 @@ function showAcTooltip(ev, dateStr, info) {
     const dateLabel = d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
 
     if (info && info.total > 0) {
-        let html = `<span class="ac-tooltip-amount">$${info.total.toFixed(0)}</span>`;
-        if (info.pending > 0) html += ` <span class="ac-tooltip-pending">(pend: $${info.pending.toFixed(0)})</span>`;
+        let html = `<span class="ac-tooltip-amount">${moneyExact(info.total)}</span>`;
+        if (info.pending > 0) html += ` <span class="ac-tooltip-pending">(pend: ${moneyExact(info.pending)})</span>`;
         if (info.allPaid) html += ' <span class="ac-tooltip-paid">&#10003;</span>';
         html += `<div class="ac-tooltip-date">${dateLabel}</div>`;
         tip.innerHTML = html;
@@ -2897,13 +3199,13 @@ function renderCalendar() {
         // En la celda va el líquido que sale de sumar los registros del periodo.
         // Lo que anotaste (recibido y deberías recibir) se ve al abrir el día.
         const paydayHtml = payday
-            ? `<span class="day-payday">$${computeExpectedForPayday(dateStr).expected.toFixed(0)}</span>`
+            ? `<span class="day-payday">${moneyCell(computeExpectedForPayday(dateStr).expected)}</span>`
             : '';
 
         day.innerHTML = `
             <span class="day-number">${i}</span>
             ${dayEntries.length > 0 ? `<span class="day-entries-count">${dayEntries.length} reg</span>` : ''}
-            ${dayTotal > 0 ? `<span class="day-amount">$${dayTotal.toFixed(0)}</span>` : ''}
+            ${dayTotal > 0 ? `<span class="day-amount">${moneyCell(dayTotal)}</span>` : ''}
             ${truncatedNotes ? `<span class="day-notes">${escapeHtml(truncatedNotes)}</span>` : ''}
             ${paydayHtml}
         `;
@@ -3153,6 +3455,7 @@ async function markSelectionAs(paid) {
         const updates = {};
         selected.forEach(e => {
             updates[`harvest/${currentUser.uid}/${e.id}/paid`] = paid;
+            if (!!e.paid !== !!paid) addHistoryEvent(updates, currentUser.uid, e.id, paid ? 'Marcado como pagado' : 'Marcado como pendiente');
         });
 
         await db.ref().update(updates);

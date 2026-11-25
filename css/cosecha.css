@@ -4225,3 +4225,128 @@ body.boss-mode .boss-only-tab {
         transition-duration: 0.01ms !important;
     }
 }
+
+/* Selector de trabajo: secciones "Usados recientemente" / "Todas las tareas" */
+.jp-section-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-3);
+    padding: 10px 12px 4px;
+    letter-spacing: .3px;
+}
+
+/* ==========================================
+   TEMA PETRÓLEO + DORADO (igual que la app)
+   Petróleo = marca y lo pagado · dorado = pendiente y día de pago · lila = retenciones
+   ========================================== */
+:root {
+    --bg: #08100F;
+    --bg-grad: linear-gradient(180deg, #08100F 0%, #0A1413 100%);
+    --surface: #132321;
+    --surface-2: #1C2E2B;
+    --surface-3: #0D1918;
+    --header-bg: #0A3B37;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.16);
+    --text: #ECF4F2;
+    --text-2: #9AB0AC;
+    --text-3: #6F8783;
+    --green: #6DB5AB;
+    --green-rgb: 109, 181, 171;
+    --green-soft: rgba(79, 156, 147, 0.14);
+    --green-line: rgba(79, 156, 147, 0.45);
+    --amber: #F2C15C;
+    --amber-rgb: 242, 193, 92;
+    --amber-soft: rgba(231, 174, 62, 0.16);
+    --amber-line: rgba(231, 174, 62, 0.5);
+    --hold: #C4B5FD;
+    --hold-soft: rgba(196, 181, 253, 0.12);
+    --hold-line: rgba(196, 181, 253, 0.55);
+    --payday-ring: #B57F14;
+    --payday-glow: rgba(181, 127, 20, 0.35);
+    --btn-primary-bg: linear-gradient(120deg, #0F5A53, #4E9C93);
+    --btn-primary-text: #FFFFFF;
+    --btn-primary-shadow: rgba(15, 90, 83, 0.35);
+    --harvest-stripe: linear-gradient(90deg, #0F5A53 0%, #4E9C93 55%, #E7AE3E 100%);
+    --ac-paid-rgb: 79, 156, 147;
+    --ac-pending-rgb: 231, 174, 62;
+    --ac-outline: rgba(79, 156, 147, 0.85);
+}
+[data-theme="light"] {
+    --bg: #EBF1EF;
+    --bg-grad: linear-gradient(180deg, #EBF1EF 0%, #E4ECE9 100%);
+    --surface: #FFFFFF;
+    --surface-2: #EEF4F2;
+    --surface-3: #F7FAF9;
+    --header-bg: #0D5953;
+    --border: rgba(16, 35, 31, 0.10);
+    --border-strong: rgba(16, 35, 31, 0.22);
+    --text: #10231F;
+    --text-2: #526863;
+    --text-3: #7A908B;
+    --green: #2F7F76;
+    --green-rgb: 47, 127, 118;
+    --green-soft: rgba(47, 127, 118, 0.10);
+    --green-line: rgba(47, 127, 118, 0.38);
+    --amber: #8A5A00;
+    --amber-rgb: 138, 90, 0;
+    --amber-soft: rgba(235, 179, 69, 0.20);
+    --amber-line: rgba(181, 127, 20, 0.45);
+    --hold: #6D4FC4;
+    --hold-soft: rgba(109, 79, 196, 0.10);
+    --hold-line: rgba(109, 79, 196, 0.50);
+    --payday-ring: #B57F14;
+    --payday-glow: rgba(181, 127, 20, 0.25);
+    --btn-primary-bg: linear-gradient(120deg, #0D5953, #2F7F76);
+    --btn-primary-text: #FFFFFF;
+    --btn-primary-shadow: rgba(13, 89, 83, 0.30);
+    --harvest-stripe: linear-gradient(90deg, #0D5953 0%, #2F7F76 55%, #EBB345 100%);
+    --ac-paid-rgb: 47, 127, 118;
+    --ac-pending-rgb: 217, 160, 48;
+    --ac-outline: rgba(13, 89, 83, 0.85);
+}
+/* Barra superior petróleo en ambos temas, con texto blanco */
+.header { background: var(--header-bg); }
+.header h1, body.boss-mode .header h1 { color: #FFFFFF; }
+/* Pestaña elegida y día de pago más marcados */
+.tab.active { color: var(--green); }
+.calendar-day.is-payday { border-width: 3px; border-color: var(--payday-ring); }
+
+
+/* Retenciones: tarjeta cerrada al final, con historial */
+.retentions-strip { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 10px 14px; margin-top: 16px; }
+.rs-header { width: 100%; display: flex; align-items: center; gap: 10px; background: none; border: 0; color: var(--text); cursor: pointer; padding: 6px 0; font: inherit; text-align: left; }
+.rs-title { font-weight: 700; color: var(--hold); font-size: 16px; }
+.rs-summary { flex: 1; color: var(--text-2); font-size: 13px; }
+.rs-caret { color: var(--text-2); }
+.retentions-strip .retention-chip { margin-top: 8px; }
+.rs-history-toggle { width: 100%; margin-top: 12px; background: none; border: 0; color: var(--text); font: inherit; font-weight: 600; text-align: left; cursor: pointer; padding: 6px 0; }
+.rh-item { border-radius: 12px; padding: 10px 12px; margin-top: 8px; border: 1px solid; }
+.rh-item.paid { border-color: var(--green-line); background: var(--green-soft); }
+.rh-item.lost { border-color: var(--red-line); background: var(--red-soft); }
+.rh-top { display: flex; justify-content: space-between; font-weight: 700; }
+.rh-item.paid .rh-top { color: var(--green); } .rh-item.lost .rh-top { color: var(--red); }
+.rh-name { font-size: 14px; margin-top: 2px; }
+.rh-meta { font-size: 12px; color: var(--text-2); }
+.rh-undo { display: block; margin-left: auto; margin-top: 4px; background: none; border: 0; color: var(--text-2); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+
+/* Ventana con dos respuestas */
+.choice-msg { margin-bottom: 12px; line-height: 1.45; }
+.choice-list { display: flex; flex-direction: column; gap: 6px; }
+.choice-list .btn { width: 100%; }
+.choice-help { font-size: 12px; color: var(--text-2); margin-bottom: 8px; }
+
+/* Dia de pago: suma automatica y "Ya me pagaron" */
+.payday-expected-show { font-size: 26px; font-weight: 800; color: var(--green); padding: 6px 0; }
+.payday-paid { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 14px; border-radius: 12px;
+    border: 1px solid var(--green-line); background: var(--green-soft); cursor: pointer; font-size: 13px; color: var(--text-2); }
+.payday-paid b { color: var(--text); font-size: 15px; }
+.payday-paid input { width: 20px; height: 20px; accent-color: var(--green); }
+
+/* Historial del registro */
+.entry-history { margin: 0 20px 12px; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
+.eh-title { font-weight: 700; margin-bottom: 4px; }
+.eh-line { font-size: 14px; }
+.eh-sub { font-size: 12px; color: var(--text-2); }
+.eh-details summary { cursor: pointer; color: var(--green); font-weight: 600; font-size: 14px; margin-top: 6px; }
+.eh-item { padding: 6px 0 6px 10px; border-left: 2px solid var(--green-line); margin-top: 6px; font-size: 14px; }
